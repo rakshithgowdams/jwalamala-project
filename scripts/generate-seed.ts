@@ -1,0 +1,9 @@
+import {writeFile} from "node:fs/promises";
+import {categories,demoPosts,demoEvents} from "../src/lib/data/demo";
+const quote=(v:string|null)=>v===null?"null":"'"+v.replaceAll("'","''")+"'";
+const uuid=(n:number)=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
+const sql=["-- Development fixtures only. Every row is marked is_seed.\nbegin;"];
+for(const[cIndex,c]of categories.entries())sql.push(`insert into public.categories(id,slug,name_kn,name_en,sort_order,is_seed) values('${uuid(cIndex+1)}',${quote("seed-"+c.slug)},${quote(c.name_kn)},${quote(c.name_en)},${cIndex},true) on conflict(id) do nothing;`);
+for(const[i,e]of demoEvents.entries())sql.push(`insert into public.events(id,slug,name_kn,name_en,start_date,end_date,place,district,organiser,description_kn,is_seed) values('${uuid(100+i)}',${[e.slug,e.name_kn,e.name_en,e.start_date,e.end_date,e.place,e.district,e.organiser,e.description_kn].map(quote).join(",")},true) on conflict(id) do nothing;`);
+for(const[i,p]of demoPosts.entries()){sql.push(`insert into public.posts(id,slug,title_kn,title_en,title_translit,summary_kn,body_html,event_date,event_place,published_at,type,status,thumbnail_url,is_seed) values('${uuid(1000+i)}',${[p.slug,p.title_kn,p.title_en,p.title_translit,p.summary_kn,p.body_html,p.event_date,p.event_place,p.published_at,p.type,p.status,p.thumbnail_url].map(quote).join(",")},true) on conflict(id) do nothing;`);for(const[ci,slug]of [...new Set(p.category_slugs)].entries()){const index=categories.findIndex(c=>c.slug===slug);sql.push(`insert into public.post_categories(post_id,category_id,is_primary) values('${uuid(1000+i)}','${uuid(index+1)}',${ci===0}) on conflict(post_id,category_id) do nothing;`);}}
+sql.push("commit;");await writeFile("supabase/seed.sql",sql.join("\n"),"utf8");console.log("Wrote 12 categories, 20 posts, and 5 events. No database modified.");

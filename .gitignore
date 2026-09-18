@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.tools/
+.cache/
+test-results/
+playwright-report/
+public/sw.js*
+public/swe-worker*
+*.tsbuildinfo
+docs/data/
+
+.tmp/

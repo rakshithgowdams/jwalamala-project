@@ -1,0 +1,15 @@
+create table public.calendar_reminders(user_id uuid references public.profiles(id) on delete cascade,day_id uuid references public.jain_calendar_days(id) on delete cascade,created_at timestamptz not null default now(),primary key(user_id,day_id));
+alter table public.calendar_reminders enable row level security;create policy own_reminders on public.calendar_reminders for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());grant select,insert,delete on public.calendar_reminders to authenticated;grant all on public.calendar_reminders to service_role;
+alter table public.push_campaigns alter column post_id drop not null;
+alter table public.push_campaigns add column target_path text;
+alter table public.push_campaigns add column reminder_key text unique;
+alter table public.push_campaigns add column source_id uuid;
+alter table public.push_campaigns add constraint push_target_required check(post_id is not null or (target_path like '/%' and target_path not like '//%' and reminder_key is not null));
+create function public.queue_due_reminders() returns integer language plpgsql security definer set search_path='' as $$declare item record;campaign uuid;added integer:=0;day date:=(now() at time zone 'Asia/Kolkata')::date;begin
+if not exists(select 1 from public.provider_settings where id='push' and enabled) or extract(hour from now() at time zone 'Asia/Kolkata')<7 then return 0;end if;
+for item in select id,name_kn title,start_date date,'events' topic,'/events/'||slug path from public.events where not is_seed and start_date between day and day+1 union all select id,title_kn,date,'parva','/jain-calendar' from public.jain_calendar_days where not is_seed and date between day and day+1 loop
+insert into public.push_campaigns(topic,title,body,target_path,reminder_key,source_id) values(item.topic,left(item.title,110),item.date::text,item.path,item.topic||':'||item.id||':'||item.date,item.id) on conflict(reminder_key) do update set title=excluded.title,body=excluded.body,target_path=excluded.target_path returning id into campaign;
+insert into public.push_deliveries(campaign_id,subscription_id,user_id) select campaign,s.id,s.user_id from public.push_subscriptions s join public.push_preferences p on p.user_id=s.user_id where p.enabled and item.topic=any(p.topics) and ((item.topic='events' and exists(select 1 from public.event_reminders r where r.user_id=s.user_id and r.event_id=item.id and r.channel='push')) or (item.topic='parva' and exists(select 1 from public.calendar_reminders r where r.user_id=s.user_id and r.day_id=item.id))) on conflict(campaign_id,subscription_id) do nothing;
+insert into public.automation_jobs(kind,payload) select 'push-delivery',jsonb_build_object('delivery_id',d.id) from public.push_deliveries d where d.campaign_id=campaign and d.status='pending' on conflict do nothing;added:=added+1;
+end loop;return added;end;$$;
+revoke all on function public.queue_due_reminders() from public,anon,authenticated;grant execute on function public.queue_due_reminders() to service_role;

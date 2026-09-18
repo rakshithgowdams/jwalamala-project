@@ -1,0 +1,4 @@
+create table public.editor_recovery(user_id uuid not null references public.profiles(id) on delete cascade,draft_key text not null check(char_length(draft_key)<=100),post_id uuid references public.posts(id) on delete cascade,snapshot jsonb not null check(octet_length(snapshot::text)<=300000),updated_at timestamptz not null default now(),primary key(user_id,draft_key));
+alter table public.editor_recovery enable row level security;
+create policy own_recovery on public.editor_recovery for all to authenticated using(user_id=auth.uid() and public.has_permission('admin.access')) with check(user_id=auth.uid() and (public.has_permission('content.create') or public.has_permission('content.edit')) and (post_id is null or public.can_edit_post(post_id)));
+grant select,insert,update,delete on public.editor_recovery to authenticated;grant all on public.editor_recovery to service_role;

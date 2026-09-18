@@ -1,0 +1,16 @@
+import {createClient} from "npm:@supabase/supabase-js@2";
+import {z} from "npm:zod@4";
+const origin=Deno.env.get("SITE_URL")||"http://localhost:3000";
+const headers={"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
+const schema=z.object({name:z.string().trim().min(2).max(100),phone:z.string().regex(/^\+?[0-9\s-]{10,16}$/),town:z.string().trim().min(2).max(100),email:z.email().or(z.literal("")).optional(),event_date:z.iso.date(),link:z.string().max(2000),message:z.string().min(20).max(5000),token:z.string().min(1)});
+Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response(null,{headers});if(req.method!=="POST")return new Response(null,{status:405,headers});
+ const reply=(value:unknown,status:number)=>new Response(JSON.stringify(value),{status,headers});
+ try{const raw=await req.text();if(raw.length>15000)return reply({error:"Too large"},413);const parsed=schema.safeParse(JSON.parse(raw));if(!parsed.success)return reply({error:"Invalid input"},400);
+ const secret=Deno.env.get("TURNSTILE_SECRET_KEY"),salt=Deno.env.get("IP_HASH_SECRET");if(!secret||!salt)return reply({error:"Service unavailable"},503);
+ const token=parsed.data.token;const verify=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",body:new URLSearchParams({secret,response:token})}).then(r=>r.json());if(!verify.success||verify.hostname!==new URL(origin).hostname)return reply({error:"Verification failed"},403);
+ const ip=req.headers.get("x-forwarded-for")?.split(",")[0].trim();if(!ip)return reply({error:"Client address unavailable"},400);
+ const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(salt+ip));const hash=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("");
+ const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+ const{data:allowed,error:limitError}=await db.rpc("consume_rate_limit",{p_key:"submission:"+hash,p_max:5,p_seconds:3600});if(limitError)return reply({error:"Unavailable"},503);if(!allowed)return reply({error:"Rate limit"},429);
+ const{token:_token,...record}=parsed.data;const{error}=await db.from("submissions").insert({...record,ip_hash:hash,status:"new"});return error?reply({error:"Unable to save"},503):reply({ok:true},201);
+ }catch{return reply({error:"Invalid request"},400);}});
