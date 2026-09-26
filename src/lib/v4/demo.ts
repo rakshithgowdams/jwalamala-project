@@ -45,6 +45,51 @@ const englishDistrict = (slug: string) =>
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+// District headquarters and town centres. Every place the weather picker offers
+// needs coordinates, because the provider is queried by lat/lng and a place
+// without them can only ever render "no weather".
+const coordinates: Record<string, [number, number]> = {
+  bagalkote: [16.1725, 75.656],
+  ballari: [15.1394, 76.9214],
+  belagavi: [15.8497, 74.4977],
+  "bengaluru-urban": [12.97194, 77.59369],
+  "bengaluru-north": [13.1, 77.59],
+  "bengaluru-south": [12.71, 77.69],
+  bidar: [17.9104, 77.5199],
+  chamarajanagar: [11.9261, 76.94],
+  chikkaballapur: [13.4355, 77.7315],
+  chikkamagaluru: [13.3161, 75.772],
+  chitradurga: [14.2251, 76.398],
+  "dakshina-kannada": [12.8703, 74.8806],
+  davanagere: [14.4644, 75.9218],
+  dharwad: [15.4589, 75.0078],
+  gadag: [15.429, 75.629],
+  hassan: [13.00715, 76.0962],
+  haveri: [14.7951, 75.3991],
+  kalaburagi: [17.3297, 76.8343],
+  kodagu: [12.4244, 75.7382],
+  kolar: [13.1367, 78.1292],
+  koppal: [15.35, 76.1546],
+  mandya: [12.5223, 76.8954],
+  mysuru: [12.2958, 76.6394],
+  raichur: [16.212, 77.3439],
+  shivamogga: [13.9299, 75.5681],
+  tumakuru: [13.3392, 77.114],
+  udupi: [13.3409, 74.7421],
+  "uttara-kannada": [14.8135, 74.1297],
+  vijayapura: [16.8302, 75.71],
+  vijayanagara: [15.2689, 76.3909],
+  yadgir: [16.77, 77.1376],
+  shravanabelagola: [12.8556, 76.4886],
+  moodbidri: [13.0667, 74.9931],
+  karkala: [13.21428, 74.99234],
+  dharmastala: [12.94792, 75.38071],
+  "bengaluru-city": [12.9716, 77.5946],
+  "mysuru-city": [12.2958, 76.6394],
+  "hassan-city": [13.00715, 76.0962],
+  "tumakuru-city": [13.3392, 77.114],
+  "belagavi-city": [15.8497, 74.4977],
+};
 const places: Place[] = districtNames.map(([slug, name_kn, name_hi], i) => ({
   id: id("place", i + 1),
   slug,
@@ -53,10 +98,8 @@ const places: Place[] = districtNames.map(([slug, name_kn, name_hi], i) => ({
   name_hi,
   district: name_kn,
   is_district: true,
-  lat:
-    slug === "bengaluru-urban" ? 12.97194 : slug === "hassan" ? 13.00715 : null,
-  lng:
-    slug === "bengaluru-urban" ? 77.59369 : slug === "hassan" ? 76.0962 : null,
+  lat: coordinates[slug]?.[0] ?? null,
+  lng: coordinates[slug]?.[1] ?? null,
   show_in_weather: slug === "bengaluru-urban" || slug === "hassan",
 }));
 places.push(
@@ -67,8 +110,8 @@ places.push(
     name_en: "Shravanabelagola",
     name_hi: "श्रवणबेलगोला",
     district: "ಹಾಸನ",
-    lat: null,
-    lng: null,
+    lat: coordinates.shravanabelagola[0],
+    lng: coordinates.shravanabelagola[1],
     show_in_weather: false,
   },
   {
@@ -78,8 +121,8 @@ places.push(
     name_en: "Moodbidri",
     name_hi: "मूडबिद्री",
     district: "ದಕ್ಷಿಣ ಕನ್ನಡ",
-    lat: null,
-    lng: null,
+    lat: coordinates.moodbidri[0],
+    lng: coordinates.moodbidri[1],
     show_in_weather: false,
   },
   {
@@ -121,8 +164,8 @@ places.push(
     district,
     state: "Karnataka",
     is_district: false,
-    lat: null,
-    lng: null,
+    lat: coordinates[slug]?.[0] ?? null,
+    lng: coordinates[slug]?.[1] ?? null,
     show_in_weather: false,
   })),
 );

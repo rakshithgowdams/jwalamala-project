@@ -14,7 +14,7 @@ export async function WeatherChip() {
     places.find((p) => p.slug === saved) ||
     places.find((p) => p.slug === "bengaluru-urban");
   const { weather, stale } = place
-    ? await getWeather(place.id)
+    ? await getWeather(place.id, place.lat, place.lng)
     : { weather: null, stale: false };
   return (
     <details className="weather-menu" data-motion="off">

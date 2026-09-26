@@ -1,7 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { reserveBudget } from "@/lib/providers/budget";
-import { OpenMeteoProvider } from "@/lib/weather/open-meteo";
+import { refreshPlan, refreshSnapshot } from "@/lib/weather/store";
 import { privateJson } from "@/lib/v4/server";
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET,
@@ -31,19 +30,8 @@ export async function POST(request: Request) {
         .select("fetched_at")
         .eq("place_id", place.id)
         .maybeSingle();
-      if (cached && Date.now() - Date.parse(cached.fetched_at) < 1800000)
-        continue;
-      await reserveBudget("weather", 2);
-      const snapshot = await new OpenMeteoProvider().fetch(
-        place.lat,
-        place.lng,
-        place.id,
-      );
-      const result = await db.rpc("save_weather_snapshot", {
-        weather: snapshot.weather,
-        air: snapshot.aqi,
-      });
-      if (result.error) throw result.error;
+      if (refreshPlan(cached?.fetched_at, Date.now()) === "fresh") continue;
+      await refreshSnapshot(place.id, place.lat, place.lng);
       updated++;
     } catch {
       failed++;
