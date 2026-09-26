@@ -15,10 +15,12 @@ export async function Footer() {
           <div>
             <div className="footer-brand">
               <Image src={site.logo} width={58} height={58} alt="" />
-              <h2>{brand}</h2>
+              <div>
+                <h2>{brand}</h2>
+                <FlameGarland />
+              </div>
             </div>
             <p>{kn.footerText}</p>
-            <FlameGarland />
           </div>
           <div>
             <h3>{kn.explore}</h3>

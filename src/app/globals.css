@@ -929,6 +929,12 @@ img {
 .footer-brand h2 {
   font-size: 25px;
 }
+/* The wrapper is only as wide as the heading, so this lands the ribbon's right
+   edge on the end of the wordmark. */
+.footer-brand svg {
+  display: block;
+  margin-left: auto;
+}
 .footer-grid p {
   font-size: 14px;
   color: #b8bdd6;
