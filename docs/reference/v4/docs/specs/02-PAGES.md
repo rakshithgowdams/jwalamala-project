@@ -5,7 +5,7 @@ Legend: [AD:slot_key] = an ad slot from 03-ADS.md. Every page uses the global he
 ## Global layout
 Header (desktop) — updated in v4 (see 08, 09, 10)
 - Row 0 (thin, optional): ಕನ್ನಡ/English toggle (P2), sister-site links, today's date in Kannada, Jain daily times shortcut.
-- Row 1 (indigo #1F2447): wordmark "ಜ್ವಾಲಾಮಾಲಾ" + FlameGarland (left) · weather + AQI chip (09 W1) · WhatsApp channel button (10 E6) · LIVE icon (glows ember when live) · search icon · theme toggle · login/avatar · menu icon (mega menu).
+- Row 1 (indigo #1F2447): wordmark "ಜ್ವಾಲಾಮಾಲ" + FlameGarland (left) · weather + AQI chip (09 W1) · WhatsApp channel button (10 E6) · LIVE icon (glows ember when live) · search icon · theme toggle · login/avatar · menu icon (mega menu).
 - Row 2 (white, 3px ember top border): home icon + category menu from DB (show_in_menu, sort_order), dropdown for sub-categories, "ಇನ್ನಷ್ಟು" overflow menu.
 - Row 3 (white, 1px border): Trending topics bar (10 T2) — flash icon + hot topic, ವಿಡಿಯೋ, ಶಾರ್ಟ್ಸ್, #hashtags, ಹವಾಮಾನ, ಜೈನ ಪಂಚಾಂಗ, ವೆಬ್‌ಸ್ಟೋರಿ, place links.
 - Below header on content pages: [AD:article_top] / [AD:category_top] leaderboard with "ಜಾಹೀರಾತು" label.

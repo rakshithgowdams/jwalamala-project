@@ -260,9 +260,9 @@ export const demoEvents: NewsEvent[] = [
     end_date,
     place,
     district,
-    organiser: "ಜ್ವಾಲಾಮಾಲಾ ಸಮುದಾಯ — ಮಾದರಿ",
+    organiser: "ಜ್ವಾಲಾಮಾಲ ಸಮುದಾಯ — ಮಾದರಿ",
     organiser_en: "Jwalamala Community — Sample",
-    organiser_hi: "ज्वालामाला समुदाय — नमूना",
+    organiser_hi: "ज्वालामाल समुदाय — नमूना",
     description_kn:
       "ಇದು ಕ್ಯಾಲೆಂಡರ್ ಪ್ರದರ್ಶನಕ್ಕಾಗಿ ಸೇರಿಸಿದ ಮಾದರಿ ಕಾರ್ಯಕ್ರಮ. ಇದು ನೈಜ ಕಾರ್ಯಕ್ರಮದ ಆಹ್ವಾನವಲ್ಲ.",
     description_en:

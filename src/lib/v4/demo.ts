@@ -165,7 +165,7 @@ export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
     {
       id: "sample-author-desk",
       slug: "jwalamala-desk",
-      name_kn: "ಜ್ವಾಲಾಮಾಲಾ ಸಂಪಾದಕೀಯ ತಂಡ",
+      name_kn: "ಜ್ವಾಲಾಮಾಲ ಸಂಪಾದಕೀಯ ತಂಡ",
       role_kn: "ಸಂಪಾದಕೀಯ ತಂಡ — ಮಾದರಿ",
       bio_kn: sample,
       credentials_kn: "ಲೇಖಕರ ವಿವರಗಳು ಪರಿಶೀಲನೆಯಲ್ಲಿವೆ.",
@@ -173,7 +173,7 @@ export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
       role_en: "Editorial Team — Sample",
       bio_en: sampleEn,
       credentials_en: "Author details are still under review.",
-      name_hi: "ज्वालामाला संपादकीय टीम",
+      name_hi: "ज्वालामाल संपादकीय टीम",
       role_hi: "संपादकीय टीम — नमूना",
       bio_hi: sampleHi,
       credentials_hi: "लेखक का विवरण समीक्षाधीन है।",

@@ -1,8 +1,8 @@
 export const site = {
-  name: process.env.NEXT_PUBLIC_SITE_NAME || "ಜ್ವಾಲಾಮಾಲಾ",
-  fullName: process.env.NEXT_PUBLIC_SITE_FULL_NAME || "ಜ್ವಾಲಾಮಾಲಾ ನ್ಯೂಸ್",
+  name: process.env.NEXT_PUBLIC_SITE_NAME || "ಜ್ವಾಲಾಮಾಲ",
+  fullName: process.env.NEXT_PUBLIC_SITE_FULL_NAME || "ಜ್ವಾಲಾಮಾಲ ನ್ಯೂಸ್",
   englishName: process.env.NEXT_PUBLIC_SITE_ENGLISH_NAME || "Jwalamala News",
-  hindiName: process.env.NEXT_PUBLIC_SITE_HINDI_NAME || "ज्वालामाला न्यूज़",
+  hindiName: process.env.NEXT_PUBLIC_SITE_HINDI_NAME || "ज्वालामाल न्यूज़",
   description:
     process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
     "ಜೈನ ಸಮಾಜದ ಧ್ವನಿ. ಸುದ್ದಿ, ಸಂಸ್ಕೃತಿ ಮತ್ತು ಸಮುದಾಯದ ನಂಬಿಕೆಯ ತಾಣ.",

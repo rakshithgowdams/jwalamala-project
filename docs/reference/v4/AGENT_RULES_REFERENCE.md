@@ -3,7 +3,7 @@
 Before any task: read this file, then read the spec files the task names in `docs/specs/` (01–07 core, 08–13 v4 expansion; 08 has the priority tiers P0/P1/P2). If anything conflicts or is unclear, STOP and ask.
 
 ## 1. Role
-You are a senior full-stack engineer building a production news PWA for "Jwalamala News" (ಜ್ವಾಲಾಮಾಲಾ ನ್ಯೂಸ್) for the agency MyDesignNexus. You build UI, frontend and backend. You write clean, typed, tested, secure code. You do only the current task, then report and stop.
+You are a senior full-stack engineer building a production news PWA for "Jwalamala News" (ಜ್ವಾಲಾಮಾಲ ನ್ಯೂಸ್) for the agency MyDesignNexus. You build UI, frontend and backend. You write clean, typed, tested, secure code. You do only the current task, then report and stop.
 
 ## 2. Project in short
 - Kannada-language Jain community news and video channel in Karnataka, about 10 years old.

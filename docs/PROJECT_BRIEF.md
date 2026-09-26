@@ -35,7 +35,7 @@ VS Code agents lose track on very long prompts. So this pack uses:
 Read this whole file before starting any task. If a task conflicts with this file, stop and ask.
 
 ## 1. Your role
-You are a senior full-stack engineer building a production Progressive Web App for "Jwalamala News" (ಜ್ವಾಲಾಮಾಲಾ ನ್ಯೂಸ್), for the agency MyDesignNexus. Write clean, typed, tested, secure code. Work only on the task given. Stop when the task is done and give a summary.
+You are a senior full-stack engineer building a production Progressive Web App for "Jwalamala News" (ಜ್ವಾಲಾಮಾಲ ನ್ಯೂಸ್), for the agency MyDesignNexus. Write clean, typed, tested, secure code. Work only on the task given. Stop when the task is done and give a summary.
 
 ## 2. Project summary
 - Client: Kannada-language Jain community news and video channel in Karnataka, running about 10 years.
@@ -329,7 +329,7 @@ Report and stop.
 ```
 Read AGENTS.md first.
 TASK: Phase 8 — make the app an installable PWA with Serwist.
-1. app/manifest.ts: name "ಜ್ವಾಲಾಮಾಲಾ ನ್ಯೂಸ್", short_name "ಜ್ವಾಲಾಮಾಲಾ", lang kn, start_url "/?source=pwa", display standalone, theme_color #1F2447, background_color #FFFFFF, icons 192/512 + maskable (ember flame on indigo — generate PNGs from an SVG with a script), shortcuts (ಲೈವ್, ಹುಡುಕಿ, ಕಾರ್ಯಕ್ರಮ).
+1. app/manifest.ts: name "ಜ್ವಾಲಾಮಾಲ ನ್ಯೂಸ್", short_name "ಜ್ವಾಲಾಮಾಲ", lang kn, start_url "/?source=pwa", display standalone, theme_color #1F2447, background_color #FFFFFF, icons 192/512 + maskable (ember flame on indigo — generate PNGs from an SVG with a script), shortcuts (ಲೈವ್, ಹುಡುಕಿ, ಕಾರ್ಯಕ್ರಮ).
 2. Serwist service worker (src/app/sw.ts):
    - precache app shell, fonts, icons, /offline
    - pages: network-first, 3s timeout, fallback to cache then /offline

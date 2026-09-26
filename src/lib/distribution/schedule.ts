@@ -43,11 +43,7 @@ export async function buildScheduledDrafts() {
   if (!posts.length) return;
   const key = date + ":" + slot,
     subject =
-      "ಜ್ವಾಲಾಮಾಲಾ · " +
-      date +
-      " · " +
-      String(slot).padStart(2, "0") +
-      ":00 IST";
+      "ಜ್ವಾಲಾಮಾಲ · " + date + " · " + String(slot).padStart(2, "0") + ":00 IST";
   const socialPosts = [...posts];
   while (bulletin(socialPosts, subject).length > 4000 && socialPosts.length > 1)
     socialPosts.pop();

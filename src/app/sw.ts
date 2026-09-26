@@ -102,7 +102,7 @@ self.addEventListener("push", (event) => {
     return;
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "ಜ್ವಾಲಾಮಾಲಾ ನ್ಯೂಸ್", {
+    self.registration.showNotification(data.title || "ಜ್ವಾಲಾಮಾಲ ನ್ಯೂಸ್", {
       body: data.body,
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",

@@ -59,7 +59,7 @@ Each component: typed props, story-like example on `/dev/components` (dev only),
 - Server Actions with useOptimistic for bookmarks.
 
 ## 6. PWA (Serwist)
-- manifest: name "ಜ್ವಾಲಾಮಾಲಾ ನ್ಯೂಸ್", short_name "ಜ್ವಾಲಾಮಾಲಾ", lang kn, start_url "/?source=pwa", display standalone, theme #1F2447, background #FFFFFF, icons 192/512 + maskable (script generates PNGs from SVG), shortcuts (ಲೈವ್, ಹುಡುಕಿ, ಕಾರ್ಯಕ್ರಮ), screenshots.
+- manifest: name "ಜ್ವಾಲಾಮಾಲ ನ್ಯೂಸ್", short_name "ಜ್ವಾಲಾಮಾಲ", lang kn, start_url "/?source=pwa", display standalone, theme #1F2447, background #FFFFFF, icons 192/512 + maskable (script generates PNGs from SVG), shortcuts (ಲೈವ್, ಹುಡುಕಿ, ಕಾರ್ಯಕ್ರಮ), screenshots.
 - Caching: precache shell/fonts/icons/offline; pages network-first 3s → cache → /offline; public Supabase GET stale-while-revalidate (200 entries, 1 day); i.ytimg.com cache-first (300, 7 days); ad creatives cache-first (100, 1 day).
 - NEVER cache: /admin, /account, /api/ads/*, AdSense requests, auth, non-GET.
 - Saved posts pre-cached on bookmark.
