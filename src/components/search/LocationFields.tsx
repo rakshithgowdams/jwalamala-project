@@ -33,7 +33,7 @@ export function LocationFields({
           <option value="">{kn.all}</option>
           {options.states.map((s) => (
             <option key={s} value={s}>
-              {s === "Karnataka" && locale === "kn" ? "ಕರ್ನಾಟಕ" : s}
+              {s === "Karnataka" ? kn.karnataka : s}
             </option>
           ))}
         </select>
@@ -72,7 +72,7 @@ export function LocationFields({
           </option>
           {options.cities.map((c) => (
             <option key={c.id} value={c.slug}>
-              {pickText(locale, c.name_kn, c.name_en)}
+              {pickText(locale, c.name_kn, c.name_en, c.name_hi)}
             </option>
           ))}
         </select>

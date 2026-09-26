@@ -1,5 +1,7 @@
 import { getUiStrings } from "@/lib/i18n/server";
 import { pickText } from "@/lib/i18n/content";
+import { localizePlace } from "@/lib/i18n/places";
+import { getPlaceNames } from "@/lib/i18n/places-server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getEvents } from "@/lib/queries/content";
@@ -14,7 +16,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const e = (await getEvents()).find((e) => e.slug === slug);
   return {
-    title: e ? pickText(locale, e.name_kn, e.name_en) : kn.notFound,
+    title: e ? pickText(locale, e.name_kn, e.name_en, e.name_hi) : kn.notFound,
     alternates: { canonical: "/events/" + slug },
   };
 }
@@ -28,15 +30,19 @@ export default async function Event({
   const { slug } = await params;
   const e = (await getEvents()).find((e) => e.slug === slug);
   if (!e) notFound();
+  const names = await getPlaceNames();
+  const place = localizePlace(names, locale, e.place);
   return (
     <div className="container page-shell text-page">
       <div className="breadcrumb">
         <Link href="/events">{kn.events}</Link>
         <span>/</span>
-        {e.place}
+        {place}
       </div>
-      <h1>{pickText(locale, e.name_kn, e.name_en)}</h1>
-      <p>{e.description_kn}</p>
+      <h1>{pickText(locale, e.name_kn, e.name_en, e.name_hi)}</h1>
+      <p>
+        {pickText(locale, e.description_kn, e.description_en, e.description_hi)}
+      </p>
       <div className="event-detail">
         <dl>
           <dt>{kn.dateRange}</dt>
@@ -47,10 +53,12 @@ export default async function Event({
           </dd>
           <dt>{kn.place}</dt>
           <dd>
-            {e.place}, {e.district}
+            {place}, {localizePlace(names, locale, e.district)}
           </dd>
           <dt>{kn.organiser}</dt>
-          <dd>{e.organiser}</dd>
+          <dd>
+            {pickText(locale, e.organiser, e.organiser_en, e.organiser_hi)}
+          </dd>
         </dl>
       </div>
       <div className="section">

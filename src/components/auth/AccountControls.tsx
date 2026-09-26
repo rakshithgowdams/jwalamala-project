@@ -182,7 +182,7 @@ export function Interests({
               )
             }
           >
-            {pickText(locale, c.name_kn, c.name_en)}
+            {pickText(locale, c.name_kn, c.name_en, c.name_hi)}
           </button>
         ))}
       </div>

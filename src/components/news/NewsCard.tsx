@@ -1,5 +1,7 @@
 "use client";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { pickText } from "@/lib/i18n/content";
+import { usePlaceName } from "@/components/i18n/PlaceNames";
 import Link from "next/link";
 import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { MapPin, ArrowUpRight, Play } from "lucide-react";
@@ -16,9 +18,14 @@ export function NewsCard({
   compact?: boolean;
 }) {
   const { kn, locale } = useUiStrings();
-  const english = locale === "en";
-  const title = (english && post.title_en) || post.title_kn;
-  const summary = (english && post.summary_en) || post.summary_kn;
+  const placeName = usePlaceName();
+  const title = pickText(locale, post.title_kn, post.title_en, post.title_hi);
+  const summary = pickText(
+    locale,
+    post.summary_kn,
+    post.summary_en,
+    post.summary_hi,
+  );
   return (
     <article className={`news-card ${compact ? "compact" : ""}`}>
       <Link
@@ -56,7 +63,7 @@ export function NewsCard({
           <div className="card-tags">
             {post.tags.slice(0, 2).map((tag) => (
               <Link href={"/tag/" + tag.slug} key={tag.slug}>
-                #{tag.name_kn}
+                #{pickText(locale, tag.name_kn, tag.name_en, tag.name_hi)}
               </Link>
             ))}
           </div>
@@ -64,7 +71,7 @@ export function NewsCard({
         <div className="card-meta">
           <span>
             <MapPin size={13} />
-            {post.event_place}
+            {placeName(post.event_place)}
           </span>
           {compact ? (
             <ArrowUpRight size={16} />
@@ -78,7 +85,7 @@ export function NewsCard({
 }
 export function HeroStory({ post }: { post: Post }) {
   const { kn, locale } = useUiStrings();
-  const english = locale === "en";
+  const placeName = usePlaceName();
   return (
     <article className="hero-story">
       <Link
@@ -99,14 +106,16 @@ export function HeroStory({ post }: { post: Post }) {
       </Link>
       <div className="hero-story-body">
         <span className="eyebrow">
-          {post.event_place} <span>•</span> {kn.news}
+          {placeName(post.event_place)} <span>•</span> {kn.news}
         </span>
         <h1>
           <Link href={postHref(post)}>
-            {(english && post.title_en) || post.title_kn}
+            {pickText(locale, post.title_kn, post.title_en, post.title_hi)}
           </Link>
         </h1>
-        <p>{(english && post.summary_en) || post.summary_kn}</p>
+        <p>
+          {pickText(locale, post.summary_kn, post.summary_en, post.summary_hi)}
+        </p>
         <div className="hero-meta">
           <span className="meta">
             {kn.published}: {post.published_at.slice(0, 10)}

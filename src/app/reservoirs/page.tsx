@@ -1,5 +1,6 @@
 import { LazyValueChart as ValueChart } from "@/components/ui/LazyComponents";
 import { getUiStrings } from "@/lib/i18n/server";
+import { pickText } from "@/lib/i18n/content";
 import { getV4Rows } from "@/lib/v4/queries";
 import { AdSlot } from "@/components/ads/AdSlot";
 export async function generateMetadata() {
@@ -7,7 +8,7 @@ export async function generateMetadata() {
   return { title: t.reservoirs };
 }
 export default async function Page() {
-  const { v4: t, kn } = await getUiStrings();
+  const { v4: t, kn, locale } = await getUiStrings();
 
   const rows = (await getV4Rows("reservoir_readings")).sort((a, b) =>
     b.reading_date.localeCompare(a.reading_date),
@@ -25,10 +26,11 @@ export default async function Page() {
             r = history[0];
           return (
             <section className="utility-panel" key={slug}>
-              <h2>{r.name_kn}</h2>
+              <h2>{pickText(locale, r.name_kn, r.name_en, r.name_hi)}</h2>
               {r.is_seed && <p className="notice">{kn.demoArticle}</p>}
               <p>
-                <time>{r.reading_date}</time> · {t.source}: {r.source}
+                <time>{r.reading_date}</time> · {t.source}:{" "}
+                {pickText(locale, r.source, r.source_en, r.source_hi)}
               </p>
               <h3>{r.storage_pct}%</h3>
               <progress

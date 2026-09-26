@@ -1,5 +1,6 @@
 "use client";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { brandName } from "@/lib/i18n/content";
 
 import Link from "next/link";
 import { createContext, useContext, useRef, useState, useEffect } from "react";
@@ -10,7 +11,7 @@ const AudioContext = createContext<{ play: (track: Track) => void }>({
   play: () => {},
 });
 export function AudioProvider({ children }: { children: React.ReactNode }) {
-  const { v4: t } = useUiStrings();
+  const { v4: t, locale } = useUiStrings();
 
   const audio = useRef<HTMLAudioElement>(null),
     [track, setTrack] = useState<Track | null>(null),
@@ -26,7 +27,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if ("mediaSession" in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
-        artist: "Jwalamala News",
+        artist: brandName(locale),
       });
       navigator.mediaSession.setActionHandler("play", () => void player.play());
       navigator.mediaSession.setActionHandler("pause", () => player.pause());
@@ -49,7 +50,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         navigator.mediaSession.metadata = null;
       }
     };
-  }, [track, t.audioPlayFailed]);
+  }, [track, t.audioPlayFailed, locale]);
   return (
     <AudioContext.Provider
       value={{

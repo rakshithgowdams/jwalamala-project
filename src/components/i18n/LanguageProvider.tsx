@@ -15,11 +15,11 @@ export function useUiStrings() {
   return uiStrings(useContext(Context));
 }
 export function LanguageSwitch() {
-  const { locale } = useUiStrings();
+  const { locale, kn } = useUiStrings();
   return (
     <select
       className="language-switch"
-      aria-label="Interface language"
+      aria-label={kn.siteLanguage}
       value={locale}
       onChange={async (e) => {
         document.cookie =

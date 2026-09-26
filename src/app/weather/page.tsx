@@ -61,7 +61,10 @@ export default async function Page({
     <div className="container page-shell">
       <div className="page-heading">
         <h1>{t.weather}</h1>
-        <p>{place && pickText(locale, place.name_kn, place.name_en)}</p>
+        <p>
+          {place &&
+            pickText(locale, place.name_kn, place.name_en, place.name_hi)}
+        </p>
       </div>
       {place && <PlacePicker places={places} selected={place.slug} />}
       <AdSlot placement="weather-top" />
@@ -193,7 +196,9 @@ export default async function Page({
                   key={p.id}
                   href={"/weather?place=" + p.slug}
                 >
-                  <strong>{pickText(locale, p.name_kn, p.name_en)}</strong>
+                  <strong>
+                    {pickText(locale, p.name_kn, p.name_en, p.name_hi)}
+                  </strong>
                   <p>
                     {w?.current.temperature != null
                       ? Math.round(w.current.temperature) + " °C"

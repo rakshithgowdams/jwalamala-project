@@ -5,6 +5,7 @@ import {
   weekdays,
   aqiLabels,
   weatherLabels,
+  pushLabels,
 } from "@/content/strings.kn";
 import {
   en,
@@ -13,6 +14,7 @@ import {
   weekdaysEn,
   aqiLabelsEn,
   weatherLabelsEn,
+  pushLabelsEn,
 } from "@/content/strings.en";
 import {
   hi,
@@ -21,6 +23,7 @@ import {
   weekdaysHi,
   aqiLabelsHi,
   weatherLabelsHi,
+  pushLabelsHi,
 } from "@/content/strings.hi";
 export const locales = ["kn", "en", "hi"] as const;
 export type Locale = (typeof locales)[number];
@@ -46,5 +49,6 @@ export function uiStrings(locale: Locale) {
       en: weatherLabelsEn,
       hi: weatherLabelsHi,
     }[locale],
+    pushLabels: { kn: pushLabels, en: pushLabelsEn, hi: pushLabelsHi }[locale],
   };
 }

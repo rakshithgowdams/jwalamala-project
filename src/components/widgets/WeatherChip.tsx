@@ -28,7 +28,8 @@ export async function WeatherChip() {
       </summary>
       <div className="weather-popover">
         <strong>
-          {place && pickText(locale, place.name_kn, place.name_en)}
+          {place &&
+            pickText(locale, place.name_kn, place.name_en, place.name_hi)}
         </strong>
         <p>
           {weather?.current.temperature != null

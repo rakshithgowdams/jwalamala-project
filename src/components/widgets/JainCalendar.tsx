@@ -1,6 +1,7 @@
 "use client";
 import { CalendarReminder } from "@/components/engagement/CalendarReminder";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { pickText } from "@/lib/i18n/content";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -13,7 +14,7 @@ export function JainCalendar({
   days: CalendarDay[];
   initialMonth: string;
 }) {
-  const { kn, v4: t, months, weekdays } = useUiStrings();
+  const { kn, v4: t, months, weekdays, locale } = useUiStrings();
 
   const [month, setMonth] = useState(initialMonth),
     [selected, setSelected] = useState("");
@@ -90,9 +91,18 @@ export function JainCalendar({
               <span className="eyebrow">
                 {day.date} {day.is_seed && " · " + t.sample}
               </span>
-              <h2>{day.title_kn}</h2>
+              <h2>
+                {pickText(locale, day.title_kn, day.title_en, day.title_hi)}
+              </h2>
               <CalendarReminder id={day.id} demo={day.is_seed} />
-              <p>{day.description_kn}</p>
+              <p>
+                {pickText(
+                  locale,
+                  day.description_kn,
+                  day.description_en,
+                  day.description_hi,
+                )}
+              </p>
               <Link
                 className="chip"
                 href={

@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { queuePush } from "@/app/admin/push/actions";
-import { pushTopics, pushLabels } from "@/lib/push/schema";
+import { pushTopics } from "@/lib/push/schema";
+import { pushLabels } from "@/content/strings.kn";
 export function PushComposer({
   posts,
 }: {

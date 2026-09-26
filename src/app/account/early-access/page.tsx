@@ -7,7 +7,7 @@ export default async function Page() {
   const { db } = await requireUser("/account/early-access");
   const { data } = await db
     .from("posts")
-    .select("id,title_kn,title_en,event_date")
+    .select("*")
     .eq("status", "published")
     .gt("early_access_until", new Date().toISOString())
     .order("published_at", { ascending: false })
@@ -22,7 +22,8 @@ export default async function Page() {
             key={p.id}
             href={"/account/early-access/" + p.id}
           >
-            {pickText(locale, p.title_kn, p.title_en)} · {p.event_date}
+            {pickText(locale, p.title_kn, p.title_en, p.title_hi)} ·{" "}
+            {p.event_date}
           </Link>
         ))
       ) : (

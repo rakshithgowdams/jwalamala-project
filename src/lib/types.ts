@@ -3,6 +3,7 @@ export type Category = {
   slug: string;
   name_kn: string;
   name_en: string;
+  name_hi?: string;
 };
 export type Post = {
   id: string;
@@ -11,6 +12,11 @@ export type Post = {
   title_en: string;
   summary_en?: string;
   body_en?: string;
+  title_hi?: string;
+  summary_hi?: string;
+  body_hi?: string;
+  /** Column names a machine translated, e.g. { title_hi: true }. */
+  machine_translated?: Record<string, boolean>;
   title_translit: string;
   summary_kn: string;
   body_html: string;
@@ -50,21 +56,36 @@ export type Post = {
   allow_comments?: boolean;
   early_access_until?: string;
   audio_enabled?: boolean;
-  key_points?: { seconds: number; label_kn: string }[];
+  key_points?: {
+    seconds: number;
+    label_kn: string;
+    label_en?: string;
+    label_hi?: string;
+  }[];
   media_images?: { url: string; credit: string }[];
-  tags?: { slug: string; name_kn: string }[];
+  tags?: {
+    slug: string;
+    name_kn: string;
+    name_en?: string;
+    name_hi?: string;
+  }[];
 };
 export type NewsEvent = {
   id: string;
   slug: string;
   name_kn: string;
   name_en: string;
+  name_hi?: string;
   start_date: string;
   end_date: string;
   place: string;
   district: string;
   place_id?: string;
   organiser: string;
+  organiser_en?: string;
+  organiser_hi?: string;
   description_kn: string;
+  description_en?: string;
+  description_hi?: string;
   is_seed: boolean;
 };

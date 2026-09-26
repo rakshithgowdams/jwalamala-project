@@ -3,38 +3,25 @@ import { getUiStrings } from "@/lib/i18n/server";
 import { pickText } from "@/lib/i18n/content";
 import { getV4Rows } from "@/lib/v4/queries";
 import { AdSlot } from "@/components/ads/AdSlot";
-const commodityLabels = {
-  kn: {
-    gold22: "ಚಿನ್ನ 22K",
-    gold24: "ಚಿನ್ನ 24K",
-    silver: "ಬೆಳ್ಳಿ",
-    petrol: "ಪೆಟ್ರೋಲ್",
-    diesel: "ಡೀಸೆಲ್",
-  },
-  en: {
-    gold22: "Gold 22K",
-    gold24: "Gold 24K",
-    silver: "Silver",
-    petrol: "Petrol",
-    diesel: "Diesel",
-  },
-  hi: {
-    gold22: "सोना 22K",
-    gold24: "सोना 24K",
-    silver: "चांदी",
-    petrol: "पेट्रोल",
-    diesel: "डीज़ल",
-  },
-};
 export async function generateMetadata() {
   const { v4: t } = await getUiStrings();
   return { title: t.rates };
 }
 export default async function Page() {
   const { v4: t, locale } = await getUiStrings();
-  const labels = commodityLabels[locale];
-  const placeName = (place?: { name_kn: string; name_en: string }) =>
-    place ? pickText(locale, place.name_kn, place.name_en) : "—";
+  const labels: Record<string, string> = {
+    gold22: t.rateGold22,
+    gold24: t.rateGold24,
+    silver: t.rateSilver,
+    petrol: t.ratePetrol,
+    diesel: t.rateDiesel,
+  };
+  const placeName = (place?: {
+    name_kn: string;
+    name_en: string;
+    name_hi?: string;
+  }) =>
+    place ? pickText(locale, place.name_kn, place.name_en, place.name_hi) : "—";
   const places = await getV4Rows("places");
   const rows = (await getV4Rows("market_rates")).sort((a, b) =>
     b.rate_date.localeCompare(a.rate_date),
@@ -65,9 +52,12 @@ export default async function Page() {
                     {placeName(places.find((p) => p.id === r.place_id))}
                   </td>
                   <td>
-                    ₹{r.value.toLocaleString("en-IN")} / {r.unit}
+                    ₹{r.value.toLocaleString("en-IN")} /{" "}
+                    {pickText(locale, r.unit, r.unit_en, r.unit_hi)}
                   </td>
-                  <td>{r.source}</td>
+                  <td>
+                    {pickText(locale, r.source, r.source_en, r.source_hi)}
+                  </td>
                   <td>{r.rate_date}</td>
                 </tr>
               ))}
@@ -96,7 +86,12 @@ export default async function Page() {
               )}
               <ValueChart
                 label={labels[current.kind]}
-                unit={current.unit}
+                unit={pickText(
+                  locale,
+                  current.unit,
+                  current.unit_en,
+                  current.unit_hi,
+                )}
                 points={history.map((r) => ({
                   date: r.rate_date,
                   value: r.value,

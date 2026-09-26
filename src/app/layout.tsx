@@ -3,7 +3,14 @@ import { getSetting } from "@/lib/v4/settings";
 import { adSettingsSchema, defaultAds } from "@/lib/ads/schema";
 import { LanguageProvider } from "@/components/i18n/LanguageProvider";
 import { getUiStrings } from "@/lib/i18n/server";
-import { brandName, brandDescription, intlLocale } from "@/lib/i18n/content";
+import {
+  brandName,
+  brandDescription,
+  brandParts,
+  intlLocale,
+} from "@/lib/i18n/content";
+import { PlaceNamesProvider } from "@/components/i18n/PlaceNames";
+import { getPlaceNames } from "@/lib/i18n/places-server";
 import { getTheme } from "@/lib/theme/server";
 import { AudioProvider } from "@/components/content/AudioPlayer";
 import { ReaderSync } from "@/components/engagement/ReaderSync";
@@ -35,7 +42,11 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     applicationName: brand,
     manifest: "/manifest.webmanifest",
-    appleWebApp: { capable: true, statusBarStyle: "default", title: site.name },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: brandParts(locale).mark,
+    },
     icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
     openGraph: {
       title: brand,
@@ -62,6 +73,7 @@ export default async function RootLayout({
     .parse((await getSetting("ads")) || defaultAds);
   const { locale, kn } = await getUiStrings();
   const { preference, scheme } = await getTheme();
+  const placeNames = await getPlaceNames();
   const nonce =
     process.env.ADS_STRICT_CSP === "true"
       ? (await headers()).get("x-nonce") || undefined
@@ -81,21 +93,23 @@ export default async function RootLayout({
           </style>
         </noscript>
         <LanguageProvider locale={locale}>
-          <AdNonceProvider nonce={nonce}>
-            <AudioProvider>
-              <a href="#main" className="skip-link">
-                {kn.skipContent}
-              </a>
-              <Header />
-              <main id="main">{children}</main>
-              <Footer />
-              <BottomNav />
-              {ads.enabled && ads.sticky_mobile_enabled && <MobileStickyAd />}
-              <PwaControls />
-              <ReaderSync />
-              <SiteMotion />
-            </AudioProvider>
-          </AdNonceProvider>
+          <PlaceNamesProvider names={placeNames}>
+            <AdNonceProvider nonce={nonce}>
+              <AudioProvider>
+                <a href="#main" className="skip-link">
+                  {kn.skipContent}
+                </a>
+                <Header />
+                <main id="main">{children}</main>
+                <Footer />
+                <BottomNav />
+                {ads.enabled && ads.sticky_mobile_enabled && <MobileStickyAd />}
+                <PwaControls />
+                <ReaderSync />
+                <SiteMotion />
+              </AudioProvider>
+            </AdNonceProvider>
+          </PlaceNamesProvider>
         </LanguageProvider>
       </body>
     </html>

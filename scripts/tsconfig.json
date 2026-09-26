@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noCheck": false,
+    "incremental": false,
+    "types": ["node"],
+    "paths": {
+      "@/*": ["../src/*"],
+      "server-only": ["./lib/server-only.ts"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": []
+}

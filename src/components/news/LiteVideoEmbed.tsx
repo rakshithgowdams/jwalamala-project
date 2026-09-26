@@ -4,6 +4,7 @@ import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { Play, VideoOff } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { pickText } from "@/lib/i18n/content";
 import { normalizeVideo } from "@/lib/utils/video";
 import { loadYouTube, type YouTubePlayer } from "@/lib/v4/youtube-player";
 import {
@@ -25,9 +26,14 @@ export function LiteVideoEmbed({
   thumbnail: string;
   title: string;
   postId?: string;
-  keyPoints?: { seconds: number; label_kn: string }[];
+  keyPoints?: {
+    seconds: number;
+    label_kn: string;
+    label_en?: string;
+    label_hi?: string;
+  }[];
 }) {
-  const { kn } = useUiStrings();
+  const { kn, locale } = useUiStrings();
   const [playing, setPlaying] = useState(false),
     [start, setStart] = useState(0),
     [error, setError] = useState(false);
@@ -176,7 +182,7 @@ export function LiteVideoEmbed({
             </div>
           )}
           {keyPoints.length > 0 && (
-            <nav className="key-facts" aria-label="Video chapters">
+            <nav className="key-facts" aria-label={kn.videoChapters}>
               {keyPoints.map((point, i) => (
                 <button
                   className="chip"
@@ -185,7 +191,12 @@ export function LiteVideoEmbed({
                 >
                   {Math.floor(point.seconds / 60)}:
                   {String(point.seconds % 60).padStart(2, "0")} ·{" "}
-                  {point.label_kn}
+                  {pickText(
+                    locale,
+                    point.label_kn,
+                    point.label_en,
+                    point.label_hi,
+                  )}
                 </button>
               ))}
             </nav>

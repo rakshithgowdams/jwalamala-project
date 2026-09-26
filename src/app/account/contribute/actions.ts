@@ -1,22 +1,20 @@
 "use server";
 import { requireUser } from "@/lib/auth/require-user";
 import { requirePermission } from "@/lib/v4/permissions";
+import { getUiStrings } from "@/lib/i18n/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 export async function applyContributor(place: string, note: string) {
   const { db } = await requireUser("/account/contribute");
+  const { kn: t } = await getUiStrings();
   if (
     !z.uuid().safeParse(place).success ||
     note.trim().length < 10 ||
     note.length > 2000
   )
-    return { error: "Select a place and describe your reporting experience." };
+    return { error: t.contributorDetailsNeeded };
   const { error } = await db.rpc("apply_contributor", { place, message: note });
-  return {
-    error: error
-      ? "Phone OTP verification is required. Check your details and try again."
-      : "",
-  };
+  return { error: error ? t.contributorPhoneNeeded : "" };
 }
 export async function reviewContributor(
   user: string,

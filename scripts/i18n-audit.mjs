@@ -1,4 +1,6 @@
-const base = "http://127.0.0.1:3000";
+// Point this at a demo-mode server to audit the translated fixtures; the
+// default port runs against whatever the live database holds.
+const base = process.env.AUDIT_BASE || "http://127.0.0.1:3000";
 const paths = [
   "/",
   "/news",
@@ -75,10 +77,11 @@ for (const path of paths) {
   );
 }
 
-// Kannada in an English page is untranslated UI. Kannada in a Hindi page is
-// expected for article bodies, which have no Hindi column, so Hindi is judged
-// on whether Devanagari renders at all.
+// Kannada on an English or Hindi page is untranslated content: against the
+// demo fixtures every field has a translation, so any residue is a real gap.
+// Against the live database Kannada is expected until the rows are backfilled.
 const leaking = rows.filter((r) => r.en.kannada > 0 && r.en.status === 200);
+const hiLeaking = rows.filter((r) => r.hi.kannada > 0 && r.hi.status === 200);
 const noHindi = rows.filter((r) => r.hi.status === 200 && r.hi.hindi === 0);
 const broken = rows.filter((r) => r.hi.status !== 200);
 console.log(
@@ -86,6 +89,10 @@ console.log(
 );
 for (const r of leaking) {
   console.log(`  ${r.path}: ${r.en.kannada} Kannada chars`);
+}
+console.log(`Hindi pages still containing Kannada: ${hiLeaking.length}`);
+for (const r of hiLeaking) {
+  console.log(`  ${r.path}: ${r.hi.kannada} Kannada chars`);
 }
 console.log(`Hindi pages rendering no Devanagari: ${noHindi.length}`);
 for (const r of noHindi) console.log(`  ${r.path}`);

@@ -7,7 +7,12 @@ export function ContributorApplication({
   places,
   status,
 }: {
-  places: { id: string; name_kn: string; name_en?: string }[];
+  places: {
+    id: string;
+    name_kn: string;
+    name_en?: string;
+    name_hi?: string;
+  }[];
   status?: string;
 }) {
   const { kn, locale } = useUiStrings();
@@ -45,7 +50,7 @@ export function ContributorApplication({
         <select name="place" required>
           {places.map((p) => (
             <option key={p.id} value={p.id}>
-              {pickText(locale, p.name_kn, p.name_en)}
+              {pickText(locale, p.name_kn, p.name_en, p.name_hi)}
             </option>
           ))}
         </select>

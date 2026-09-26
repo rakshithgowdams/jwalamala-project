@@ -1,5 +1,6 @@
 import { CalendarReminder } from "@/components/engagement/CalendarReminder";
 import { getUiStrings } from "@/lib/i18n/server";
+import { pickText } from "@/lib/i18n/content";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/require-user";
 import { getCategories, getPosts, getEvents } from "@/lib/queries/content";
@@ -29,7 +30,7 @@ export default async function Account({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const { kn, v4: t } = await getUiStrings();
+  const { kn, v4: t, locale } = await getUiStrings();
 
   const { db, user } = await requireUser();
   const { tab = "saved" } = await searchParams;
@@ -51,7 +52,7 @@ export default async function Account({
     ]);
   const { data: calendar } = await db
     .from("calendar_reminders")
-    .select("day_id,jain_calendar_days(date,title_kn)")
+    .select("day_id,jain_calendar_days(*)")
     .eq("user_id", user.id);
   const saved = posts.filter((p) => bookmarks?.some((b) => b.post_id === p.id));
   const { data: staffAccess } = await db.rpc("has_permission", {
@@ -120,7 +121,10 @@ export default async function Account({
             : r.jain_calendar_days;
           return (
             <section className="utility-panel" key={r.day_id}>
-              <h2>{day?.title_kn}</h2>
+              <h2>
+                {day &&
+                  pickText(locale, day.title_kn, day.title_en, day.title_hi)}
+              </h2>
               <p>{day?.date}</p>
               <CalendarReminder id={r.day_id} />
             </section>

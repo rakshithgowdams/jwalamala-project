@@ -40,10 +40,3 @@ export const defaultPush: PushPreferences = {
   daily_cap: 3,
   breaking_override: true,
 };
-export const pushLabels: Record<string, string> = {
-  breaking: "ಬ್ರೇಕಿಂಗ್ ಸುದ್ದಿ",
-  live: "ನೇರಪ್ರಸಾರ",
-  daily: "ದಿನದ ಮುಖ್ಯ ಸುದ್ದಿ",
-  events: "ಕಾರ್ಯಕ್ರಮಗಳು",
-  parva: "ಜೈನ ಪರ್ವಗಳು",
-};

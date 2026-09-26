@@ -42,6 +42,8 @@ export function LiveConsole({
                   }
                 : null,
               body_html: String(data.get("body") || ""),
+              body_html_en: String(data.get("body_en") || ""),
+              body_html_hi: String(data.get("body_hi") || ""),
               is_key: data.has("is_key"),
               is_pinned: data.has("is_pinned"),
             });
@@ -64,6 +66,22 @@ export function LiveConsole({
             rows={6}
             required
             defaultValue={selected?.body_html}
+          />
+        </label>
+        <label className="field">
+          {kn.body + " (English)"}
+          <textarea
+            name="body_en"
+            rows={6}
+            defaultValue={selected?.body_html_en || ""}
+          />
+        </label>
+        <label className="field">
+          {kn.body + " (हिंदी)"}
+          <textarea
+            name="body_hi"
+            rows={6}
+            defaultValue={selected?.body_html_hi || ""}
           />
         </label>
         <label className="field">

@@ -3,7 +3,7 @@ import { ContributorApplication } from "@/components/engagement/ContributorAppli
 export default async function Page() {
   const { db, user } = await requireUser("/account/contribute");
   const [places, application] = await Promise.all([
-    db.from("places").select("id,name_kn").order("name_kn"),
+    db.from("places").select("*").order("name_kn"),
     db
       .from("contributor_applications")
       .select("status")

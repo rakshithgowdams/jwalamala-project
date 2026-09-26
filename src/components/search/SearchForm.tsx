@@ -86,7 +86,7 @@ export function SearchForm({
             <option value="">{kn.allCategories}</option>
             {categories.map((c) => (
               <option key={c.slug} value={c.slug}>
-                {pickText(locale, c.name_kn, c.name_en)}
+                {pickText(locale, c.name_kn, c.name_en, c.name_hi)}
               </option>
             ))}
           </select>

@@ -1,4 +1,5 @@
 import { getUiStrings } from "@/lib/i18n/server";
+import { pickText } from "@/lib/i18n/content";
 import Link from "next/link";
 import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { getV4Rows } from "@/lib/v4/queries";
@@ -11,7 +12,7 @@ export async function CollectionsIndex({
 }: {
   kind: "topics" | "series" | "gallery" | "stories" | "live";
 }) {
-  const { v4: t } = await getUiStrings();
+  const { v4: t, locale } = await getUiStrings();
 
   const table = {
     topics: "topics",
@@ -64,14 +65,26 @@ export async function CollectionsIndex({
                   />
                 </div>
               )}
-              <h2>{row.title_kn}</h2>
+              <h2>
+                {pickText(locale, row.title_kn, row.title_en, row.title_hi)}
+              </h2>
               <p>
                 {"intro_kn" in row
-                  ? row.intro_kn
+                  ? pickText(locale, row.intro_kn, row.intro_en, row.intro_hi)
                   : "description_kn" in row
-                    ? row.description_kn
+                    ? pickText(
+                        locale,
+                        row.description_kn,
+                        row.description_en,
+                        row.description_hi,
+                      )
                     : "summary_kn" in row
-                      ? row.summary_kn
+                      ? pickText(
+                          locale,
+                          row.summary_kn,
+                          row.summary_en,
+                          row.summary_hi,
+                        )
                       : ""}
               </p>
             </Link>

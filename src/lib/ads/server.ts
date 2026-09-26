@@ -162,6 +162,8 @@ export async function pickAd(
           image_url: ad.image_url,
           mobile_image_url: ad.mobile_image_url,
           alt_kn: ad.alt_kn,
+          alt_en: ad.alt_en,
+          alt_hi: ad.alt_hi,
           token: adToken({
             id: ad.id,
             slot: slotKey,

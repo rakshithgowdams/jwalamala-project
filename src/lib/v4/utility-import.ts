@@ -17,8 +17,21 @@ export const utilityFields = {
     "inflow_cusecs",
     "outflow_cusecs",
     "source",
+    "source_en",
+    "source_hi",
   ],
-  market_rates: ["rate_date", "kind", "place_id", "value", "unit", "source"],
+  market_rates: [
+    "rate_date",
+    "kind",
+    "place_id",
+    "value",
+    "unit",
+    "unit_en",
+    "unit_hi",
+    "source",
+    "source_en",
+    "source_hi",
+  ],
 } as const;
 export type UtilityResource = keyof typeof utilityFields;
 export function parseUtilityRow(

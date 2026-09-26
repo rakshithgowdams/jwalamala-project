@@ -38,8 +38,8 @@ export async function JainTimesPanel({
         </Link>
       </div>
       <p className="meta">
-        {place && pickText(locale, place.name_kn, place.name_en)} ·{" "}
-        {formatDate(date, false, locale)}
+        {place && pickText(locale, place.name_kn, place.name_en, place.name_hi)}{" "}
+        · {formatDate(date, false, locale)}
       </p>
       {times ? (
         <div className="utility-grid">

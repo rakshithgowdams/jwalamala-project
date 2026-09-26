@@ -1,6 +1,6 @@
 "use client";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
-import { intlLocale } from "@/lib/i18n/content";
+import { intlLocale, pickText } from "@/lib/i18n/content";
 
 import { useState, useEffect } from "react";
 import type { Poll } from "@/lib/v4/types";
@@ -26,10 +26,23 @@ export function PollCard({ poll, closed }: { poll: Poll; closed: boolean }) {
     return () => controller.abort();
   }, [closed, poll.id, poll.is_seed]);
   const total = results?.reduce((n, r) => n + Number(r.votes), 0) || 0;
+  const question = pickText(
+    locale,
+    poll.question_kn,
+    poll.question_en,
+    poll.question_hi,
+  );
+  const englishOptions =
+    poll.options_en?.length === poll.options.length ? poll.options_en : null;
+  const hindiOptions =
+    poll.options_hi?.length === poll.options.length ? poll.options_hi : null;
+  const options = poll.options.map((option, index) =>
+    pickText(locale, option, englishOptions?.[index], hindiOptions?.[index]),
+  );
 
   return (
     <section className="utility-panel">
-      <h2>{poll.question_kn}</h2>
+      <h2>{question}</h2>
       {poll.is_seed && <p className="notice">{t.samplePoll}</p>}
       <form
         onSubmit={async (e) => {
@@ -68,8 +81,8 @@ export function PollCard({ poll, closed }: { poll: Poll; closed: boolean }) {
         }}
       >
         <fieldset disabled={!!results || closed || busy}>
-          <legend className="sr-only">{poll.question_kn}</legend>
-          {poll.options.map((option, index) => (
+          <legend className="sr-only">{question}</legend>
+          {options.map((option, index) => (
             <label className="poll-option" key={index}>
               <input
                 type={poll.multiple_choice ? "checkbox" : "radio"}
@@ -92,7 +105,7 @@ export function PollCard({ poll, closed }: { poll: Poll; closed: boolean }) {
         </fieldset>
         {results ? (
           <div aria-live="polite">
-            {poll.options.map((option, index) => {
+            {options.map((option, index) => {
               const count = Number(
                 results.find((r) => r.option_index === index)?.votes || 0,
               );

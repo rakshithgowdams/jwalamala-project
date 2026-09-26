@@ -7,6 +7,21 @@ import { normalizeVideo } from "@/lib/utils/video";
 import { resourceSchemas, type Resource } from "@/lib/admin/resources";
 import { kn } from "@/content/strings.kn";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import {
+  autoTranslatePost,
+  autoTranslateRows,
+  clearReviewedTranslations,
+} from "@/lib/ai/autotranslate";
+import { hasTranslatablePass } from "@/lib/ai/rows";
+const translationColumns = [
+  "title_en",
+  "summary_en",
+  "body_en",
+  "title_hi",
+  "summary_hi",
+  "body_hi",
+] as const;
 const postSchema = z.object({
   key_points: chapterTextSchema,
   type: z.enum(["article", "video", "short"]).default("article"),
@@ -70,6 +85,9 @@ const postSchema = z.object({
   title_en: z.string().max(300),
   summary_en: z.string().max(1000).default(""),
   body_en: z.string().max(200000).default(""),
+  title_hi: z.string().max(300).default(""),
+  summary_hi: z.string().max(1000).default(""),
+  body_hi: z.string().max(200000).default(""),
   slug: z.string().regex(/^[a-z0-9-]+$/),
   summary_kn: z.string().max(1000),
   body_html: z.string().max(200000),
@@ -134,6 +152,15 @@ export async function savePost(input: unknown) {
   } catch {
     return { error: kn.validation };
   }
+  // Read the stored translations before the write replaces them, so we can tell
+  // which ones the editor actually changed.
+  const { data: prior } = p.id
+    ? await db
+        .from("posts")
+        .select(["machine_translated", ...translationColumns].join(","))
+        .eq("id", p.id)
+        .maybeSingle()
+    : { data: null };
   const { data, error } = await db.rpc("save_editor_post", {
     payload: {
       ...p,
@@ -155,6 +182,7 @@ export async function savePost(input: unknown) {
       body_json: body,
       body_html: cleanHtml(p.body_html),
       body_en: cleanHtml(p.body_en),
+      body_hi: cleanHtml(p.body_hi),
       author_id: user.id,
       video_provider: video?.provider || "none",
       video_id: video?.id || null,
@@ -174,8 +202,22 @@ export async function savePost(input: unknown) {
     },
   });
   if (error) return { error: kn.unavailable };
+  const id = String(data);
+  if (prior)
+    await clearReviewedTranslations(
+      id,
+      prior as unknown as Record<string, unknown>,
+      p as unknown as Record<string, unknown>,
+    );
+  // Drafts are not worth spending translation budget on. Headline and summary are
+  // short enough to finish before the editor sees the response, which keeps cards
+  // and listings whole; the body follows once the response has been sent.
+  if (p.status !== "draft") {
+    await autoTranslatePost(id, "short");
+    after(() => autoTranslatePost(id, "body"));
+  }
   revalidatePath("/", "layout");
-  return { id: String(data) };
+  return { id };
 }
 export async function saveResource(
   resource: Resource,
@@ -223,8 +265,17 @@ export async function saveResource(
         .update(payload)
         .eq(resource === "settings" ? "key" : "id", id)
     : db.from(table).insert(payload);
-  const { error } = await query;
+  // Categories, events and ads carry Kannada that the public site renders in three
+  // languages, so their id is needed to translate them; the rest never are.
+  const translates =
+    hasTranslatablePass(table, "short") || hasTranslatablePass(table, "long");
+  const { data, error } = translates ? await query.select("id") : await query;
   if (error) return { error: kn.unavailable };
+  const saved = id || String(data?.[0]?.id || "");
+  if (translates && saved) {
+    await autoTranslateRows(table, [saved], "short");
+    after(() => autoTranslateRows(table, [saved], "long"));
+  }
   revalidatePath("/", "layout");
   return { ok: true };
 }

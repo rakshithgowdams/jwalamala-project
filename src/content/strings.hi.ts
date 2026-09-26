@@ -236,6 +236,7 @@ export const hi = {
   state: "राज्य",
   district: "ज़िला",
   cityOrTown: "नगर / गाँव",
+  karnataka: "कर्नाटक",
   selectStateFirst: "पहले राज्य चुनें",
   selectDistrictFirst: "पहले ज़िला चुनें",
   noCities: "नगर अभी जोड़े नहीं गए हैं",
@@ -255,6 +256,7 @@ export const hi = {
   openVideo: "वीडियो खोलें",
   resumeAt: "यहाँ से जारी रखें",
   startOver: "शुरू से",
+  videoChapters: "वीडियो अध्याय",
   cancelReminder: "अनुस्मारक रद्द करें",
   notificationSettings: "सूचनाओं की सेटिंग",
   continueWatching: "देखना जारी रखें",
@@ -269,6 +271,8 @@ export const hi = {
   messagesAfterReview: "संदेश समीक्षा के बाद प्रकाशित होते हैं।",
   readInKannada: "कन्नड़ में पढ़ें",
   readInEnglish: "अंग्रेज़ी में पढ़ें",
+  readInHindi: "हिंदी में पढ़ें",
+  machineTranslated: "कन्नड़ से मशीन अनुवाद, अभी समीक्षा नहीं हुई",
   sponsoredContent: "प्रायोजित सामग्री",
   contributorApplication: "नागरिक पत्रकार आवेदन",
   contributorIntro:
@@ -278,6 +282,10 @@ export const hi = {
   applyNow: "आवेदन करें",
   applicationSent: "आवेदन समीक्षा के लिए भेज दिया गया है।",
   submitFailed: "भेजा नहीं जा सका।",
+  contributorDetailsNeeded:
+    "स्थान चुनें और अपने रिपोर्टिंग अनुभव का विवरण दें।",
+  contributorPhoneNeeded:
+    "फ़ोन OTP सत्यापन आवश्यक है। अपने विवरण जाँचकर फिर प्रयास करें।",
   earlyAccess: "सहयोगियों के लिए पूर्व पहुँच",
   noEarlyAccess: "आपके खाते के लिए कोई पूर्व-पहुँच समाचार उपलब्ध नहीं है।",
   supportBrand: "{brand} को सहयोग दें",
@@ -305,6 +313,9 @@ export const hi = {
   earlyAccessShort: "पूर्व पहुँच",
   fullScreenStory: "पूर्ण स्क्रीन चित्रकथा",
   newsNearYou: "आपके क्षेत्र के समाचार",
+  editorPicks: "संपादक की पसंद",
+  pages: "पृष्ठ",
+  siteLanguage: "साइट की भाषा",
 };
 export const v4hi = {
   correctionsIntro:
@@ -529,6 +540,11 @@ export const v4hi = {
   reservoirs: "जलाशयों का जलस्तर",
   rates: "आज की दरें",
   storage: "संग्रह",
+  rateGold22: "सोना 22K",
+  rateGold24: "सोना 24K",
+  rateSilver: "चांदी",
+  ratePetrol: "पेट्रोल",
+  rateDiesel: "डीज़ल",
   readingTools: "पढ़ने के विकल्प",
   textSize: "अक्षरों का आकार",
   lineSpace: "पंक्तियों का अंतर",
@@ -655,4 +671,11 @@ export const weatherLabelsHi: Record<string, string> = {
   "81": "वर्षा",
   "82": "भारी वर्षा",
   "95": "गरज के साथ वर्षा",
+};
+export const pushLabelsHi: Record<string, string> = {
+  breaking: "ताज़ा ख़बर",
+  live: "सीधा प्रसारण",
+  daily: "दिन की मुख्य ख़बर",
+  events: "कार्यक्रम",
+  parva: "जैन पर्व",
 };

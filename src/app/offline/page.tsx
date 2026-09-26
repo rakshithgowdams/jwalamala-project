@@ -1,8 +1,14 @@
 import { WifiOff } from "lucide-react";
 import Link from "next/link";
-import { kn } from "@/content/strings.kn";
-export const metadata = { title: kn.offline };
-export default function Offline() {
+import { getUiStrings } from "@/lib/i18n/server";
+export async function generateMetadata() {
+  const { kn } = await getUiStrings();
+  return { title: kn.offline };
+}
+// The service worker precaches this route, so the copy a reader sees offline is
+// the one that was current when the worker installed, not their latest switch.
+export default async function Offline() {
+  const { kn } = await getUiStrings();
   return (
     <div className="container page-shell">
       <div className="empty-state">

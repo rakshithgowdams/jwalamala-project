@@ -7,9 +7,10 @@ import { getPosts } from "@/lib/queries/content";
 import { MyFeed } from "@/components/engagement/MyFeed";
 import { NewsCard } from "@/components/news/NewsCard";
 import { getUiStrings } from "@/lib/i18n/server";
+import { pickText } from "@/lib/i18n/content";
 import { isoToday } from "@/lib/utils/dates";
 export async function HomeExtras({ config }: { config: HomeConfig }) {
-  const { kn, v4: t } = await getUiStrings();
+  const { kn, v4: t, locale } = await getUiStrings();
   const [stories, galleries, days, feed, posts] = await Promise.all([
     getV4Rows("web_stories"),
     getV4Rows("galleries"),
@@ -31,6 +32,9 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
     galleries.find((g) => g.id === config.photo_gallery_id) ||
     galleries.find((g) => g.images.length)
   )?.images[0];
+  const photoCaption = photo
+    ? pickText(locale, photo.caption, photo.caption_en, photo.caption_hi)
+    : "";
   return (
     <>
       {config.extras.feed && (
@@ -49,7 +53,7 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
                 href={"/stories/" + s.slug}
                 key={s.id}
               >
-                <h3>{s.title_kn}</h3>
+                <h3>{pickText(locale, s.title_kn, s.title_en, s.title_hi)}</h3>
                 {s.slides[0] && (
                   <Image
                     src={s.slides[0].image}
@@ -70,13 +74,13 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
           <figure>
             <Image
               src={photo.url}
-              alt={photo.caption || ""}
+              alt={photoCaption}
               width={1000}
               height={650}
               style={{ width: "100%", maxHeight: 420, objectFit: "cover" }}
             />
             <figcaption>
-              {photo.caption} · {photo.credit}
+              {photoCaption} · {photo.credit}
             </figcaption>
           </figure>
           <Link href="/gallery" className="chip">
@@ -89,7 +93,7 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
           <h2>{t.jainCalendar}</h2>
           {parva.map((d) => (
             <Link className="directory-link" href="/jain-calendar" key={d.id}>
-              {d.date} · {d.title_kn}
+              {d.date} · {pickText(locale, d.title_kn, d.title_en, d.title_hi)}
               {d.is_seed ? " · " + t.sample : ""}
             </Link>
           ))}

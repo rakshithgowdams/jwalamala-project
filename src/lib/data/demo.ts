@@ -1,22 +1,23 @@
 import type { Category, Post, NewsEvent } from "@/lib/types";
 export const categories: Category[] = [
-  ["news", "ಸುದ್ದಿ", "News"],
-  ["pravachana", "ಪ್ರವಚನ", "Discourses"],
-  ["utsava", "ಉತ್ಸವ", "Festivals"],
-  ["panchakalyana", "ಪಂಚಕಲ್ಯಾಣ", "Panchakalyana"],
-  ["chaturmasa", "ಚಾತುರ್ಮಾಸ", "Chaturmasa"],
-  ["samaja", "ಸಮಾಜ", "Community"],
-  ["basadi", "ಬಸದಿಗಳು", "Basadis"],
-  ["acharya", "ಆಚಾರ್ಯಶ್ರೀ", "Acharya"],
-  ["muni", "ಮುನಿಶ್ರೀ", "Muni"],
-  ["bhattaraka", "ಭಟ್ಟಾರಕರು", "Bhattaraka"],
-  ["education", "ಶಿಕ್ಷಣ", "Education"],
-  ["programmes", "ಕಾರ್ಯಕ್ರಮ", "Programmes"],
-].map(([slug, name_kn, name_en], i) => ({
+  ["news", "ಸುದ್ದಿ", "News", "समाचार"],
+  ["pravachana", "ಪ್ರವಚನ", "Discourses", "प्रवचन"],
+  ["utsava", "ಉತ್ಸವ", "Festivals", "उत्सव"],
+  ["panchakalyana", "ಪಂಚಕಲ್ಯಾಣ", "Panchakalyana", "पंचकल्याण"],
+  ["chaturmasa", "ಚಾತುರ್ಮಾಸ", "Chaturmasa", "चातुर्मास"],
+  ["samaja", "ಸಮಾಜ", "Community", "समाज"],
+  ["basadi", "ಬಸದಿಗಳು", "Basadis", "बसदियाँ"],
+  ["acharya", "ಆಚಾರ್ಯಶ್ರೀ", "Acharya", "आचार्यश्री"],
+  ["muni", "ಮುನಿಶ್ರೀ", "Muni", "मुनिश्री"],
+  ["bhattaraka", "ಭಟ್ಟಾರಕರು", "Bhattaraka", "भट्टारक"],
+  ["education", "ಶಿಕ್ಷಣ", "Education", "शिक्षा"],
+  ["programmes", "ಕಾರ್ಯಕ್ರಮ", "Programmes", "कार्यक्रम"],
+].map(([slug, name_kn, name_en, name_hi], i) => ({
   id: `seed-category-${i + 1}`,
   slug,
   name_kn,
   name_en,
+  name_hi,
 }));
 const stories = [
   [
@@ -29,6 +30,9 @@ const stories = [
     "ಶ್ರವಣಬೆಳಗೊಳ",
     "hill",
     "article",
+    "श्रवणबेलगोला: भक्ति, परंपरा और इतिहास का जीवंत संगम",
+    "पहाड़ी पर विराजमान बाहुबली के सान्निध्य से लेकर बसदियों की शिल्पकला तक — आइए अपनी जैन परंपरा को निकट से जानें।",
+    "From the presence of Bahubali atop the hill to the sculptural artistry of the basadis — a closer look at our Jain heritage.",
   ],
   [
     "moodbidri-basadi",
@@ -40,6 +44,9 @@ const stories = [
     "ಮೂಡುಬಿದಿರೆ",
     "temple",
     "article",
+    "मूडबिद्री की सहस्र स्तंभ बसदि का कला वैभव",
+    "सदियों की शिल्पकला, सांस्कृतिक स्मृति और जैन परंपरा का सुंदर परिचय।",
+    "Centuries of sculpture, cultural memory and a graceful introduction to Jain heritage.",
   ],
   [
     "chaturmasa-reflections",
@@ -51,6 +58,9 @@ const stories = [
     "ಹಾಸನ",
     "detail",
     "video",
+    "चातुर्मास: आत्मचिंतन और अहिंसा की राह पर",
+    "रोज़मर्रा के जीवन में संयम, करुणा और सरलता का महत्व बताने वाले चिंतन।",
+    "Reflections on the place of restraint, compassion and simplicity in everyday life.",
   ],
   [
     "youth-community",
@@ -62,6 +72,9 @@ const stories = [
     "ಬೆಂಗಳೂರು",
     "landscape",
     "article",
+    "समाजसेवा में युवाओं की भूमिका: नए कदम",
+    "शिक्षा, पर्यावरण और समाजसेवा में युवाओं की भागीदारी के लिए एक मंच।",
+    "A platform for young people to take part in education, the environment and community service.",
   ],
   [
     "panchakalyana-tradition",
@@ -73,6 +86,9 @@ const stories = [
     "ಮೈಸೂರು",
     "temple",
     "video",
+    "पंचकल्याण महोत्सव की परंपराएँ और उनका महत्व",
+    "पंचकल्याण के पाँच मंगल प्रसंगों का अर्थ और उनसे मिलने वाला जीवन संदेश।",
+    "The meaning of the five auspicious occasions of Panchakalyana and the message they hold for life.",
   ],
   [
     "jain-education",
@@ -84,6 +100,9 @@ const stories = [
     "ತುಮಕೂರು",
     "detail",
     "article",
+    "विद्या का प्रकाश: विद्यार्थियों की उपलब्धि को समाज का सहारा",
+    "समुदाय के सहयोग से शिक्षा के अवसर बढ़ाने वाले विचारों का परिचय।",
+    "Ideas for widening access to learning through the support of the community.",
   ],
   [
     "dharmasthala-journey",
@@ -95,6 +114,9 @@ const stories = [
     "ಧರ್ಮಸ್ಥಳ",
     "landscape",
     "video",
+    "धर्मस्थल की ओर एक सांस्कृतिक यात्रा",
+    "आस्था, सेवा और सहजीवन की परंपरा को जानने की एक यात्रा।",
+    "A journey into a tradition of faith, service and living together.",
   ],
   [
     "ahimsa-daily",
@@ -106,6 +128,9 @@ const stories = [
     "ಶ್ರವಣಬೆಳಗೊಳ",
     "hill",
     "article",
+    "रोज़मर्रा के जीवन में अहिंसा: छोटा बदलाव, बड़ा अर्थ",
+    "वाणी, मन और आचरण में करुणा की राह अपनाने के सरल उपाय।",
+    "Simple ways to follow the path of compassion in speech, thought and action.",
   ],
   [
     "basadi-conservation",
@@ -117,6 +142,9 @@ const stories = [
     "ಕಾರ್ಕಳ",
     "temple",
     "article",
+    "हमारी बसदियों का संरक्षण: अगली पीढ़ी के लिए परंपरा",
+    "ऐतिहासिक स्मारकों के संरक्षण में स्थानीय समुदाय की ज़िम्मेदारी।",
+    "The responsibility local communities carry in conserving historic monuments.",
   ],
   [
     "festival-community",
@@ -128,6 +156,9 @@ const stories = [
     "ಬೆಳಗಾವಿ",
     "detail",
     "video",
+    "उत्सव जो समुदाय के रिश्तों को जोड़ते हैं",
+    "परंपरा और एकजुटता के आयोजनों से समुदाय में पनपती आत्मीयता।",
+    "The warmth that grows within a community through celebrations of tradition and togetherness.",
   ],
 ] as const;
 export const demoPosts: Post[] = Array.from({ length: 20 }, (_, i) => {
@@ -138,9 +169,14 @@ export const demoPosts: Post[] = Array.from({ length: 20 }, (_, i) => {
     slug: `seed-${s[0]}${i >= 10 ? "-archive" : ""}`,
     title_kn: s[1],
     title_en: s[2],
+    title_hi: s[9],
     title_translit: s[3],
     summary_kn: s[4],
+    summary_en: s[11],
+    summary_hi: s[10],
     body_html: `<p>${s[4]}</p><p>ನಮ್ಮ ಸಮುದಾಯದ ಪರಂಪರೆ, ನಂಬಿಕೆ ಮತ್ತು ಜೀವನಮೌಲ್ಯಗಳನ್ನು ಪರಿಚಯಿಸುವ ಮಾದರಿ ಲೇಖನ ಇದು. ಈ ಪುಟದ ಮೂಲಕ ಸುದ್ದಿ ಓದುವ ಅನುಭವ, ಕಾರ್ಯಕ್ರಮದ ದಿನಾಂಕ ಮತ್ತು ಸಂಬಂಧಿತ ವಿಷಯಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು.</p><h2>ಪರಂಪರೆಯೊಂದಿಗೆ ಮುಂದಿನ ಹೆಜ್ಜೆ</h2><p>ಜೈನ ಸಂಸ್ಕೃತಿಯಲ್ಲಿ ಅಹಿಂಸೆ, ಸಹಬಾಳ್ವೆ ಮತ್ತು ಸೇವೆಗೆ ವಿಶೇಷ ಸ್ಥಾನವಿದೆ. ನಮ್ಮ ಊರುಗಳ ಇತಿಹಾಸ ಮತ್ತು ಸಮಾಜದ ಸಾಧನೆಗಳನ್ನು ದಾಖಲಿಸುವುದು ಮುಂದಿನ ಪೀಳಿಗೆಗೆ ಅಮೂಲ್ಯ ಕೊಡುಗೆ.</p><p>ಇಲ್ಲಿರುವ ವಿಷಯವು ವಿನ್ಯಾಸವನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಿದ್ಧಪಡಿಸಿದ ಮಾದರಿ ಮಾತ್ರ. ನೈಜ ವರದಿ ಮತ್ತು ಕಾರ್ಯಕ್ರಮಗಳ ಮಾಹಿತಿಯನ್ನು ಸಂಪಾದಕೀಯ ಪರಿಶೀಲನೆಯ ನಂತರ ಪ್ರಕಟಿಸಲಾಗುತ್ತದೆ.</p>`,
+    body_hi: `<p>${s[10]}</p><p>यह हमारे समुदाय की परंपरा, आस्था और जीवनमूल्यों का परिचय देने वाला एक नमूना लेख है। इस पृष्ठ के माध्यम से समाचार पढ़ने का अनुभव, कार्यक्रम की तिथि और संबंधित विषय देखे जा सकते हैं।</p><h2>परंपरा के साथ अगला कदम</h2><p>जैन संस्कृति में अहिंसा, सहजीवन और सेवा का विशेष स्थान है। हमारे गाँव-शहरों का इतिहास और समाज की उपलब्धियाँ दर्ज करना अगली पीढ़ी के लिए अमूल्य योगदान है।</p><p>यहाँ दी गई सामग्री केवल डिज़ाइन दिखाने के लिए तैयार किया गया नमूना है। वास्तविक रिपोर्ट और कार्यक्रमों की जानकारी संपादकीय समीक्षा के बाद प्रकाशित की जाएगी।</p>`,
+    body_en: `<p>${s[11]}</p><p>This is a sample article introducing our community's heritage, faith and values. Through this page you can see how a report reads, how event dates appear and how related topics are surfaced.</p><h2>Carrying the tradition forward</h2><p>Ahimsa, coexistence and service hold a special place in Jain culture. Recording the history of our towns and the achievements of our community is an invaluable gift to the next generation.</p><p>The content here is only a sample prepared to demonstrate the design. Real reports and event details will be published after editorial review.</p>`,
     type: s[8],
     status: "published",
     event_date: `2026-09-${String(day).padStart(2, "0")}`,
@@ -168,6 +204,7 @@ export const demoEvents: NewsEvent[] = [
     "2026-09-24",
     "ಶ್ರವಣಬೆಳಗೊಳ",
     "ಹಾಸನ",
+    "जैन परंपरा परिचय",
   ],
   [
     "community-meet",
@@ -177,6 +214,7 @@ export const demoEvents: NewsEvent[] = [
     "2026-09-27",
     "ಮೂಡುಬಿದಿರೆ",
     "ದಕ್ಷಿಣ ಕನ್ನಡ",
+    "समाज का सांस्कृतिक समागम",
   ],
   [
     "study-circle",
@@ -186,6 +224,7 @@ export const demoEvents: NewsEvent[] = [
     "2026-09-30",
     "ಬೆಂಗಳೂರು",
     "ಬೆಂಗಳೂರು",
+    "अहिंसा और जीवनमूल्यों पर चिंतन",
   ],
   [
     "youth-forum",
@@ -195,6 +234,7 @@ export const demoEvents: NewsEvent[] = [
     "2026-10-04",
     "ಮೈಸೂರು",
     "ಮೈಸೂರು",
+    "युवाओं का सेवा मंच",
   ],
   [
     "festival",
@@ -204,18 +244,31 @@ export const demoEvents: NewsEvent[] = [
     "2026-10-12",
     "ಕಾರ್ಕಳ",
     "ಉಡುಪಿ",
+    "सांस्कृतिक उत्सव",
   ],
-].map(([slug, name_kn, name_en, start_date, end_date, place, district], i) => ({
-  id: `seed-event-${i + 1}`,
-  slug: `seed-${slug}`,
-  name_kn,
-  name_en,
-  start_date,
-  end_date,
-  place,
-  district,
-  organiser: "ಜ್ವಾಲಾಮಾಲಾ ಸಮುದಾಯ — ಮಾದರಿ",
-  description_kn:
-    "ಇದು ಕ್ಯಾಲೆಂಡರ್ ಪ್ರದರ್ಶನಕ್ಕಾಗಿ ಸೇರಿಸಿದ ಮಾದರಿ ಕಾರ್ಯಕ್ರಮ. ಇದು ನೈಜ ಕಾರ್ಯಕ್ರಮದ ಆಹ್ವಾನವಲ್ಲ.",
-  is_seed: true,
-}));
+].map(
+  (
+    [slug, name_kn, name_en, start_date, end_date, place, district, name_hi],
+    i,
+  ) => ({
+    id: `seed-event-${i + 1}`,
+    slug: `seed-${slug}`,
+    name_kn,
+    name_en,
+    name_hi,
+    start_date,
+    end_date,
+    place,
+    district,
+    organiser: "ಜ್ವಾಲಾಮಾಲಾ ಸಮುದಾಯ — ಮಾದರಿ",
+    organiser_en: "Jwalamala Community — Sample",
+    organiser_hi: "ज्वालामाला समुदाय — नमूना",
+    description_kn:
+      "ಇದು ಕ್ಯಾಲೆಂಡರ್ ಪ್ರದರ್ಶನಕ್ಕಾಗಿ ಸೇರಿಸಿದ ಮಾದರಿ ಕಾರ್ಯಕ್ರಮ. ಇದು ನೈಜ ಕಾರ್ಯಕ್ರಮದ ಆಹ್ವಾನವಲ್ಲ.",
+    description_en:
+      "This is a sample event added to demonstrate the calendar. It is not an invitation to a real event.",
+    description_hi:
+      "यह कैलेंडर प्रदर्शन के लिए जोड़ा गया नमूना कार्यक्रम है। यह किसी वास्तविक कार्यक्रम का निमंत्रण नहीं है।",
+    is_seed: true,
+  }),
+);

@@ -6,11 +6,10 @@ import {
   defaultPush,
   pushPreferencesSchema,
   pushTopics,
-  pushLabels,
   type PushPreferences,
 } from "@/lib/push/schema";
 export function PushSettings() {
-  const { kn } = useUiStrings();
+  const { kn, pushLabels } = useUiStrings();
   const [prefs, setPrefs] = useState<PushPreferences>(defaultPush),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);

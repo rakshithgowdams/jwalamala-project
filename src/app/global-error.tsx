@@ -1,8 +1,21 @@
 "use client";
+import { uiStrings, isLocale, type Locale } from "@/lib/i18n/strings";
+
+/**
+ * This boundary replaces the root layout, so it renders outside the language
+ * provider and has to read the reader's choice from the cookie itself.
+ */
+function cookieLocale(): Locale {
+  if (typeof document === "undefined") return "kn";
+  const value = document.cookie.match(/jwalamala-language=([^;]+)/)?.[1];
+  return isLocale(value) ? value : "kn";
+}
 
 export default function GlobalError({ reset }: { reset: () => void }) {
+  const locale = cookieLocale();
+  const { kn } = uiStrings(locale);
   return (
-    <html lang="kn">
+    <html lang={locale}>
       <body
         style={{
           margin: 0,
@@ -17,10 +30,10 @@ export default function GlobalError({ reset }: { reset: () => void }) {
       >
         <div style={{ textAlign: "center", padding: "2rem" }}>
           <h1 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>
-            ದೋಷ ಸಂಭವಿಸಿದೆ
+            {kn.error}
           </h1>
           <p style={{ color: "#78716c", marginBottom: "1.5rem" }}>
-            Something went wrong. Please try again.
+            {kn.errorText}
           </p>
           <button
             onClick={reset}
@@ -34,7 +47,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
               fontSize: "0.9375rem",
             }}
           >
-            Retry
+            {kn.retry}
           </button>
         </div>
       </body>

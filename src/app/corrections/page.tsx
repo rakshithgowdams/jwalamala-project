@@ -31,10 +31,15 @@ export default async function Page() {
                     { timeZone: "Asia/Kolkata" },
                   )}
                 </time>
-                <p>{row.note_kn}</p>
+                <p>{pickText(locale, row.note_kn, row.note_en, row.note_hi)}</p>
                 {post && (
                   <Link href={postHref(post)}>
-                    {pickText(locale, post.title_kn, post.title_en)}
+                    {pickText(
+                      locale,
+                      post.title_kn,
+                      post.title_en,
+                      post.title_hi,
+                    )}
                   </Link>
                 )}
               </article>

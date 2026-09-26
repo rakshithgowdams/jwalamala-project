@@ -71,7 +71,7 @@ export function PlacePicker({
         >
           {places.map((place) => (
             <option value={place.slug} key={place.id}>
-              {pickText(locale, place.name_kn, place.name_en)}
+              {pickText(locale, place.name_kn, place.name_en, place.name_hi)}
             </option>
           ))}
         </select>

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Script from "next/script";
 
 import { site } from "@/config/site";
+import { pickText } from "@/lib/i18n/content";
 import { routeAllowsAds, type AdPick } from "@/lib/ads/schema";
 export const AdNonceContext = createContext<string | undefined>(undefined);
 export function AdNonceProvider({
@@ -48,7 +49,7 @@ function Slot({
   format: string;
   pathname: string;
 }) {
-  const { kn, v4: t } = useUiStrings();
+  const { kn, v4: t, locale } = useUiStrings();
 
   const root = useRef<HTMLDivElement>(null),
     [pick, setPick] = useState<AdPick>(
@@ -155,7 +156,12 @@ function Slot({
                 )}
                 <img
                   src={pick.creative.image_url}
-                  alt={pick.creative.alt_kn}
+                  alt={pickText(
+                    locale,
+                    pick.creative.alt_kn,
+                    pick.creative.alt_en,
+                    pick.creative.alt_hi,
+                  )}
                   loading="lazy"
                   width={format === "rectangle" ? 300 : 728}
                   height={format === "rectangle" ? 250 : 90}

@@ -17,10 +17,21 @@ import {
 import { EventCard } from "@/components/events/EventCard";
 import { site } from "@/config/site";
 import { FollowButton } from "@/components/engagement/FollowButton";
-import type { Topic } from "@/lib/v4/types";
+import type { Topic, Tag, Place, Author, Series } from "@/lib/v4/types";
+import type { Locale } from "@/lib/i18n/strings";
 export type DiscoveryKind = "tag" | "topic" | "place" | "author" | "series";
+function rowTitle(locale: Locale, row: Tag | Topic | Place | Author | Series) {
+  return "title_kn" in row
+    ? pickText(locale, row.title_kn, row.title_en, row.title_hi)
+    : pickText(
+        locale,
+        row.name_kn,
+        "name_en" in row ? row.name_en : null,
+        row.name_hi,
+      );
+}
 export async function discoveryMetadata(kind: DiscoveryKind, slug: string) {
-  const { kn } = await getUiStrings();
+  const { kn, locale } = await getUiStrings();
   const table = {
     tag: "tags",
     topic: "topics",
@@ -30,7 +41,7 @@ export async function discoveryMetadata(kind: DiscoveryKind, slug: string) {
   } as const;
   const row = (await getV4Rows(table[kind])).find((row) => row.slug === slug);
   return {
-    title: row ? ("title_kn" in row ? row.title_kn : row.name_kn) : kn.notFound,
+    title: row ? rowTitle(locale, row) : kn.notFound,
     alternates: { canonical: `/${kind}/${slug}` },
   };
 }
@@ -63,7 +74,6 @@ export async function DiscoveryPage({
   let posts = allPosts;
   let topic: Topic | undefined;
   let description = "";
-  let englishTitle = "";
   if (kind === "tag") {
     const tag = tags.find((tag) => tag.slug === slug)!;
     if (tag.merged_into_id) {
@@ -80,10 +90,14 @@ export async function DiscoveryPage({
     topic = (await getV4Rows("topics")).find((item) => item.id === row.id)!;
     if (!topic.is_active) notFound();
     posts = topicPosts(topic, await getV4Rows("topic_pins"), links, posts);
-    description = topic.intro_kn;
+    description = pickText(
+      locale,
+      topic.intro_kn,
+      topic.intro_en,
+      topic.intro_hi,
+    );
   } else if (kind === "place") {
     const place = (await getV4Rows("places")).find((p) => p.id === row.id)!;
-    englishTitle = place.name_en;
     posts = posts.filter(
       (post) =>
         post.event_place === place.name_kn || post.place_id === place.id,
@@ -96,7 +110,15 @@ export async function DiscoveryPage({
         post.public_author_id === author.id ||
         (site.demo && author.slug === "jwalamala-desk"),
     );
-    description = author.bio_kn + " " + author.credentials_kn;
+    description =
+      pickText(locale, author.bio_kn, author.bio_en, author.bio_hi) +
+      " " +
+      pickText(
+        locale,
+        author.credentials_kn,
+        author.credentials_en,
+        author.credentials_hi,
+      );
   } else {
     const series = (await getV4Rows("series")).find((p) => p.id === row.id)!;
     if (!series.is_active) notFound();
@@ -106,13 +128,14 @@ export async function DiscoveryPage({
     posts = episodes.flatMap((item) =>
       allPosts.filter((post) => post.id === item.post_id),
     );
-    description = series.description_kn;
+    description = pickText(
+      locale,
+      series.description_kn,
+      series.description_en,
+      series.description_hi,
+    );
   }
-  const title = pickText(
-    locale,
-    "title_kn" in row ? row.title_kn : row.name_kn,
-    englishTitle,
-  );
+  const title = rowTitle(locale, row);
   const results = site.demo
     ? { ...paginate(posts, page), total: posts.length }
     : await getListing(
@@ -122,6 +145,14 @@ export async function DiscoveryPage({
   const events = topic
     ? (await getEvents()).filter((event) => topic.event_ids.includes(event.id))
     : [];
+  const englishFacts =
+    topic && topic.key_facts_en?.length === topic.key_facts.length
+      ? topic.key_facts_en
+      : null;
+  const hindiFacts =
+    topic && topic.key_facts_hi?.length === topic.key_facts.length
+      ? topic.key_facts_hi
+      : null;
   return (
     <div className="container page-shell">
       {site.demo && <SampleNotice />}
@@ -156,7 +187,9 @@ export async function DiscoveryPage({
           <h2>{t.keyFacts}</h2>
           <ul>
             {topic.key_facts.map((fact, i) => (
-              <li key={i}>{fact}</li>
+              <li key={i}>
+                {pickText(locale, fact, englishFacts?.[i], hindiFacts?.[i])}
+              </li>
             ))}
           </ul>
         </section>
@@ -166,7 +199,8 @@ export async function DiscoveryPage({
           <summary>{t.timeline}</summary>
           {topic.timeline.map((entry, i) => (
             <p key={i}>
-              <time>{entry.date}</time> — {entry.text}
+              <time>{entry.date}</time> —{" "}
+              {pickText(locale, entry.text, entry.text_en, entry.text_hi)}
             </p>
           ))}
         </details>
@@ -208,7 +242,7 @@ export async function DiscoveryPage({
               )
               .map((tag) => (
                 <Link className="chip" href={"/tag/" + tag.slug} key={tag.id}>
-                  #{tag.name_kn}
+                  #{pickText(locale, tag.name_kn, tag.name_en, tag.name_hi)}
                 </Link>
               ))}
           </div>
@@ -235,7 +269,7 @@ export async function DiscoveryPage({
                 key={item.id}
                 href={"/basadis/" + item.slug}
               >
-                {item.name_kn}
+                {pickText(locale, item.name_kn, item.name_en, item.name_hi)}
               </Link>
             ))}
         </section>

@@ -230,6 +230,34 @@ export function PostEditor({
           article are filled. Review translated text before publishing.
         </p>
       </details>
+      <details className="wide">
+        <summary>Reviewed Hindi version</summary>
+        <label className="field">
+          Hindi title
+          <input name="title_hi" defaultValue={post?.title_hi || ""} />
+        </label>
+        <label className="field">
+          Hindi summary
+          <textarea
+            name="summary_hi"
+            maxLength={1000}
+            defaultValue={post?.summary_hi || ""}
+          />
+        </label>
+        <label className="field">
+          Hindi article HTML
+          <textarea
+            name="body_hi"
+            rows={10}
+            maxLength={200000}
+            defaultValue={post?.body_hi || ""}
+          />
+        </label>
+        <p className="meta">
+          The Hindi version is available when both the Hindi title and article
+          are filled. Review translated text before publishing.
+        </p>
+      </details>
       <p className="notice wide">{t.publishChecklist}</p>
       <SeoHelper form={formRef} />
       <label className="field">

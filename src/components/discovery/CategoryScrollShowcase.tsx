@@ -105,7 +105,12 @@ export function CategoryScrollShowcase({
           <ScrollRow
             key={row.category.slug}
             color={PALETTE[i % PALETTE.length]}
-            title={pickText(locale, row.category.name_kn, row.category.name_en)}
+            title={pickText(
+              locale,
+              row.category.name_kn,
+              row.category.name_en,
+              row.category.name_hi,
+            )}
             href={`/category/${row.category.slug}`}
           >
             {row.items.map((post) => (

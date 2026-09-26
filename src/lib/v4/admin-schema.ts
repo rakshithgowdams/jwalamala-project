@@ -7,6 +7,7 @@ const title = z.string().trim().min(1).max(300),
     .string()
     .regex(/^[a-z0-9-]+$/)
     .max(150);
+const translation = (max = 300) => z.string().max(max).default("");
 const nullableId = z
   .union([z.uuid(), z.literal("")])
   .transform((value) => value || null);
@@ -49,6 +50,8 @@ const time = z
 const photo = z.object({
   url: image,
   caption: z.string().max(300).optional(),
+  caption_en: z.string().max(300).optional(),
+  caption_hi: z.string().max(300).optional(),
   credit: title,
 });
 export const v4Schemas = {
@@ -84,6 +87,8 @@ export const v4Schemas = {
             !new URL(v).password,
         ),
       alt_kn: title,
+      alt_en: translation(),
+      alt_hi: translation(),
       starts_at: time,
       ends_at: time,
       is_active: bool,
@@ -109,14 +114,16 @@ export const v4Schemas = {
   tags: z.object({
     slug,
     name_kn: title,
-    name_en: z.string().max(150),
+    name_en: translation(150),
+    name_hi: translation(150),
     is_hidden_from_trending: bool,
   }),
   places: z.object({
     slug,
     state: z.string().trim().min(1).max(150).default("Karnataka"),
     name_kn: title,
-    name_en: z.string().max(150),
+    name_en: translation(150),
+    name_hi: translation(150),
     district: title,
     lat: z
       .union([z.literal(""), number.min(-90).max(90)])
@@ -133,24 +140,47 @@ export const v4Schemas = {
     role_kn: title,
     bio_kn: body,
     credentials_kn: body,
+    name_en: translation(),
+    role_en: translation(),
+    bio_en: translation(20000),
+    credentials_en: translation(20000),
+    name_hi: translation(),
+    role_hi: translation(),
+    bio_hi: translation(20000),
+    credentials_hi: translation(20000),
     is_active: bool,
   }),
   topics: z.object({
     slug,
     title_kn: title,
     intro_kn: body,
+    title_en: translation(),
+    intro_en: translation(20000),
+    title_hi: translation(),
+    intro_hi: translation(20000),
     cover_url: image,
     is_active: bool,
     sort_order: number.int(),
     key_facts: jsonArray(z.string().max(500)),
+    key_facts_en: jsonArray(z.string().max(500)),
+    key_facts_hi: jsonArray(z.string().max(500)),
     tag_ids: jsonArray(z.uuid()),
-    timeline: jsonArray(z.object({ date: z.iso.date(), text: title })),
+    timeline: jsonArray(
+      z.object({
+        date: z.iso.date(),
+        text: title,
+        text_en: z.string().max(300).optional(),
+        text_hi: z.string().max(300).optional(),
+      }),
+    ),
     event_ids: jsonArray(z.uuid()),
     liveblog_post_id: nullableId,
   }),
   trending_items: z
     .object({
       label_kn: title,
+      label_en: translation(),
+      label_hi: translation(),
       url: z.string().refine((value) => !!safePublicLink(value)),
       type: z.enum(["tag", "topic", "page", "category", "external", "live"]),
       is_highlight: bool,
@@ -169,6 +199,10 @@ export const v4Schemas = {
     slug,
     title_kn: title,
     description_kn: body,
+    title_en: translation(),
+    description_en: translation(20000),
+    title_hi: translation(),
+    description_hi: translation(20000),
     cover_url: image,
     is_active: bool,
   }),
@@ -177,17 +211,28 @@ export const v4Schemas = {
     title_kn: title,
     kind: z.enum(["parva", "tithi", "festival", "note"]),
     description_kn: body,
+    title_en: translation(),
+    description_en: translation(20000),
+    title_hi: translation(),
+    description_hi: translation(20000),
     is_major: bool,
     is_seed: bool,
   }),
   basadis: z.object({
     slug,
     name_kn: title,
-    name_en: z.string(),
+    name_en: translation(),
+    name_hi: translation(),
     place_id: nullableId,
     deity_kn: z.string(),
     history_kn: body,
     timings_kn: z.string().max(1000),
+    deity_en: translation(),
+    history_en: translation(20000),
+    timings_en: translation(1000),
+    deity_hi: translation(),
+    history_hi: translation(20000),
+    timings_hi: translation(1000),
     contact: z.string().max(200),
     lat: z
       .union([z.literal(""), number.min(-90).max(90)])
@@ -212,6 +257,10 @@ export const v4Schemas = {
     title_kn: title,
     person_name: z.string().max(150),
     body_kn: body,
+    title_en: translation(),
+    body_en: translation(20000),
+    title_hi: translation(),
+    body_hi: translation(20000),
     place_id: nullableId,
     event_date: z.iso.date(),
     contact: z.string().max(200),
@@ -223,6 +272,8 @@ export const v4Schemas = {
     slug,
     title_kn: title,
     org: title,
+    org_en: translation(),
+    org_hi: translation(),
     kind: z.enum(["job", "scholarship", "competition", "admission"]),
     place_id: nullableId,
     last_date: z.iso.date(),
@@ -234,6 +285,10 @@ export const v4Schemas = {
       .transform((value) => value || null),
     contact: z.string().max(200),
     description_kn: body,
+    title_en: translation(),
+    description_en: translation(20000),
+    title_hi: translation(),
+    description_hi: translation(20000),
     status: z.enum(["pending", "approved", "rejected"]),
     is_seed: bool,
   }),
@@ -241,6 +296,10 @@ export const v4Schemas = {
     slug,
     title_kn: title,
     summary_kn: body,
+    title_en: translation(),
+    summary_en: translation(20000),
+    title_hi: translation(),
+    summary_hi: translation(20000),
     cover_url: image,
     event_date: z.iso.date(),
     is_live: bool,
@@ -253,6 +312,10 @@ export const v4Schemas = {
       slug,
       title_kn: title,
       description_kn: body,
+      title_en: translation(),
+      description_en: translation(20000),
+      title_hi: translation(),
+      description_hi: translation(20000),
       images: jsonArray(photo),
       event_date: z.iso.date(),
       status: z.enum(["draft", "published"]),
@@ -263,11 +326,15 @@ export const v4Schemas = {
     .object({
       slug,
       title_kn: title,
+      title_en: translation(),
+      title_hi: translation(),
       cover_url: image,
       slides: jsonArray(
         z.object({
           image,
           text: title,
+          text_en: z.string().max(300).optional(),
+          text_hi: z.string().max(300).optional(),
           credit: title,
           href: z
             .string()
@@ -287,8 +354,19 @@ export const v4Schemas = {
   polls: z
     .object({
       question_kn: title,
+      question_en: translation(),
+      question_hi: translation(),
       options: jsonArray(z.string().min(1).max(200)).pipe(
         z.array(z.string()).min(2).max(8),
+      ),
+      // Translated option lists may be left empty; PollCard only uses one when its
+      // length matches the Kannada list, so a partial translation is ignored
+      // rather than mismatching the votes it labels.
+      options_en: jsonArray(z.string().max(200)).pipe(
+        z.array(z.string()).max(8),
+      ),
+      options_hi: jsonArray(z.string().max(200)).pipe(
+        z.array(z.string()).max(8),
       ),
       ends_at: time,
       status: z.enum(["draft", "active", "closed"]),
@@ -298,13 +376,21 @@ export const v4Schemas = {
   quizzes: z.object({
     slug,
     title_kn: title,
+    title_en: translation(),
+    title_hi: translation(),
     questions: jsonArray(
       z
         .object({
           question: title,
+          question_en: z.string().max(300).optional(),
+          question_hi: z.string().max(300).optional(),
           options: z.array(z.string().min(1)).min(2).max(6),
+          options_en: z.array(z.string().max(300)).max(6).optional(),
+          options_hi: z.array(z.string().max(300)).max(6).optional(),
           answer: number.int().min(0),
           explanation: title,
+          explanation_en: z.string().max(300).optional(),
+          explanation_hi: z.string().max(300).optional(),
         })
         .refine((question) => question.answer < question.options.length),
     ),
@@ -314,6 +400,8 @@ export const v4Schemas = {
   reservoir_readings: z.object({
     reservoir_slug: slug,
     name_kn: title,
+    name_en: translation(),
+    name_hi: translation(),
     reading_date: z.iso.date(),
     full_level_m: number.nonnegative(),
     level_m: number.nonnegative(),
@@ -321,6 +409,8 @@ export const v4Schemas = {
     inflow_cusecs: number.nonnegative(),
     outflow_cusecs: number.nonnegative(),
     source: title,
+    source_en: translation(),
+    source_hi: translation(),
     is_seed: bool,
   }),
   market_rates: z.object({
@@ -329,7 +419,11 @@ export const v4Schemas = {
     place_id: nullableId,
     value: number.nonnegative(),
     unit: title,
+    unit_en: translation(),
+    unit_hi: translation(),
     source: title,
+    source_en: translation(),
+    source_hi: translation(),
     is_seed: bool,
   }),
 };
@@ -356,7 +450,12 @@ const f = (
   type: Field["type"] = "text",
   options?: string[],
 ): Field => ({ name, label, type, options });
-const standard = [f("slug", kn.slug), f("title_kn", kn.title)];
+const standard = [
+  f("slug", kn.slug),
+  f("title_kn", kn.title),
+  f("title_en", "English title"),
+  f("title_hi", "Hindi title"),
+];
 const publication = [
   f("status", kn.status, "select", ["draft", "published"]),
   f("is_seed", t.sample, "checkbox"),
@@ -392,6 +491,8 @@ export const v4Resources: Record<
       f("mobile_image_url", t.mobileImage),
       f("target_url", kn.link),
       f("alt_kn", t.alt),
+      f("alt_en", "English alt"),
+      f("alt_hi", "Hindi alt"),
       f("campaign_id", t.campaigns),
       f("slot_keys", t.adSlots, "list"),
       f("category_ids", kn.categories, "ids"),
@@ -415,6 +516,7 @@ export const v4Resources: Record<
       f("slug", kn.slug),
       f("name_kn", kn.title),
       f("name_en", "English"),
+      f("name_hi", "Hindi"),
       f("is_hidden_from_trending", t.hide, "checkbox"),
     ],
   },
@@ -426,6 +528,7 @@ export const v4Resources: Record<
       f("slug", kn.slug),
       f("name_kn", kn.title),
       f("name_en", "English"),
+      f("name_hi", "Hindi"),
       f("district", t.district),
       f("lat", t.latitude, "number"),
       f("lng", t.longitude, "number"),
@@ -439,9 +542,17 @@ export const v4Resources: Record<
     fields: [
       f("slug", kn.slug),
       f("name_kn", kn.name),
+      f("name_en", "English name"),
+      f("name_hi", "Hindi name"),
       f("role_kn", kn.status),
+      f("role_en", "English role"),
+      f("role_hi", "Hindi role"),
       f("bio_kn", kn.summary, "textarea"),
+      f("bio_en", "English bio", "textarea"),
+      f("bio_hi", "Hindi bio", "textarea"),
       f("credentials_kn", t.credentials, "textarea"),
+      f("credentials_en", "English credentials", "textarea"),
+      f("credentials_hi", "Hindi credentials", "textarea"),
       f("is_active", t.enabled, "checkbox"),
     ],
   },
@@ -451,8 +562,12 @@ export const v4Resources: Record<
     fields: [
       ...standard,
       f("intro_kn", kn.summary, "textarea"),
+      f("intro_en", "English intro", "textarea"),
+      f("intro_hi", "Hindi intro", "textarea"),
       f("cover_url", kn.link),
       f("key_facts", t.keyFacts, "list"),
+      f("key_facts_en", t.keyFacts + " (English)", "list"),
+      f("key_facts_hi", t.keyFacts + " (हिंदी)", "list"),
       f("tag_ids", t.tags, "ids"),
       f("timeline", t.timeline, "structured"),
       f("event_ids", kn.events, "ids"),
@@ -466,6 +581,8 @@ export const v4Resources: Record<
     permission: "content.edit",
     fields: [
       f("label_kn", kn.title),
+      f("label_en", "English label"),
+      f("label_hi", "Hindi label"),
       f("url", kn.link),
       f("type", t.contentType, "select", [
         "tag",
@@ -488,6 +605,8 @@ export const v4Resources: Record<
     fields: [
       ...standard,
       f("description_kn", kn.summary, "textarea"),
+      f("description_en", "English description", "textarea"),
+      f("description_hi", "Hindi description", "textarea"),
       f("cover_url", kn.link),
       f("is_active", t.enabled, "checkbox"),
     ],
@@ -498,6 +617,8 @@ export const v4Resources: Record<
     fields: [
       f("date", kn.eventDate, "date"),
       f("title_kn", kn.title),
+      f("title_en", "English title"),
+      f("title_hi", "Hindi title"),
       f("kind", t.contentType, "select", [
         "parva",
         "tithi",
@@ -505,6 +626,8 @@ export const v4Resources: Record<
         "note",
       ]),
       f("description_kn", kn.summary, "textarea"),
+      f("description_en", "English description", "textarea"),
+      f("description_hi", "Hindi description", "textarea"),
       f("is_major", t.pinned, "checkbox"),
       f("is_seed", t.sample, "checkbox"),
     ],
@@ -516,10 +639,17 @@ export const v4Resources: Record<
       f("slug", kn.slug),
       f("name_kn", kn.title),
       f("name_en", "English"),
+      f("name_hi", "Hindi"),
       f("place_id", kn.place),
       f("deity_kn", t.deity),
+      f("deity_en", "English deity"),
+      f("deity_hi", "Hindi deity"),
       f("history_kn", kn.body, "textarea"),
+      f("history_en", "English history", "textarea"),
+      f("history_hi", "Hindi history", "textarea"),
       f("timings_kn", t.timings),
+      f("timings_en", "English timings"),
+      f("timings_hi", "Hindi timings"),
       f("contact", kn.contact),
       f("lat", t.latitude, "number"),
       f("lng", t.longitude, "number"),
@@ -542,6 +672,8 @@ export const v4Resources: Record<
       ]),
       f("person_name", kn.name),
       f("body_kn", kn.body, "textarea"),
+      f("body_en", "English body", "textarea"),
+      f("body_hi", "Hindi body", "textarea"),
       f("place_id", kn.place),
       f("event_date", kn.eventDate, "date"),
       f("contact", kn.contact),
@@ -556,6 +688,8 @@ export const v4Resources: Record<
     fields: [
       ...standard,
       f("org", t.organisation),
+      f("org_en", t.organisation + " (English)"),
+      f("org_hi", t.organisation + " (हिंदी)"),
       f("kind", t.contentType, "select", [
         "job",
         "scholarship",
@@ -567,6 +701,8 @@ export const v4Resources: Record<
       f("link", kn.link),
       f("contact", kn.contact),
       f("description_kn", kn.body, "textarea"),
+      f("description_en", "English description", "textarea"),
+      f("description_hi", "Hindi description", "textarea"),
       f("status", kn.status, "select", ["pending", "approved", "rejected"]),
       f("is_seed", t.sample, "checkbox"),
     ],
@@ -577,6 +713,8 @@ export const v4Resources: Record<
     fields: [
       ...standard,
       f("summary_kn", kn.summary, "textarea"),
+      f("summary_en", "English summary", "textarea"),
+      f("summary_hi", "Hindi summary", "textarea"),
       f("cover_url", kn.link),
       f("event_date", kn.eventDate, "date"),
       f("is_live", kn.live, "checkbox"),
@@ -590,6 +728,8 @@ export const v4Resources: Record<
     fields: [
       ...standard,
       f("description_kn", kn.summary, "textarea"),
+      f("description_en", "English description", "textarea"),
+      f("description_hi", "Hindi description", "textarea"),
       f("images", t.gallery, "structured"),
       f("event_date", kn.eventDate, "date"),
       ...publication,
@@ -611,7 +751,11 @@ export const v4Resources: Record<
     permission: "content.edit",
     fields: [
       f("question_kn", kn.title),
+      f("question_en", kn.title + " (English)"),
+      f("question_hi", kn.title + " (हिंदी)"),
       f("options", t.options, "list"),
+      f("options_en", t.options + " (English)", "list"),
+      f("options_hi", t.options + " (हिंदी)", "list"),
       f("ends_at", t.end, "datetime-local"),
       f("status", kn.status, "select", ["draft", "active", "closed"]),
       f("is_seed", t.sample, "checkbox"),
@@ -632,6 +776,8 @@ export const v4Resources: Record<
     fields: [
       f("reservoir_slug", kn.slug),
       f("name_kn", kn.title),
+      f("name_en", "English name"),
+      f("name_hi", "Hindi name"),
       f("reading_date", kn.eventDate, "date"),
       f("full_level_m", t.fullLevel, "number"),
       f("level_m", t.currentLevel, "number"),
@@ -639,6 +785,8 @@ export const v4Resources: Record<
       f("inflow_cusecs", t.inflow, "number"),
       f("outflow_cusecs", t.outflow, "number"),
       f("source", t.source),
+      f("source_en", t.source + " (English)"),
+      f("source_hi", t.source + " (हिंदी)"),
       f("is_seed", t.sample, "checkbox"),
     ],
   },
@@ -657,7 +805,11 @@ export const v4Resources: Record<
       f("place_id", kn.place),
       f("value", t.value, "number"),
       f("unit", t.unit),
+      f("unit_en", t.unit + " (English)"),
+      f("unit_hi", t.unit + " (हिंदी)"),
       f("source", t.source),
+      f("source_en", t.source + " (English)"),
+      f("source_hi", t.source + " (हिंदी)"),
       f("is_seed", t.sample, "checkbox"),
     ],
   },

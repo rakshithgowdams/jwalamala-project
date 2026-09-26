@@ -39,7 +39,7 @@ export function CategoryNav({ categories }: { categories: Category[] }) {
             ["/videos", kn.videos],
             ...categories.map((c): [string, string] => [
               `/category/${c.slug}`,
-              pickText(locale, c.name_kn, c.name_en),
+              pickText(locale, c.name_kn, c.name_en, c.name_hi),
             ]),
             ["/events", kn.events],
           ]}
@@ -49,7 +49,7 @@ export function CategoryNav({ categories }: { categories: Category[] }) {
           { href: "/videos", label: kn.videos },
           ...categories.slice(0, 7).map((c) => ({
             href: `/category/${c.slug}`,
-            label: pickText(locale, c.name_kn, c.name_en),
+            label: pickText(locale, c.name_kn, c.name_en, c.name_hi),
           })),
           { href: "/events", label: kn.events },
         ].map((n) => (

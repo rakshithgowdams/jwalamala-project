@@ -14,20 +14,18 @@ export default async function Page({
     { id } = await params;
   const { data: p } = await db
     .from("posts")
-    .select(
-      "title_kn,title_en,summary_kn,summary_en,body_html,body_en,video_url,thumbnail_url",
-    )
+    .select("*")
     .eq("id", id)
     .eq("status", "published")
     .gt("early_access_until", new Date().toISOString())
     .maybeSingle();
   if (!p) notFound();
-  const title = pickText(locale, p.title_kn, p.title_en);
+  const title = pickText(locale, p.title_kn, p.title_en, p.title_hi);
   return (
     <div className="container page-shell">
       <p className="notice">{kn.earlyAccess}</p>
       <h1>{title}</h1>
-      <p>{pickText(locale, p.summary_kn, p.summary_en)}</p>
+      <p>{pickText(locale, p.summary_kn, p.summary_en, p.summary_hi)}</p>
       {p.video_url && (
         <LiteVideoEmbed
           url={p.video_url}
@@ -38,7 +36,9 @@ export default async function Page({
       <div
         className="prose"
         dangerouslySetInnerHTML={{
-          __html: cleanHtml(pickText(locale, p.body_html, p.body_en)),
+          __html: cleanHtml(
+            pickText(locale, p.body_html, p.body_en, p.body_hi),
+          ),
         }}
       />
     </div>

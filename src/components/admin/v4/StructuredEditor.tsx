@@ -9,10 +9,14 @@ const fieldSets: Record<
   timeline: [
     { key: "date", label: kn.eventDate, type: "date" },
     { key: "text", label: t.note },
+    { key: "text_en", label: t.note + " (English)" },
+    { key: "text_hi", label: t.note + " (हिंदी)" },
   ],
   images: [
     { key: "url", label: kn.link },
     { key: "caption", label: t.caption },
+    { key: "caption_en", label: t.caption + " (English)" },
+    { key: "caption_hi", label: t.caption + " (हिंदी)" },
     { key: "credit", label: t.credit },
   ],
   photos: [
@@ -23,14 +27,22 @@ const fieldSets: Record<
   slides: [
     { key: "image", label: kn.link },
     { key: "text", label: kn.title },
+    { key: "text_en", label: kn.title + " (English)" },
+    { key: "text_hi", label: kn.title + " (हिंदी)" },
     { key: "credit", label: t.credit },
     { key: "href", label: t.read },
   ],
   questions: [
     { key: "question", label: t.question },
+    { key: "question_en", label: t.question + " (English)" },
+    { key: "question_hi", label: t.question + " (हिंदी)" },
     { key: "options", label: t.options, type: "lines" },
+    { key: "options_en", label: t.options + " (English)", type: "lines" },
+    { key: "options_hi", label: t.options + " (हिंदी)", type: "lines" },
     { key: "answer", label: t.answer, type: "number" },
     { key: "explanation", label: t.explanation },
+    { key: "explanation_en", label: t.explanation + " (English)" },
+    { key: "explanation_hi", label: t.explanation + " (हिंदी)" },
   ],
 };
 export function StructuredEditor({

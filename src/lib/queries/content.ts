@@ -6,6 +6,14 @@ import { site } from "@/config/site";
 import { v4Demo } from "@/lib/v4/demo";
 import { demoPosts, demoEvents, categories } from "@/lib/data/demo";
 import type { Post, NewsEvent, Category } from "@/lib/types";
+/**
+ * The nested relations are read with a wildcard rather than a column list:
+ * naming a column that a pending migration has not added yet makes Postgres
+ * reject the entire query, which would drop every post instead of just the
+ * missing translation.
+ */
+const postColumns =
+  "*,key_points(*),post_categories(categories(slug)),post_tags(tags(*))";
 function publicDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -27,9 +35,7 @@ export const getPosts = cache(async (): Promise<Post[]> => {
   if (!db) return [];
   const { data, error } = await db
     .from("posts")
-    .select(
-      "*,key_points(seconds,label_kn),post_categories(categories(slug)),post_tags(tags(slug,name_kn))",
-    )
+    .select(postColumns)
     .eq("status", "published")
     .lte("published_at", new Date().toISOString())
     .order("published_at", { ascending: false })
@@ -38,8 +44,9 @@ export const getPosts = cache(async (): Promise<Post[]> => {
   return (data || []).map((p) => ({
     ...p,
     tags: (
-      (p.post_tags as { tags: { slug: string; name_kn: string } | null }[]) ||
-      []
+      (p.post_tags as {
+        tags: { slug: string; name_kn: string; name_hi?: string } | null;
+      }[]) || []
     ).flatMap((link) => (link.tags ? [link.tags] : [])),
     category_slugs: (
       p.post_categories as { categories: { slug: string } | null }[]
@@ -74,9 +81,7 @@ export async function getPost(slug: string) {
   if (!db) return undefined;
   const { data, error } = await db
     .from("posts")
-    .select(
-      "*,key_points(seconds,label_kn),post_categories(categories(slug)),post_tags(tags(slug,name_kn))",
-    )
+    .select(postColumns)
     .eq("slug", slug)
     .eq("status", "published")
     .lte("published_at", new Date().toISOString())
@@ -87,7 +92,7 @@ export async function getPost(slug: string) {
     ...data,
     tags: (
       (data.post_tags as {
-        tags: { slug: string; name_kn: string } | null;
+        tags: { slug: string; name_kn: string; name_hi?: string } | null;
       }[]) || []
     ).flatMap((link) => (link.tags ? [link.tags] : [])),
     category_slugs: (

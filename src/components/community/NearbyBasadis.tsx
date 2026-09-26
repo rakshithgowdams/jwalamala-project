@@ -2,15 +2,18 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { pickText } from "@/lib/i18n/content";
 type Place = {
   id: string;
   slug: string;
   name_kn: string;
+  name_en?: string;
+  name_hi?: string;
   lat: number | null;
   lng: number | null;
 };
 export function NearbyBasadis({ places }: { places: Place[] }) {
-  const { v4: t } = useUiStrings();
+  const { v4: t, locale } = useUiStrings();
   const [nearby, setNearby] = useState<(Place & { km: number })[]>([]),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -59,7 +62,8 @@ export function NearbyBasadis({ places }: { places: Place[] }) {
       </button>
       {nearby.map((r) => (
         <Link className="directory-link" href={"/basadis/" + r.slug} key={r.id}>
-          {r.name_kn} · {r.km.toFixed(1)} km
+          {pickText(locale, r.name_kn, r.name_en, r.name_hi)} ·{" "}
+          {r.km.toFixed(1)} km
         </Link>
       ))}
       <p role="status">{message}</p>

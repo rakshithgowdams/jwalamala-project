@@ -19,6 +19,8 @@
     "test:release": "node scripts/check-database.mjs --bundle",
     "db:status": "node scripts/supabase-status.mjs",
     "db:content": "node scripts/build-content-import.mjs",
+    "db:translations": "tsx scripts/generate-translation-updates.ts",
+    "db:backfill": "tsx --tsconfig scripts/tsconfig.json scripts/backfill-translations.ts",
     "db:connect": "node scripts/connect-supabase.mjs --apply --activate",
     "test:content": "node scripts/check-content-import.mjs"
   },

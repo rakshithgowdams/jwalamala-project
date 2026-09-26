@@ -18,7 +18,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const c = (await getCategories()).find((c) => c.slug === slug);
   return {
-    title: c ? pickText(locale, c.name_kn, c.name_en) : kn.notFound,
+    title: c ? pickText(locale, c.name_kn, c.name_en, c.name_hi) : kn.notFound,
     alternates: { canonical: "/category/" + slug },
   };
 }
@@ -44,10 +44,17 @@ export default async function CategoryPage({
       <div className="breadcrumb">
         <Link href="/">{kn.home}</Link>
         <span>/</span>
-        {pickText(locale, category.name_kn, category.name_en)}
+        {pickText(locale, category.name_kn, category.name_en, category.name_hi)}
       </div>
       <div className="page-heading">
-        <h1>{pickText(locale, category.name_kn, category.name_en)}</h1>
+        <h1>
+          {pickText(
+            locale,
+            category.name_kn,
+            category.name_en,
+            category.name_hi,
+          )}
+        </h1>
       </div>
       <AdSlot placement={`category-${slug}-top`} />
       <div className="ad-supported-layout">

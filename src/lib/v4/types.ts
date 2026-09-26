@@ -3,6 +3,7 @@ export type Tag = {
   slug: string;
   name_kn: string;
   name_en?: string;
+  name_hi?: string;
   merged_into_id?: string | null;
   is_hidden_from_trending?: boolean;
 };
@@ -11,6 +12,7 @@ export type Place = {
   slug: string;
   name_kn: string;
   name_en: string;
+  name_hi?: string;
   district: string;
   state?: string;
   lat: number | null;
@@ -25,6 +27,14 @@ export type Author = {
   role_kn: string;
   bio_kn: string;
   credentials_kn: string;
+  name_en?: string;
+  role_en?: string;
+  bio_en?: string;
+  credentials_en?: string;
+  name_hi?: string;
+  role_hi?: string;
+  bio_hi?: string;
+  credentials_hi?: string;
   photo_url: string | null;
   is_active: boolean;
 };
@@ -33,10 +43,21 @@ export type Topic = {
   slug: string;
   title_kn: string;
   intro_kn: string;
+  title_en?: string;
+  intro_en?: string;
+  title_hi?: string;
+  intro_hi?: string;
   cover_url: string;
   key_facts: string[];
+  key_facts_en?: string[];
+  key_facts_hi?: string[];
   tag_ids: string[];
-  timeline: { date: string; text: string }[];
+  timeline: {
+    date: string;
+    text: string;
+    text_en?: string;
+    text_hi?: string;
+  }[];
   event_ids: string[];
   liveblog_post_id: string | null;
   is_active: boolean;
@@ -45,6 +66,8 @@ export type Topic = {
 export type TrendingItem = {
   id: string;
   label_kn: string;
+  label_en?: string;
+  label_hi?: string;
   url: string;
   type: "tag" | "topic" | "page" | "category" | "external" | "live";
   is_highlight: boolean;
@@ -58,6 +81,10 @@ export type Series = {
   slug: string;
   title_kn: string;
   description_kn: string;
+  title_en?: string;
+  description_en?: string;
+  title_hi?: string;
+  description_hi?: string;
   cover_url: string;
   is_active: boolean;
 };
@@ -78,6 +105,10 @@ export type CalendarDay = {
   title_kn: string;
   kind: "parva" | "tithi" | "festival" | "note";
   description_kn: string;
+  title_en?: string;
+  description_en?: string;
+  title_hi?: string;
+  description_hi?: string;
   is_major: boolean;
   is_seed: boolean;
 };
@@ -90,6 +121,13 @@ export type Basadi = {
   deity_kn: string;
   history_kn: string;
   timings_kn: string;
+  deity_en?: string;
+  history_en?: string;
+  timings_en?: string;
+  name_hi?: string;
+  deity_hi?: string;
+  history_hi?: string;
+  timings_hi?: string;
   contact: string;
   lat: number | null;
   lng: number | null;
@@ -111,6 +149,10 @@ export type Notice = {
   person_name: string;
   photo_url: string | null;
   body_kn: string;
+  title_en?: string;
+  body_en?: string;
+  title_hi?: string;
+  body_hi?: string;
   place_id: string;
   event_date: string;
   contact: string;
@@ -123,12 +165,18 @@ export type Opportunity = {
   slug: string;
   title_kn: string;
   org: string;
+  org_en?: string;
+  org_hi?: string;
   kind: "job" | "scholarship" | "competition" | "admission";
   place_id: string;
   last_date: string;
   link: string | null;
   contact: string;
   description_kn: string;
+  title_en?: string;
+  description_en?: string;
+  title_hi?: string;
+  description_hi?: string;
   status: "pending" | "approved" | "rejected";
   is_seed: boolean;
 };
@@ -137,6 +185,10 @@ export type LiveBlog = {
   slug: string;
   title_kn: string;
   summary_kn: string;
+  title_en?: string;
+  summary_en?: string;
+  title_hi?: string;
+  summary_hi?: string;
   cover_url: string;
   event_date: string;
   is_live: boolean;
@@ -148,6 +200,8 @@ export type LiveUpdate = {
   id: string;
   liveblog_id: string;
   body_html: string;
+  body_html_en?: string;
+  body_html_hi?: string;
   is_key: boolean;
   is_pinned: boolean;
   published_at: string;
@@ -157,7 +211,11 @@ export type Poll = {
   multiple_choice?: boolean;
   id: string;
   question_kn: string;
+  question_en?: string;
+  question_hi?: string;
   options: string[];
+  options_en?: string[];
+  options_hi?: string[];
   ends_at: string;
   status: "draft" | "active" | "closed";
   is_seed: boolean;
@@ -166,11 +224,19 @@ export type Quiz = {
   id: string;
   slug: string;
   title_kn: string;
+  title_en?: string;
+  title_hi?: string;
   questions: {
     question: string;
+    question_en?: string;
+    question_hi?: string;
     options: string[];
+    options_en?: string[];
+    options_hi?: string[];
     answer: number;
     explanation: string;
+    explanation_en?: string;
+    explanation_hi?: string;
   }[];
   status: "draft" | "published";
   is_seed: boolean;
@@ -180,7 +246,17 @@ export type Gallery = {
   slug: string;
   title_kn: string;
   description_kn: string;
-  images: { url: string; caption: string; credit: string }[];
+  title_en?: string;
+  description_en?: string;
+  title_hi?: string;
+  description_hi?: string;
+  images: {
+    url: string;
+    caption: string;
+    caption_en?: string;
+    caption_hi?: string;
+    credit: string;
+  }[];
   event_date: string;
   status: "draft" | "published";
   is_seed: boolean;
@@ -189,8 +265,17 @@ export type WebStory = {
   id: string;
   slug: string;
   title_kn: string;
+  title_en?: string;
+  title_hi?: string;
   cover_url: string;
-  slides: { image: string; text: string; credit: string; href?: string }[];
+  slides: {
+    image: string;
+    text: string;
+    text_en?: string;
+    text_hi?: string;
+    credit: string;
+    href?: string;
+  }[];
   status: "draft" | "published";
   published_at: string;
   is_seed: boolean;
@@ -199,6 +284,8 @@ export type ReservoirReading = {
   id: string;
   reservoir_slug: string;
   name_kn: string;
+  name_en?: string;
+  name_hi?: string;
   reading_date: string;
   full_level_m: number;
   level_m: number;
@@ -206,6 +293,8 @@ export type ReservoirReading = {
   inflow_cusecs: number;
   outflow_cusecs: number;
   source: string;
+  source_en?: string;
+  source_hi?: string;
   is_seed: boolean;
 };
 export type MarketRate = {
@@ -215,13 +304,19 @@ export type MarketRate = {
   place_id: string | null;
   value: number;
   unit: string;
+  unit_en?: string;
+  unit_hi?: string;
   source: string;
+  source_en?: string;
+  source_hi?: string;
   is_seed: boolean;
 };
 export type Correction = {
   id: string;
   post_id: string;
   note_kn: string;
+  note_en?: string;
+  note_hi?: string;
   created_at: string;
 };
 export type DataTables = {

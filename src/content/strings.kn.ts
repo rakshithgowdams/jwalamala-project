@@ -239,6 +239,7 @@ export const kn = {
   state: "ರಾಜ್ಯ",
   district: "ಜಿಲ್ಲೆ",
   cityOrTown: "ನಗರ / ಊರು",
+  karnataka: "ಕರ್ನಾಟಕ",
   selectStateFirst: "ಮೊದಲು ರಾಜ್ಯ ಆಯ್ಕೆಮಾಡಿ",
   selectDistrictFirst: "ಮೊದಲು ಜಿಲ್ಲೆ ಆಯ್ಕೆಮಾಡಿ",
   noCities: "ನಗರಗಳನ್ನು ಇನ್ನೂ ಸೇರಿಸಿಲ್ಲ",
@@ -259,6 +260,7 @@ export const kn = {
   openVideo: "ವೀಡಿಯೊ ತೆರೆಯಿರಿ",
   resumeAt: "ಮುಂದುವರಿಸಿ",
   startOver: "ಆರಂಭದಿಂದ",
+  videoChapters: "ವೀಡಿಯೊ ಅಧ್ಯಾಯಗಳು",
   cancelReminder: "ಜ್ಞಾಪನೆ ರದ್ದುಮಾಡಿ",
   notificationSettings: "ಅಧಿಸೂಚನೆಗಳ ಸೆಟ್ಟಿಂಗ್",
   continueWatching: "ವೀಕ್ಷಣೆ ಮುಂದುವರಿಸಿ",
@@ -273,6 +275,8 @@ export const kn = {
   messagesAfterReview: "ಸಂದೇಶಗಳು ಪರಿಶೀಲನೆಯ ನಂತರ ಪ್ರಕಟವಾಗುತ್ತವೆ.",
   readInKannada: "ಕನ್ನಡದಲ್ಲಿ ಓದಿ",
   readInEnglish: "Read in English",
+  readInHindi: "हिंदी में पढ़ें",
+  machineTranslated: "ಕನ್ನಡದಿಂದ ಯಂತ್ರ ಅನುವಾದ, ಇನ್ನೂ ಪರಿಶೀಲಿಸಿಲ್ಲ",
   sponsoredContent: "ಪ್ರಾಯೋಜಿತ ವಿಷಯ",
   contributorApplication: "ನಾಗರಿಕ ವರದಿಗಾರರ ಅರ್ಜಿ",
   contributorIntro:
@@ -282,6 +286,10 @@ export const kn = {
   applyNow: "ಅರ್ಜಿ ಸಲ್ಲಿಸಿ",
   applicationSent: "ಅರ್ಜಿ ಪರಿಶೀಲನೆಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.",
   submitFailed: "ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+  contributorDetailsNeeded:
+    "ಸ್ಥಳವನ್ನು ಆಯ್ಕೆಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ವರದಿಗಾರಿಕೆಯ ಅನುಭವವನ್ನು ವಿವರಿಸಿ.",
+  contributorPhoneNeeded:
+    "ಫೋನ್ OTP ಪರಿಶೀಲನೆ ಅಗತ್ಯ. ವಿವರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ.",
   earlyAccess: "ಬೆಂಬಲಿಗರಿಗೆ ಮುಂಗಡ ಪ್ರವೇಶ",
   noEarlyAccess: "ನಿಮ್ಮ ಖಾತೆಗೆ ಲಭ್ಯವಿರುವ ಮುಂಗಡ ಸುದ್ದಿಗಳಿಲ್ಲ.",
   supportBrand: "{brand}ಗೆ ಬೆಂಬಲ ನೀಡಿ",
@@ -309,6 +317,9 @@ export const kn = {
   earlyAccessShort: "ಮುಂಗಡ ಪ್ರವೇಶ",
   fullScreenStory: "ಪೂರ್ಣ ಪರದೆಯ ಚಿತ್ರಕಥೆ",
   newsNearYou: "ನಿಮ್ಮ ಪ್ರದೇಶದ ಸುದ್ದಿ",
+  editorPicks: "ಸಂಪಾದಕರ ಆಯ್ಕೆ",
+  pages: "ಪುಟಗಳು",
+  siteLanguage: "ತಾಣದ ಭಾಷೆ",
 } as const;
 export const months = [
   "ಜನವರಿ",
@@ -547,6 +558,11 @@ export const v4 = {
   reservoirs: "ಜಲಾಶಯಗಳ ನೀರಿನ ಮಟ್ಟ",
   rates: "ಇಂದಿನ ದರಗಳು",
   storage: "ಸಂಗ್ರಹ",
+  rateGold22: "ಚಿನ್ನ 22K",
+  rateGold24: "ಚಿನ್ನ 24K",
+  rateSilver: "ಬೆಳ್ಳಿ",
+  ratePetrol: "ಪೆಟ್ರೋಲ್",
+  rateDiesel: "ಡೀಸೆಲ್",
   readingTools: "ಓದುವ ಆಯ್ಕೆಗಳು",
   textSize: "ಅಕ್ಷರದ ಗಾತ್ರ",
   lineSpace: "ಸಾಲಿನ ಅಂತರ",
@@ -658,6 +674,13 @@ export const weatherLabels: Record<string, string> = {
   "81": "ಮಳೆ",
   "82": "ಭಾರಿ ಮಳೆ",
   "95": "ಗುಡುಗು ಸಹಿತ ಮಳೆ",
+};
+export const pushLabels: Record<string, string> = {
+  breaking: "ಬ್ರೇಕಿಂಗ್ ಸುದ್ದಿ",
+  live: "ನೇರಪ್ರಸಾರ",
+  daily: "ದಿನದ ಮುಖ್ಯ ಸುದ್ದಿ",
+  events: "ಕಾರ್ಯಕ್ರಮಗಳು",
+  parva: "ಜೈನ ಪರ್ವಗಳು",
 };
 
 export const v4Choices: Record<string, string> = {

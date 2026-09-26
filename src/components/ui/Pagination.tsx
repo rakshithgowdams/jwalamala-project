@@ -1,5 +1,6 @@
 import Link from "next/link";
-export function Pagination({
+import { getUiStrings } from "@/lib/i18n/server";
+export async function Pagination({
   page,
   pages,
   query = {},
@@ -9,6 +10,7 @@ export function Pagination({
   query?: Record<string, string | undefined>;
 }) {
   if (pages <= 1) return null;
+  const { kn } = await getUiStrings();
   const numbers = [
     ...new Set([
       1,
@@ -19,7 +21,7 @@ export function Pagination({
     ]),
   ].sort((a, b) => a - b);
   return (
-    <nav className="pagination" aria-label="Pages">
+    <nav className="pagination" aria-label={kn.pages}>
       {numbers.map((n, i) => (
         <span key={n}>
           {i > 0 && n > numbers[i - 1] + 1 && (

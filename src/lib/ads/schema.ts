@@ -33,6 +33,8 @@ export type AdCreative = {
   image_url: string;
   mobile_image_url: string | null;
   alt_kn: string;
+  alt_en?: string;
+  alt_hi?: string;
   token: string;
 };
 export type AdPick =

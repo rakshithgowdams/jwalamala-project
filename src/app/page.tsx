@@ -79,7 +79,12 @@ export default async function Home() {
                                 {kn.breaking}
                               </span>
                               <Link href={postHref(lead)}>
-                                {pickText(locale, lead.title_kn, lead.title_en)}
+                                {pickText(
+                                  locale,
+                                  lead.title_kn,
+                                  lead.title_en,
+                                  lead.title_hi,
+                                )}
                               </Link>
                               <ArrowRight size={19} />
                             </div>
@@ -161,7 +166,12 @@ export default async function Home() {
                                 key={c.slug}
                                 className="chip"
                               >
-                                {pickText(locale, c.name_kn, c.name_en)}
+                                {pickText(
+                                  locale,
+                                  c.name_kn,
+                                  c.name_en,
+                                  c.name_hi,
+                                )}
                               </Link>
                             ))}
                           </div>
@@ -220,7 +230,12 @@ export default async function Home() {
                               >
                                 <span>{String(i + 1).padStart(2, "0")}</span>
                                 <h3>
-                                  {pickText(locale, p.title_kn, p.title_en)}
+                                  {pickText(
+                                    locale,
+                                    p.title_kn,
+                                    p.title_en,
+                                    p.title_hi,
+                                  )}
                                 </h3>
                               </Link>
                             ))}
@@ -255,7 +270,7 @@ export default async function Home() {
                     return (
                       <>
                         <section className="section">
-                          <SectionTitle>ಸಂಪಾದಕರ ಆಯ್ಕೆ</SectionTitle>
+                          <SectionTitle>{kn.editorPicks}</SectionTitle>
                           <div className="news-grid">
                             {config.pick_ids
                               .map((id) => posts.find((p) => p.id === id))

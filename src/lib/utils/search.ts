@@ -54,10 +54,14 @@ export function filterPosts(posts: Post[], f: Filters) {
         [
           p.title_kn,
           p.title_en,
+          p.title_hi,
           p.title_translit,
           p.summary_kn,
+          p.summary_hi,
           p.event_place,
-        ].join(" "),
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
       return (
         (f.mode === "event_date" ||

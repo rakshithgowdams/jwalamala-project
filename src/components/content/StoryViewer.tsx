@@ -1,5 +1,6 @@
 "use client";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { pickText } from "@/lib/i18n/content";
 
 import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import Link from "next/link";
@@ -7,19 +8,25 @@ import { useState, useRef } from "react";
 
 import type { WebStory } from "@/lib/v4/types";
 export function StoryViewer({ story }: { story: WebStory }) {
-  const { kn, v4: t } = useUiStrings();
+  const { kn, v4: t, locale } = useUiStrings();
 
   const touchStart = useRef(0);
   const [index, setIndex] = useState(0);
   const slide = story.slides[index];
   if (!slide) return null;
+  const text = pickText(locale, slide.text, slide.text_en, slide.text_hi);
   return (
     <div>
       <div
         className="stories-stage"
         tabIndex={0}
         role="group"
-        aria-label={story.title_kn}
+        aria-label={pickText(
+          locale,
+          story.title_kn,
+          story.title_en,
+          story.title_hi,
+        )}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight")
             setIndex((i) => Math.min(story.slides.length - 1, i + 1));
@@ -39,14 +46,14 @@ export function StoryViewer({ story }: { story: WebStory }) {
             );
         }}
       >
-        <Image src={slide.image} alt={slide.text} fill sizes="420px" priority />
+        <Image src={slide.image} alt={text} fill sizes="420px" priority />
         <div className="stories-progress">
           {story.slides.map((_, i) => (
             <span className={i <= index ? "active" : ""} key={i} />
           ))}
         </div>
         <div className="stories-caption">
-          <h2>{slide.text}</h2>
+          <h2>{text}</h2>
           <p>
             {t.credit}: {slide.credit}
           </p>

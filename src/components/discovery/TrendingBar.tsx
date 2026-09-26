@@ -1,11 +1,12 @@
 import { getUiStrings } from "@/lib/i18n/server";
+import { pickText } from "@/lib/i18n/content";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 
 import { getV4Rows } from "@/lib/v4/queries";
 import { activeTrending, safePublicLink } from "@/lib/v4/utils";
 export async function TrendingBar() {
-  const { v4: t } = await getUiStrings();
+  const { v4: t, locale } = await getUiStrings();
 
   const items = activeTrending(await getV4Rows("trending_items"));
   if (!items.length) return null;
@@ -23,7 +24,7 @@ export async function TrendingBar() {
             className={item.is_highlight ? "highlight" : ""}
           >
             {item.type === "live" && <span className="status-dot" />}
-            {item.label_kn}
+            {pickText(locale, item.label_kn, item.label_en, item.label_hi)}
           </Link>
         ))}
       </nav>

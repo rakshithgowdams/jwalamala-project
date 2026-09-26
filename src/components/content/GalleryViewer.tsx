@@ -1,18 +1,23 @@
 "use client";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { pickText } from "@/lib/i18n/content";
 
 import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { useEffect, useState, useRef } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import type { Gallery } from "@/lib/v4/types";
 
-type Photo = { url: string; caption: string; credit: string };
+type Photo = Gallery["images"][number];
 export function GalleryViewer({ images }: { images: Photo[] }) {
-  const { kn, v4: t } = useUiStrings();
+  const { kn, v4: t, locale } = useUiStrings();
 
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const [index, setIndex] = useState<number | null>(null);
   const active = index !== null ? images[index] : null;
+  const activeCaption = active
+    ? pickText(locale, active.caption, active.caption_en, active.caption_hi)
+    : "";
   useEffect(() => {
     if (index === null) {
       trigger.current?.focus();
@@ -36,31 +41,39 @@ export function GalleryViewer({ images }: { images: Photo[] }) {
   return (
     <>
       <div className="collection-grid">
-        {images.map((photo, i) => (
-          <figure key={i}>
-            <button
-              className="collection-image gallery-button"
-              aria-label={photo.caption}
-              onClick={(event) => {
-                trigger.current = event.currentTarget;
-                setIndex(i);
-              }}
-            >
-              <Image
-                src={photo.url}
-                alt={photo.caption}
-                fill
-                sizes="(max-width:640px) 100vw, 380px"
-              />
-            </button>
-            <figcaption>
-              {photo.caption}
-              <small className="meta">
-                {t.credit}: {photo.credit}
-              </small>
-            </figcaption>
-          </figure>
-        ))}
+        {images.map((photo, i) => {
+          const caption = pickText(
+            locale,
+            photo.caption,
+            photo.caption_en,
+            photo.caption_hi,
+          );
+          return (
+            <figure key={i}>
+              <button
+                className="collection-image gallery-button"
+                aria-label={caption}
+                onClick={(event) => {
+                  trigger.current = event.currentTarget;
+                  setIndex(i);
+                }}
+              >
+                <Image
+                  src={photo.url}
+                  alt={caption}
+                  fill
+                  sizes="(max-width:640px) 100vw, 380px"
+                />
+              </button>
+              <figcaption>
+                {caption}
+                <small className="meta">
+                  {t.credit}: {photo.credit}
+                </small>
+              </figcaption>
+            </figure>
+          );
+        })}
       </div>
       {active && (
         <dialog
@@ -102,9 +115,9 @@ export function GalleryViewer({ images }: { images: Photo[] }) {
               </button>
             </div>
             <div className="lightbox-stage">
-              <Image src={active.url} alt={active.caption} fill sizes="100vw" />
+              <Image src={active.url} alt={activeCaption} fill sizes="100vw" />
             </div>
-            <p>{active.caption}</p>
+            <p>{activeCaption}</p>
             <p>
               {t.credit}: {active.credit}
             </p>

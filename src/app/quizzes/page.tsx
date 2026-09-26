@@ -1,4 +1,5 @@
 import { getUiStrings } from "@/lib/i18n/server";
+import { pickText } from "@/lib/i18n/content";
 import Link from "next/link";
 import { getV4Rows } from "@/lib/v4/queries";
 import { AdSlot } from "@/components/ads/AdSlot";
@@ -7,7 +8,7 @@ export async function generateMetadata() {
   return { title: t.quizzes };
 }
 export default async function Page() {
-  const { v4: t, kn } = await getUiStrings();
+  const { v4: t, kn, locale } = await getUiStrings();
 
   const quizzes = await getV4Rows("quizzes");
   return (
@@ -23,7 +24,7 @@ export default async function Page() {
               href={"/quizzes/" + q.slug}
               key={q.id}
             >
-              <h2>{q.title_kn}</h2>
+              <h2>{pickText(locale, q.title_kn, q.title_en, q.title_hi)}</h2>
               <p>
                 {q.questions.length} {t.questions}
               </p>

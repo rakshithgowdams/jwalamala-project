@@ -1,10 +1,12 @@
 "use server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requirePermission } from "@/lib/v4/permissions";
 import { v4Schemas, v4Resources, type V4Resource } from "@/lib/v4/admin-schema";
 import { kn, v4 as t } from "@/content/strings.kn";
 import { cleanHtml } from "@/lib/utils/sanitize";
+import { autoTranslateRows } from "@/lib/ai/autotranslate";
 export async function saveV4(
   resource: V4Resource,
   id: string | null,
@@ -20,8 +22,17 @@ export async function saveV4(
     ? await db.from(resource).update(payload).eq("id", id).select("id").single()
     : await db.from(resource).insert(payload).select("id").single();
   if (result.error) return { error: t.failed };
+  const saved = String(result.data.id);
+  // Drafts are not worth spending translation budget on; they will be saved again.
+  // Labels feed cards, menus and listings, so they are filled before the editor
+  // sees the response, while prose and jsonb payloads follow after it. Neither
+  // call can fail the save: autoTranslateRows swallows everything.
+  if (payload.status !== "draft") {
+    await autoTranslateRows(resource, [saved], "short");
+    after(() => autoTranslateRows(resource, [saved], "long"));
+  }
   revalidatePath("/", "layout");
-  return { id: String(result.data.id) };
+  return { id: saved };
 }
 export async function saveRelationships(
   resource: "topics" | "series",
@@ -72,6 +83,8 @@ const updateSchema = z.object({
   liveblog_id: z.uuid(),
   id: z.uuid().optional(),
   body_html: z.string().min(1).max(12000),
+  body_html_en: z.string().max(20000).default(""),
+  body_html_hi: z.string().max(20000).default(""),
   is_key: z.boolean(),
   is_pinned: z.boolean(),
 });
@@ -98,6 +111,8 @@ export async function saveLiveUpdate(input: unknown) {
   const payload = {
     ...parsed.data,
     body_html: cleanHtml(parsed.data.body_html),
+    body_html_en: cleanHtml(parsed.data.body_html_en),
+    body_html_hi: cleanHtml(parsed.data.body_html_hi),
     author_id: user.id,
     published_at: new Date().toISOString(),
   };
@@ -107,19 +122,34 @@ export async function saveLiveUpdate(input: unknown) {
     .eq("id", payload.liveblog_id)
     .single();
   if (!blog?.is_live) return { error: t.ended };
-  const result = payload.id
-    ? await db
-        .from("liveblog_updates")
-        .update({
-          media: payload.media || null,
-          body_html: payload.body_html,
-          is_key: payload.is_key,
-          is_pinned: payload.is_pinned,
-        })
-        .eq("id", payload.id)
-        .eq("liveblog_id", payload.liveblog_id)
-    : await db.from("liveblog_updates").insert(payload);
-  if (result.error) return { error: t.failed };
+  let saved = payload.id || "";
+  if (payload.id) {
+    const { error } = await db
+      .from("liveblog_updates")
+      .update({
+        media: payload.media || null,
+        body_html: payload.body_html,
+        body_html_en: payload.body_html_en,
+        body_html_hi: payload.body_html_hi,
+        is_key: payload.is_key,
+        is_pinned: payload.is_pinned,
+      })
+      .eq("id", payload.id)
+      .eq("liveblog_id", payload.liveblog_id);
+    if (error) return { error: t.failed };
+  } else {
+    const { data, error } = await db
+      .from("liveblog_updates")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error) return { error: t.failed };
+    saved = String(data.id);
+  }
+  // A live update is one block of prose, and live blogging is the most latency
+  // sensitive thing here, so the translation always runs after the response.
+  if (saved)
+    after(() => autoTranslateRows("liveblog_updates", [saved], "long"));
   revalidatePath("/live", "layout");
   return { ok: true };
 }

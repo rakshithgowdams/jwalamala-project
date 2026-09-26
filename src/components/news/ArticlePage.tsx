@@ -1,6 +1,10 @@
 import { PreferredSource } from "@/components/engagement/PreferredSource";
 import { ArticleBody } from "./ArticleBody";
 import { getUiStrings } from "@/lib/i18n/server";
+import { brandName, pickText } from "@/lib/i18n/content";
+import { localizePlace } from "@/lib/i18n/places";
+import { getPlaceNames } from "@/lib/i18n/places-server";
+import type { Locale } from "@/lib/i18n/strings";
 import { LazyComments as Comments } from "@/components/ui/LazyComponents";
 import { getSetting } from "@/lib/v4/settings";
 import { commentSettingsSchema, defaultComments } from "@/lib/v4/comments";
@@ -21,11 +25,24 @@ import { NewsCard } from "./NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import { BookmarkButton, ShareButtons } from "./PostActions";
 import { LiteVideoEmbed } from "./LiteVideoEmbed";
-export async function articleMetadata(slug: string, language = "kn") {
+/**
+ * Which language the article body is shown in. `?lang=` wins so the
+ * "read in ..." chips still work either way, but with no parameter the reader's
+ * chosen interface language decides: switching the site to Hindi should not
+ * leave the headline and body in Kannada.
+ */
+function articleLanguageFor(requested: string | undefined, locale: Locale) {
+  return requested || locale;
+}
+export async function articleMetadata(slug: string, language?: string) {
+  const { kn, locale } = await getUiStrings();
   const original = await getPost(slug);
-  if (!original) return { title: (await getUiStrings()).kn.notFound };
-  const english =
-    language === "en" && !!original.body_en && !!original.title_en;
+  if (!original) return { title: kn.notFound };
+  const hasEnglish = !!original.body_en && !!original.title_en;
+  const hasHindi = !!original.body_hi && !!original.title_hi;
+  const shown = articleLanguageFor(language, locale);
+  const english = shown === "en" && hasEnglish;
+  const hindi = shown === "hi" && hasHindi;
   const p = english
     ? {
         ...original,
@@ -34,7 +51,15 @@ export async function articleMetadata(slug: string, language = "kn") {
         seo_title: original.title_en,
         seo_description: original.summary_en || "",
       }
-    : original;
+    : hindi
+      ? {
+          ...original,
+          title_kn: original.title_hi!,
+          summary_kn: original.summary_hi || "",
+          seo_title: original.title_hi,
+          seo_description: original.summary_hi || "",
+        }
+      : original;
   return {
     robots: {
       index: !p.is_seed,
@@ -44,15 +69,17 @@ export async function articleMetadata(slug: string, language = "kn") {
     title: p.seo_title || p.title_kn,
     description: p.seo_description || p.summary_kn,
     alternates: {
-      canonical: postHref(p) + (english ? "?lang=en" : ""),
-      languages:
-        original.body_en && original.title_en
-          ? {
-              kn: postHref(p),
-              en: postHref(p) + "?lang=en",
-              "x-default": postHref(p),
-            }
-          : { kn: postHref(p) },
+      // Keyed off the query parameter, not the reader's cookie, so one URL
+      // always reports the same canonical to crawlers.
+      canonical:
+        postHref(p) +
+        (language === "en" ? "?lang=en" : language === "hi" ? "?lang=hi" : ""),
+      languages: {
+        kn: postHref(p),
+        ...(hasEnglish ? { en: postHref(p) + "?lang=en" } : {}),
+        ...(hasHindi ? { hi: postHref(p) + "?lang=hi" } : {}),
+        ...(hasEnglish || hasHindi ? { "x-default": postHref(p) } : {}),
+      },
     },
     openGraph: {
       title: p.title_kn,
@@ -70,7 +97,7 @@ export async function articleMetadata(slug: string, language = "kn") {
 }
 export async function ArticlePage({
   slug,
-  language = "kn",
+  language,
 }: {
   slug: string;
   language?: string;
@@ -79,8 +106,11 @@ export async function ArticlePage({
 
   const original = await getPost(slug);
   if (!original) notFound();
-  const english =
-    language === "en" && !!original.body_en && !!original.title_en;
+  const hasEnglish = !!original.body_en && !!original.title_en;
+  const hasHindi = !!original.body_hi && !!original.title_hi;
+  const shown = articleLanguageFor(language, locale);
+  const english = shown === "en" && hasEnglish;
+  const hindi = shown === "hi" && hasHindi;
   const p = english
     ? {
         ...original,
@@ -89,7 +119,21 @@ export async function ArticlePage({
         body_html: original.body_en!,
         summary_points: [],
       }
-    : original;
+    : hindi
+      ? {
+          ...original,
+          title_kn: original.title_hi!,
+          summary_kn: original.summary_hi || "",
+          body_html: original.body_hi!,
+          summary_points: [],
+        }
+      : original;
+  const articleLanguage = english ? "en" : hindi ? "hi" : "kn";
+  const eventPlace = localizePlace(
+    await getPlaceNames(),
+    locale,
+    p.event_place,
+  );
   const commentSettings = commentSettingsSchema
     .catch(defaultComments)
     .parse((await getSetting("comments")) || defaultComments);
@@ -130,17 +174,30 @@ export async function ArticlePage({
         <article>
           <div className="article-header">
             <span className="eyebrow">
-              {p.event_place} · {p.type === "article" ? kn.news : kn.videoLabel}
+              {eventPlace} · {p.type === "article" ? kn.news : kn.videoLabel}
             </span>
-            <h1 lang={english ? "en" : "kn"}>{p.title_kn}</h1>
-            {original.body_en && original.title_en && (
+            <h1 lang={articleLanguage}>{p.title_kn}</h1>
+            {hasEnglish && (
               <Link
                 className="chip"
-                href={postHref(p) + (english ? "" : "?lang=en")}
+                href={postHref(p) + (english ? "?lang=kn" : "?lang=en")}
               >
                 {english ? kn.readInKannada : kn.readInEnglish}
               </Link>
             )}
+            {hasHindi && (
+              <Link
+                className="chip"
+                href={postHref(p) + (hindi ? "?lang=kn" : "?lang=hi")}
+              >
+                {hindi ? kn.readInKannada : kn.readInHindi}
+              </Link>
+            )}
+            {articleLanguage !== "kn" &&
+              (original.machine_translated?.["title_" + articleLanguage] ||
+                original.machine_translated?.["body_" + articleLanguage]) && (
+                <p className="notice">{kn.machineTranslated}</p>
+              )}
             {p.sponsor_name && (
               <p className="notice">
                 {kn.sponsoredContent} · {p.sponsor_name}
@@ -148,7 +205,19 @@ export async function ArticlePage({
             )}
             {author && (
               <Link className="byline" href={"/author/" + author.slug}>
-                {author.name_kn} · {author.role_kn}
+                {pickText(
+                  locale,
+                  author.name_kn,
+                  author.name_en,
+                  author.name_hi,
+                )}{" "}
+                ·{" "}
+                {pickText(
+                  locale,
+                  author.role_kn,
+                  author.role_en,
+                  author.role_hi,
+                )}
               </Link>
             )}
             {p.meaningful_update_at && (
@@ -209,7 +278,7 @@ export async function ArticlePage({
             <BookmarkButton postId={p.id} href={postHref(p)} />
           </div>
           <Reactions postId={p.id} demo={p.is_seed} />
-          {!english && (
+          {!english && !hindi && (
             <ArticleAudio postId={p.id} title={p.title_kn} href={postHref(p)} />
           )}
           <ReadingTools postId={p.id} title={p.title_kn} href={postHref(p)} />
@@ -230,7 +299,7 @@ export async function ArticlePage({
           )}
           {p.is_seed && <p className="notice">{kn.demoArticle}</p>}
           <ArticleBody
-            language={english ? "en" : "kn"}
+            language={articleLanguage}
             html={p.body_html}
             hideAds={p.hide_ads}
             sponsored={!!p.sponsor_name}
@@ -241,7 +310,7 @@ export async function ArticlePage({
               .filter((tag) => awaitPostTagIds.has(tag.id))
               .map((tag) => (
                 <Link className="chip" href={"/tag/" + tag.slug} key={tag.id}>
-                  #{tag.name_kn}
+                  #{pickText(locale, tag.name_kn, tag.name_en, tag.name_hi)}
                 </Link>
               ))}
           </div>
@@ -250,14 +319,21 @@ export async function ArticlePage({
               <strong>
                 {t.corrections} · {formatDate(row.created_at, false, locale)}
               </strong>
-              <p>{row.note_kn}</p>
+              <p>{pickText(locale, row.note_kn, row.note_en, row.note_hi)}</p>
             </aside>
           ))}
           <PreferredSource />
           {series && (
             <section className="utility-panel">
               <h2>
-                <Link href={"/series/" + series.slug}>{series.title_kn}</Link>
+                <Link href={"/series/" + series.slug}>
+                  {pickText(
+                    locale,
+                    series.title_kn,
+                    series.title_en,
+                    series.title_hi,
+                  )}
+                </Link>
               </h2>
               {episodes
                 .filter((e) => e.series_id === series.id)
@@ -272,7 +348,13 @@ export async function ArticlePage({
                         href={postHref(post)}
                         aria-current={post.id === p.id ? "page" : undefined}
                       >
-                        {e.episode_no}. {post.title_kn}
+                        {e.episode_no}.{" "}
+                        {pickText(
+                          locale,
+                          post.title_kn,
+                          post.title_en,
+                          post.title_hi,
+                        )}
                       </Link>
                     )
                   );
@@ -288,7 +370,7 @@ export async function ArticlePage({
               <dt>{kn.eventDate}</dt>
               <dd>{formatDate(p.event_date, false, locale)}</dd>
               <dt>{kn.place}</dt>
-              <dd>{p.event_place}</dd>
+              <dd>{eventPlace}</dd>
             </dl>
           </div>
         </article>
@@ -322,8 +404,13 @@ export async function ArticlePage({
               "@type": p.type === "article" ? "NewsArticle" : "VideoObject",
               ...(p.type !== "article"
                 ? {
-                    name: p.title_kn,
-                    description: p.summary_kn,
+                    name: pickText(locale, p.title_kn, p.title_en, p.title_hi),
+                    description: pickText(
+                      locale,
+                      p.summary_kn,
+                      p.summary_en,
+                      p.summary_hi,
+                    ),
                     uploadDate: p.published_at,
                     thumbnailUrl: new URL(p.thumbnail_url, site.url).href,
                     ...(p.video_url ? { contentUrl: p.video_url } : {}),
@@ -332,25 +419,32 @@ export async function ArticlePage({
                       : {}),
                   }
                 : {}),
-              headline: p.title_kn,
-              inLanguage: english ? "en" : "kn",
+              headline: pickText(locale, p.title_kn, p.title_en, p.title_hi),
+              inLanguage: articleLanguage,
               datePublished: p.published_at,
               dateModified: p.meaningful_update_at || p.published_at,
               mainEntityOfPage:
-                site.url + postHref(p) + (english ? "?lang=en" : ""),
+                site.url +
+                postHref(p) +
+                (english ? "?lang=en" : hindi ? "?lang=hi" : ""),
               publisher: {
                 "@type": "Organization",
-                name: site.fullName,
+                name: brandName(locale),
                 logo: { "@type": "ImageObject", url: site.url + site.logo },
               },
               image: new URL(p.thumbnail_url, site.url).href,
               author: author
                 ? {
                     "@type": "Person",
-                    name: author.name_kn,
+                    name: pickText(
+                      locale,
+                      author.name_kn,
+                      author.name_en,
+                      author.name_hi,
+                    ),
                     url: site.url + "/author/" + author.slug,
                   }
-                : { "@type": "Organization", name: site.fullName },
+                : { "@type": "Organization", name: brandName(locale) },
             }).replace(/</g, "\\u003c"),
           }}
         />

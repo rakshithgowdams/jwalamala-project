@@ -17,7 +17,25 @@ import { SampleNotice, EmptyState } from "@/components/ui/Primitives";
 import { AdSlot } from "@/components/ads/AdSlot";
 
 import { site } from "@/config/site";
+import type { Locale } from "@/lib/i18n/strings";
+import type { Basadi, Notice, Opportunity } from "@/lib/v4/types";
 export type CommunityKind = "basadis" | "notices" | "opportunities";
+type CommunityRow = Basadi | Notice | Opportunity;
+const rowTitle = (locale: Locale, row: CommunityRow) =>
+  "name_kn" in row
+    ? pickText(locale, row.name_kn, row.name_en, row.name_hi)
+    : pickText(locale, row.title_kn, row.title_en, row.title_hi);
+const rowBody = (locale: Locale, row: CommunityRow) =>
+  "history_kn" in row
+    ? pickText(locale, row.history_kn, row.history_en, row.history_hi)
+    : "body_kn" in row
+      ? pickText(locale, row.body_kn, row.body_en, row.body_hi)
+      : pickText(
+          locale,
+          row.description_kn,
+          row.description_en,
+          row.description_hi,
+        );
 export async function CommunityList({
   kind,
   filters,
@@ -38,14 +56,16 @@ export async function CommunityList({
   }[kind];
   const placeName = (id: string) => {
     const place = places.find((p) => p.id === id);
-    return place ? pickText(locale, place.name_kn, place.name_en) : "";
+    return place
+      ? pickText(locale, place.name_kn, place.name_en, place.name_hi)
+      : "";
   };
   const filtered = rows.filter((row) => {
     if ("last_date" in row && row.last_date < isoToday()) return false;
     if ("status" in row && !["approved", "published"].includes(row.status))
       return false;
     const place = places.find((p) => p.id === row.place_id);
-    const name = "name_kn" in row ? row.name_kn : row.title_kn;
+    const name = rowTitle(locale, row);
     return (
       matchesLocation(place, filters) &&
       (!filters.q || name.includes(filters.q)) &&
@@ -114,16 +134,10 @@ export async function CommunityList({
               <span className="eyebrow">{placeName(row.place_id)}</span>
               <h2>
                 <Link href={"/" + kind + "/" + row.slug}>
-                  {"name_kn" in row ? row.name_kn : row.title_kn}
+                  {rowTitle(locale, row)}
                 </Link>
               </h2>
-              <p>
-                {"history_kn" in row
-                  ? row.history_kn
-                  : "description_kn" in row
-                    ? row.description_kn
-                    : row.body_kn}
-              </p>
+              <p>{rowBody(locale, row)}</p>
               {"last_date" in row && (
                 <p className="meta">
                   {t.deadline}: {formatDate(row.last_date, false, locale)}
@@ -180,7 +194,7 @@ export async function CommunityDetail({
       condolences = data || [];
     }
   }
-  const title = "name_kn" in row ? row.name_kn : row.title_kn;
+  const title = rowTitle(locale, row);
   return (
     <div
       className={"container page-shell " + (obituary ? "obituary-page" : "")}
@@ -199,7 +213,8 @@ export async function CommunityDetail({
         <span className="eyebrow">
           {obituary
             ? t.obituary
-            : place && pickText(locale, place.name_kn, place.name_en)}
+            : place &&
+              pickText(locale, place.name_kn, place.name_en, place.name_hi)}
         </span>
         <h1>{title}</h1>
         {"event_date" in row && (
@@ -223,18 +238,14 @@ export async function CommunityDetail({
         </>
       )}
       <div className="prose">
-        <p>
-          {"history_kn" in row
-            ? row.history_kn
-            : "body_kn" in row
-              ? row.body_kn
-              : row.description_kn}
-        </p>
+        <p>{rowBody(locale, row)}</p>
       </div>
       {"timings_kn" in row && (
         <div className="utility-panel">
           <h2>{t.timings}</h2>
-          <p>{row.timings_kn}</p>
+          <p>
+            {pickText(locale, row.timings_kn, row.timings_en, row.timings_hi)}
+          </p>
           {row.lat !== null && row.lng !== null && (
             <a
               className="chip"
@@ -255,7 +266,8 @@ export async function CommunityDetail({
       {"last_date" in row && (
         <div className="utility-panel">
           <p>
-            {t.organisation}: {row.org}
+            {t.organisation}:{" "}
+            {pickText(locale, row.org, row.org_en, row.org_hi)}
           </p>
           <p>
             {t.deadline}: {formatDate(row.last_date, false, locale)}
