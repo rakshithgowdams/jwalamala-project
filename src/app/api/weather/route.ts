@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   );
   if (!place) return Response.json({ error: "not-found" }, { status: 404 });
   return Response.json(
-    { place, ...(await getWeather(place.id)) },
+    { place, ...(await getWeather(place.id, place.lat, place.lng)) },
     {
       headers: {
         "Cache-Control": "public, s-maxage=600, stale-while-revalidate=600",

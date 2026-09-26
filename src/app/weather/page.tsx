@@ -33,9 +33,22 @@ export default async function Page({
     places.find((place) => place.slug === "bengaluru-urban") ||
     places[0];
   const { weather, aqi, stale } = place
-    ? await getWeather(place.id)
+    ? await getWeather(place.id, place.lat, place.lng)
     : { weather: null, aqi: null, stale: false };
   const grid = await getWeatherGrid();
+  // Snapshots only exist once the cron has run, so the listed towns fall back to
+  // the provider. Restricted to show_in_weather places to keep the number of
+  // concurrent provider requests well inside the free tier's allowance.
+  const tiles = await Promise.all(
+    places
+      .filter((p) => p.show_in_weather)
+      .map(async (p) => ({
+        place: p,
+        snapshot:
+          grid.find((row) => row.place_id === p.id) ??
+          (await getWeather(p.id, p.lat, p.lng)).weather,
+      })),
+  );
   const settings = (await getSetting("weather_display")) as {
     rain_probability_threshold?: number;
   } | null;
@@ -168,13 +181,12 @@ export default async function Page({
           <p className="meta">
             {t.source}:{" "}
             <a
-              href="https://open-meteo.com/"
+              href="https://openweathermap.org/"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Open-Meteo
-            </a>{" "}
-            / CAMS · CC BY 4.0
+              OpenWeather
+            </a>
           </p>
           {place && <JainTimesPanel placeSlug={place.slug} />}
         </section>
@@ -186,32 +198,27 @@ export default async function Page({
       <section className="section">
         <h2>{t.places}</h2>
         <div className="community-grid">
-          {places
-            .filter((p) => p.show_in_weather)
-            .map((p) => {
-              const w = grid.find((w) => w.place_id === p.id);
-              return (
-                <Link
-                  className="community-card"
-                  key={p.id}
-                  href={"/weather?place=" + p.slug}
-                >
-                  <strong>
-                    {pickText(locale, p.name_kn, p.name_en, p.name_hi)}
-                  </strong>
-                  <p>
-                    {w?.current.temperature != null
-                      ? Math.round(w.current.temperature) + " °C"
-                      : t.dataUnavailable}
-                  </p>
-                  {w && (
-                    <time className="meta" dateTime={w.fetched_at}>
-                      {t.updated}: {istTime(w.fetched_at)}
-                    </time>
-                  )}
-                </Link>
-              );
-            })}
+          {tiles.map(({ place: p, snapshot: w }) => (
+            <Link
+              className="community-card"
+              key={p.id}
+              href={"/weather?place=" + p.slug}
+            >
+              <strong>
+                {pickText(locale, p.name_kn, p.name_en, p.name_hi)}
+              </strong>
+              <p>
+                {w?.current.temperature != null
+                  ? Math.round(w.current.temperature) + " °C"
+                  : t.dataUnavailable}
+              </p>
+              {w && (
+                <time className="meta" dateTime={w.fetched_at}>
+                  {t.updated}: {istTime(w.fetched_at)}
+                </time>
+              )}
+            </Link>
+          ))}
         </div>
       </section>
       {related.length > 0 && (
