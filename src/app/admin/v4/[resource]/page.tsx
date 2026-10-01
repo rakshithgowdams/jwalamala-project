@@ -15,11 +15,14 @@ export default async function Page({
   const name = resource as V4Resource,
     config = v4Resources[name];
   const { db } = await requirePermission(config.permission);
-  const { data, error } = await db
-    .from(name)
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const query = db.from(name).select("*");
+  const { data, error } = await (name === "places"
+    ? query
+        .order("is_district", { ascending: false })
+        .order("sort_order")
+        .order("name_kn")
+        .limit(1000)
+    : query.order("created_at", { ascending: false }).limit(200));
   if (error) throw new Error("v4 migration required");
   const choices: Record<string, Choice[]> = {};
   for (const table of [

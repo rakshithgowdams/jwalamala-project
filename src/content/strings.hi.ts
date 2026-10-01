@@ -630,6 +630,19 @@ export const v4hi = {
   up: "ऊपर",
   down: "नीचे",
   next6Hours: "अगले 6 घंटों में",
+  districts: "ज़िले",
+  localShops: "स्थानीय दुकानें",
+  districtNews: "ज़िलेवार समाचार",
+  districtNewsIntro:
+    "कर्नाटक के हर ज़िले के समाचार, रिपोर्ट और कार्यक्रम एक ही जगह।",
+  allDistricts: "सभी ज़िले",
+  findDistrict: "ज़िला खोजें",
+  noDistrictMatch: "इस नाम का कोई ज़िला नहीं मिला।",
+  districtLatest: "ज़िले की ताज़ा ख़बरें",
+  districtAllNews: "इस ज़िले के सभी समाचार",
+  noDistrictNews: "इस ज़िले से अभी कोई समाचार प्रकाशित नहीं हुआ है।",
+  districtTowns: "ज़िले के स्थान",
+  otherDistricts: "अन्य ज़िले",
 };
 export const monthsHi = [
   "जनवरी",

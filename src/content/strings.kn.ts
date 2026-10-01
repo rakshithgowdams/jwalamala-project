@@ -647,6 +647,31 @@ export const v4 = {
   up: "ಮೇಲೆ",
   down: "ಕೆಳಗೆ",
   next6Hours: "ಮುಂದಿನ 6 ಗಂಟೆಗಳಲ್ಲಿ",
+  districts: "ಜಿಲ್ಲೆಗಳು",
+  localShops: "ಸ್ಥಳೀಯ ಮಳಿಗೆಗಳು",
+  districtNews: "ಜಿಲ್ಲಾವಾರು ಸುದ್ದಿ",
+  districtNewsIntro:
+    "ಕರ್ನಾಟಕದ ಪ್ರತಿಯೊಂದು ಜಿಲ್ಲೆಯ ಸುದ್ದಿ, ವರದಿ ಮತ್ತು ಕಾರ್ಯಕ್ರಮಗಳು ಒಂದೇ ಕಡೆ.",
+  allDistricts: "ಎಲ್ಲಾ ಜಿಲ್ಲೆಗಳು",
+  findDistrict: "ಜಿಲ್ಲೆ ಹುಡುಕಿ",
+  noDistrictMatch: "ಈ ಹೆಸರಿನ ಜಿಲ್ಲೆ ಸಿಗಲಿಲ್ಲ.",
+  districtLatest: "ಜಿಲ್ಲೆಯ ಇತ್ತೀಚಿನ ಸುದ್ದಿ",
+  districtAllNews: "ಈ ಜಿಲ್ಲೆಯ ಎಲ್ಲಾ ಸುದ್ದಿಗಳು",
+  noDistrictNews: "ಈ ಜಿಲ್ಲೆಯಿಂದ ಇನ್ನೂ ಸುದ್ದಿ ಪ್ರಕಟವಾಗಿಲ್ಲ.",
+  districtTowns: "ಜಿಲ್ಲೆಯ ಊರುಗಳು",
+  otherDistricts: "ಇತರ ಜಿಲ್ಲೆಗಳು",
+  showInDistrictNews: "ಜಿಲ್ಲಾವಾರು ಸುದ್ದಿಯಲ್ಲಿ ತೋರಿಸಿ",
+  districtOrder: "ಜಿಲ್ಲಾವಾರು ಸುದ್ದಿಯಲ್ಲಿ ಜಿಲ್ಲೆಗಳ ಕ್ರಮ",
+  districtOrderHelp:
+    "ಮೇಲಿರುವ ಜಿಲ್ಲೆ ಮೊದಲು ಕಾಣಿಸುತ್ತದೆ. ವಿಭಾಗಗಳ ಕ್ರಮವನ್ನು ‘ವಿಭಾಗಗಳು’ ಪುಟದ ಕ್ರಮ ಸಂಖ್ಯೆಯಿಂದ ಬದಲಿಸಿ.",
+  hiddenDistrict: "ಮರೆಮಾಡಲಾಗಿದೆ",
+  moveFirst: "ಮೊದಲಿಗೆ",
+  moveLast: "ಕೊನೆಗೆ",
+  delete: "ಅಳಿಸಿ",
+  confirmDelete: "ಈ ದಾಖಲೆಯನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸಬೇಕೆ?",
+  deleted: "ಅಳಿಸಲಾಗಿದೆ.",
+  deleteInUse:
+    "ಅಳಿಸಲಾಗಲಿಲ್ಲ. ಸುದ್ದಿ ಅಥವಾ ಇತರ ದಾಖಲೆಗಳು ಈ ಊರನ್ನು ಬಳಸುತ್ತಿವೆ; ಬದಲಿಗೆ ಮರೆಮಾಡಿ.",
 } as const;
 
 export const aqiLabels = [

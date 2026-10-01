@@ -29,6 +29,12 @@ export default async function Page() {
         <Link href="/admin/v4/ad_campaigns" className="button button-outline">
           {t.campaigns}
         </Link>
+        <Link href="/admin/posters" className="button button-outline">
+          ಪೋಸ್ಟರ್/ಬ್ಯಾನರ್ ಜಾಹೀರಾತು
+        </Link>
+        <Link href="/admin/business-ads" className="button button-outline">
+          ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು
+        </Link>
         <a
           download
           href="/api/admin/ad-report"

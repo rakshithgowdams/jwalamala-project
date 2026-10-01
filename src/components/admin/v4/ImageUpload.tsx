@@ -3,9 +3,12 @@ import { useState } from "react";
 export function ImageUpload({
   onUploaded,
   kind = "post",
+  shape,
 }: {
   onUploaded: (url: string) => void;
   kind?: "post" | "ad";
+  /** Crop an ad upload to a poster space: 16:9 landscape or 1:1 square. */
+  shape?: "landscape" | "square";
 }) {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -25,6 +28,7 @@ export function ImageUpload({
             const form = new FormData();
             form.set("file", file);
             form.set("kind", kind);
+            if (shape) form.set("shape", shape);
             const r = await fetch("/api/admin/media", {
               method: "POST",
               body: form,

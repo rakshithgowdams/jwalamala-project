@@ -116,8 +116,12 @@ export const translatable: Record<string, TranslatableField[]> = {
     long("description_kn", "description", 20000),
   ],
   ads: [short("alt_kn", "alt", 300)],
+  business_ads: [short("offer_kn", "offer", 160)],
   tags: [short("name_kn", "name", 150)],
-  places: [short("name_kn", "name", 150)],
+  places: [
+    short("name_kn", "name", 150),
+    long("description_kn", "description", 2000),
+  ],
   authors: [
     short("name_kn", "name", 300),
     short("role_kn", "role", 300),

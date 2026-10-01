@@ -34,6 +34,39 @@ export async function saveV4(
   revalidatePath("/", "layout");
   return { id: saved };
 }
+const deletable: ReadonlySet<V4Resource> = new Set(["places"]);
+export async function deleteV4(resource: V4Resource, id: string) {
+  if (!deletable.has(resource)) return { error: kn.validation };
+  const { db } = await requirePermission(v4Resources[resource].permission);
+  if (!z.uuid().safeParse(id).success) return { error: kn.validation };
+  const { error } = await db.from(resource).delete().eq("id", id);
+  // 23503: still referenced by posts, basadis, notices or a reader's saved place.
+  if (error)
+    return { error: error.code === "23503" ? t.deleteInUse : t.failed };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+export async function saveDistrictOrder(ids: string[]) {
+  const { db } = await requirePermission(v4Resources.places.permission);
+  if (
+    !z.array(z.uuid()).min(1).max(200).safeParse(ids).success ||
+    new Set(ids).size !== ids.length
+  )
+    return { error: kn.validation };
+  // Steps of ten leave room to slot a new district in by hand from the editor.
+  const results = await Promise.all(
+    ids.map((id, i) =>
+      db
+        .from("places")
+        .update({ sort_order: (i + 1) * 10 })
+        .eq("id", id)
+        .eq("is_district", true),
+    ),
+  );
+  if (results.some((result) => result.error)) return { error: t.failed };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
 export async function saveRelationships(
   resource: "topics" | "series",
   id: string,

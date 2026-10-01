@@ -3,7 +3,13 @@ import { ImageUpload } from "./ImageUpload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { v4Resources, type V4Resource } from "@/lib/v4/admin-schema";
-import { saveV4, saveRelationships, mergeTags } from "@/app/admin/v4/actions";
+import {
+  saveV4,
+  saveRelationships,
+  mergeTags,
+  deleteV4,
+  saveDistrictOrder,
+} from "@/app/admin/v4/actions";
 import { StructuredEditor } from "./StructuredEditor";
 import { kn, v4 as t, v4Choices } from "@/content/strings.kn";
 export type Choice = { id: string; label: string };
@@ -129,7 +135,7 @@ export function ResourceEditor({
                 name={field.name}
                 label={field.label}
                 initial={String(value || "")}
-                ad={resource === "ads"}
+                ad={resource === "ads" || resource === "business_ads"}
               />
             );
           if (field.type === "structured")
@@ -162,7 +168,11 @@ export function ResourceEditor({
                 <input
                   type="checkbox"
                   name={field.name}
-                  defaultChecked={Boolean(value)}
+                  defaultChecked={
+                    value === undefined
+                      ? field.name === "show_in_district_news"
+                      : Boolean(value)
+                  }
                 />
               ) : field.type === "select" || catalog ? (
                 <select name={field.name} defaultValue={String(value ?? "")}>
@@ -212,6 +222,7 @@ export function ResourceEditor({
                                     "max_impressions",
                                     "max_clicks",
                                     "daily_impression_cap",
+                                    "amount",
                                   ].includes(field.name)
                                 ? field.name === "weight"
                                   ? 1
@@ -228,9 +239,41 @@ export function ResourceEditor({
           <button className="button button-ember" disabled={busy}>
             {busy ? t.loading : kn.save}
           </button>
+          {resource === "places" && !!selected.id && (
+            <button
+              type="button"
+              className="button button-outline"
+              disabled={busy}
+              onClick={async () => {
+                if (!window.confirm(t.confirmDelete)) return;
+                setBusy(true);
+                setMessage("");
+                try {
+                  const result = await deleteV4(resource, String(selected.id));
+                  setMessage(result.error || t.deleted);
+                  if (!result.error) {
+                    setSelected({});
+                    router.refresh();
+                  }
+                } catch {
+                  setMessage(t.failed);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {t.delete}
+            </button>
+          )}
           <p role="status">{message}</p>
         </div>
       </form>
+      {resource === "places" && (
+        <DistrictOrder
+          key={rows.map((row) => String(row.id)).join()}
+          districts={rows.filter((row) => row.is_district)}
+        />
+      )}
       {selected.id && (resource === "topics" || resource === "series") && (
         <RelationshipEditor
           key={String(selected.id)}
@@ -383,6 +426,97 @@ function RelationshipEditor({
         }}
       >
         {kn.save}
+      </button>
+      <p role="status">{message}</p>
+    </section>
+  );
+}
+
+function DistrictOrder({
+  districts,
+}: {
+  districts: Record<string, unknown>[];
+}) {
+  const router = useRouter();
+  const [ids, setIds] = useState(() => districts.map((row) => String(row.id))),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState("");
+  const byId = new Map(districts.map((row) => [String(row.id), row]));
+  function move(index: number, to: number) {
+    const next = [...ids];
+    const [id] = next.splice(index, 1);
+    next.splice(to, 0, id);
+    setIds(next);
+    setMessage("");
+  }
+  if (!ids.length) return null;
+  return (
+    <section className="utility-panel">
+      <h2>{t.districtOrder}</h2>
+      <p className="meta">{t.districtOrderHelp}</p>
+      {ids.map((id, i) => {
+        const row = byId.get(id);
+        return (
+          <div className="ordered-row" key={id}>
+            <span>
+              {i + 1}. {String(row?.name_kn || id)}
+              {row?.show_in_district_news === false && (
+                <> ({t.hiddenDistrict})</>
+              )}
+            </span>
+            <button
+              type="button"
+              className="chip"
+              disabled={i === 0}
+              onClick={() => move(i, 0)}
+            >
+              {t.moveFirst}
+            </button>
+            <button
+              type="button"
+              className="chip"
+              disabled={i === 0}
+              onClick={() => move(i, i - 1)}
+            >
+              {t.up}
+            </button>
+            <button
+              type="button"
+              className="chip"
+              disabled={i === ids.length - 1}
+              onClick={() => move(i, i + 1)}
+            >
+              {t.down}
+            </button>
+            <button
+              type="button"
+              className="chip"
+              disabled={i === ids.length - 1}
+              onClick={() => move(i, ids.length - 1)}
+            >
+              {t.moveLast}
+            </button>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="button button-ember"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            const result = await saveDistrictOrder(ids);
+            setMessage(result.error || t.saved);
+            if (!result.error) router.refresh();
+          } catch {
+            setMessage(t.failed);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? t.loading : kn.save}
       </button>
       <p role="status">{message}</p>
     </section>

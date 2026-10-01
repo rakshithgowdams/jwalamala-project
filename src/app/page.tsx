@@ -23,6 +23,9 @@ import {
   EmptyState,
 } from "@/components/ui/Primitives";
 import { EventsTicker } from "@/components/events/EventsTicker";
+import { BusinessAdShelf } from "@/components/ads/BusinessAds";
+import { getBusinessAds } from "@/lib/ads/business-server";
+import { pickBusinessAds } from "@/lib/ads/business";
 export default async function Home() {
   const { kn, locale } = await getUiStrings();
 
@@ -43,6 +46,9 @@ export default async function Home() {
   const config = homeSchema
     .catch(defaultHome)
     .parse((await getSetting("homepage")) || defaultHome);
+  const shops = pickBusinessAds(await getBusinessAds().catch(() => []), {
+    count: 8,
+  });
   const lead =
     posts.find((p) => p.id === config.lead_id) ||
     posts.find((p) => p.is_featured) ||
@@ -292,6 +298,7 @@ export default async function Home() {
           );
         })}
       <CategoryScrollShowcase posts={posts} categories={categoriesList} />
+      <BusinessAdShelf ads={shops} />
       <HomeExtras config={config} />
       <HeritageStrip />
       <AdSlot placement="home-bottom" />

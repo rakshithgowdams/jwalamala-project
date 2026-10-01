@@ -26,7 +26,7 @@ import {
 
 import type { Category } from "@/lib/types";
 export function CategoryNav({ categories }: { categories: Category[] }) {
-  const { kn, locale } = useUiStrings();
+  const { kn, v4: t, locale } = useUiStrings();
 
   const path = usePathname();
   return (
@@ -47,6 +47,7 @@ export function CategoryNav({ categories }: { categories: Category[] }) {
         {[
           { href: "/", label: kn.home },
           { href: "/videos", label: kn.videos },
+          { href: "/districts", label: t.districts },
           ...categories.slice(0, 7).map((c) => ({
             href: `/category/${c.slug}`,
             label: pickText(locale, c.name_kn, c.name_en, c.name_hi),

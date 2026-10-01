@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { v4 as t, kn } from "@/content/strings.kn";
 import { safePublicLink } from "./utils";
+import { businessAdFormats, businessCategories } from "@/lib/ads/business";
 const title = z.string().trim().min(1).max(300),
   body = z.string().max(20000),
   slug = z
@@ -111,6 +112,58 @@ export const v4Schemas = {
         .transform((v) => (v === "" ? null : v)),
     })
     .refine((v) => !!v.starts_at && !!v.ends_at && v.ends_at > v.starts_at),
+  business_ads: z
+    .object({
+      status: z.enum(["pending", "approved", "paused", "rejected"]),
+      payment_status: z.enum(["unpaid", "paid", "waived"]),
+      amount: z
+        .union([z.literal(""), number.nonnegative()])
+        .transform((v) => (v === "" ? null : v)),
+      payment_ref: z.string().trim().max(200).default(""),
+      slug,
+      name_kn: z.string().trim().min(1).max(150),
+      name_en: translation(150),
+      name_hi: translation(150),
+      category: z.enum(businessCategories),
+      offer_kn: z.string().trim().max(160).default(""),
+      offer_en: translation(160),
+      offer_hi: translation(160),
+      image_url: z.union([z.literal(""), image]).transform((v) => v || null),
+      phone: z
+        .string()
+        .trim()
+        .regex(/^(\+?[0-9][0-9 -]{7,19})?$/),
+      whatsapp: z
+        .string()
+        .trim()
+        .regex(/^(\+?[0-9][0-9 -]{7,19})?$/),
+      website: z
+        .union([
+          z.literal(""),
+          z
+            .url()
+            .max(500)
+            .refine((v) => new URL(v).protocol === "https:"),
+        ])
+        .transform((v) => v || null),
+      address_kn: z.string().trim().max(300).default(""),
+      place_id: nullableId,
+      target_places: jsonArray(z.uuid()),
+      starts_at: time,
+      ends_at: time,
+      priority: number.int(),
+      weight: number.int().min(1).max(1000),
+      contact_name: z.string().trim().max(100).default(""),
+      contact_email: z.union([z.literal(""), z.email().max(254)]).default(""),
+      contact_phone: z.string().trim().max(20).default(""),
+      requested_formats: jsonArray(z.enum(businessAdFormats)),
+      message: z.string().max(2000).default(""),
+      review_note: z.string().max(2000).default(""),
+      is_seed: bool,
+    })
+    .refine((v) => !v.starts_at || !v.ends_at || v.ends_at > v.starts_at)
+    // An approved ad without an end date would run, and bill, forever.
+    .refine((v) => v.status !== "approved" || (!!v.starts_at && !!v.ends_at)),
   tags: z.object({
     slug,
     name_kn: title,
@@ -133,6 +186,14 @@ export const v4Schemas = {
       .transform((value) => (value === "" ? null : value)),
     is_district: bool,
     show_in_weather: bool,
+    show_in_district_news: bool,
+    sort_order: number.int(),
+    cover_url: z
+      .union([z.literal(""), image])
+      .transform((value) => value || null),
+    description_kn: z.string().max(2000).default(""),
+    description_en: translation(2000),
+    description_hi: translation(2000),
   }),
   authors: z.object({
     slug,
@@ -509,6 +570,51 @@ export const v4Resources: Record<
       f("is_active", t.enabled, "checkbox"),
     ],
   },
+  business_ads: {
+    title: "ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು",
+    permission: "ads.manage",
+    fields: [
+      f("status", kn.status, "select", [
+        "pending",
+        "approved",
+        "paused",
+        "rejected",
+      ]),
+      f("payment_status", "ಪಾವತಿ / Payment", "select", [
+        "unpaid",
+        "paid",
+        "waived",
+      ]),
+      f("amount", "ಮೊತ್ತ (₹) / Amount", "number"),
+      f("payment_ref", "ರಸೀದಿ / Receipt reference"),
+      f("name_kn", kn.name),
+      f("name_en", "English name"),
+      f("name_hi", "Hindi name"),
+      f("slug", kn.slug),
+      f("category", t.contentType, "select", [...businessCategories]),
+      f("offer_kn", "ಜಾಹೀರಾತಿನ ಸಂದೇಶ (160)"),
+      f("offer_en", "English offer"),
+      f("offer_hi", "Hindi offer"),
+      f("image_url", t.image),
+      f("phone", "ಫೋನ್ / Phone"),
+      f("whatsapp", "WhatsApp"),
+      f("website", "Website (https://)"),
+      f("address_kn", "ವಿಳಾಸ / ಊರು"),
+      f("place_id", kn.place),
+      f("target_places", t.places + " (ಖಾಲಿ = ಎಲ್ಲೆಡೆ)", "ids"),
+      f("starts_at", t.start, "datetime-local"),
+      f("ends_at", t.end, "datetime-local"),
+      f("priority", t.priority, "number"),
+      f("weight", t.weight, "number"),
+      f("contact_name", "ಅರ್ಜಿದಾರರು / Applicant"),
+      f("contact_email", kn.email),
+      f("contact_phone", "Applicant phone"),
+      f("requested_formats", "Requested formats", "list"),
+      f("message", kn.message, "textarea"),
+      f("review_note", "ಪರಿಶೀಲನಾ ಟಿಪ್ಪಣಿ / Review note", "textarea"),
+      f("is_seed", t.sample, "checkbox"),
+    ],
+  },
   tags: {
     title: t.tags,
     permission: "content.edit",
@@ -534,6 +640,12 @@ export const v4Resources: Record<
       f("lng", t.longitude, "number"),
       f("is_district", t.district, "checkbox"),
       f("show_in_weather", t.weather, "checkbox"),
+      f("show_in_district_news", t.showInDistrictNews, "checkbox"),
+      f("sort_order", t.order, "number"),
+      f("cover_url", t.image),
+      f("description_kn", kn.summary, "textarea"),
+      f("description_en", "English description", "textarea"),
+      f("description_hi", "Hindi description", "textarea"),
     ],
   },
   authors: {
