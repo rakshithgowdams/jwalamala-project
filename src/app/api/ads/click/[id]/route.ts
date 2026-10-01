@@ -14,11 +14,19 @@ export async function GET(
     return new Response(null, { status: 404 });
   const { data: ad } = await db
       .from("ads")
-      .select("target_url,is_active,campaign_id")
+      .select("target_url,is_active,campaign_id,starts_at,ends_at")
       .eq("id", id)
       .maybeSingle(),
-    target = ad ? safeAdTarget(ad.target_url) : null;
-  if (!target || !ad?.is_active) return new Response(null, { status: 404 });
+    target = ad?.target_url ? safeAdTarget(ad.target_url) : null,
+    now = Date.now();
+  // A page left open past the end date must not keep sending readers to the offer.
+  if (
+    !target ||
+    !ad?.is_active ||
+    Date.parse(ad.starts_at) > now ||
+    Date.parse(ad.ends_at) <= now
+  )
+    return new Response(null, { status: 404 });
   if (!/bot|crawler|spider/i.test(request.headers.get("user-agent") || ""))
     await db.rpc("record_ad_event", {
       ad: id,

@@ -100,6 +100,8 @@ export function MoreMenu({
           <nav className="mega-menu" aria-label={t.openMenu}>
             {[
               ...primaryLinks,
+              ["/districts", t.districtNews],
+              ["/local-shops", t.localShops],
               ["/topics", t.topics],
               ["/series", t.series],
               ["/shorts", t.shorts],

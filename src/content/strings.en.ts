@@ -624,6 +624,19 @@ export const v4en = {
   audioProgress: "Audio progress",
   audioSpeed: "Playback speed",
   next6Hours: "next 6 hours",
+  districts: "Districts",
+  localShops: "Local shops",
+  districtNews: "District-wise news",
+  districtNewsIntro:
+    "News, reports and programmes from every district of Karnataka, in one place.",
+  allDistricts: "All districts",
+  findDistrict: "Find a district",
+  noDistrictMatch: "No district matches that name.",
+  districtLatest: "Latest from the district",
+  districtAllNews: "All news from this district",
+  noDistrictNews: "No news has been published from this district yet.",
+  districtTowns: "Towns in this district",
+  otherDistricts: "Other districts",
 };
 export const monthsEn = [
   "January",

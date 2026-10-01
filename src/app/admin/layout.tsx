@@ -20,6 +20,8 @@ export default async function AdminLayout({
           ["categories", kn.categories],
           ["events", kn.events],
           ["ads", kn.advertise],
+          ["posters", "ಪೋಸ್ಟರ್/ಬ್ಯಾನರ್ ಜಾಹೀರಾತು"],
+          ["business-ads", "ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು"],
           ["ad-settings", t.adSlots],
           ["roles", t.roles],
           ["submissions", kn.submissions],

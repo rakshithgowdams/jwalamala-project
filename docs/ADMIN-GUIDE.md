@@ -30,6 +30,8 @@ Sign in with an approved staff account. Permissions are checked by the server an
 | /admin/contributors | Approve phone-verified local contributors; revoke contributor access |
 | /admin/users, roles | Staff roles and permission matrix / ಬಳಕೆದಾರ ಅನುಮತಿಗಳು |
 | /admin/ads, ad-settings | Direct campaigns, Google slots, caps, test mode, sticky placement and ads.txt |
+| /admin/posters | Own 16:9 banners (1280×720) and 1:1 posters (1080×1080): pick pages (none = all), upload (auto-cropped), set IST start/end; they switch on and off by themselves |
+| /admin/business-ads | Local shop ads from /advertise: verify, record offline payment, set dates/districts, approve; live status and 90-day views/clicks |
 | /admin/support | Membership tiers, legal details and payment enablement |
 | /admin/notice-billing | Notice amount/payment link and verified paid/waived status |
 | /admin/newsletter, social | Build/edit/preview and explicitly approve distribution drafts |
@@ -48,6 +50,7 @@ Sign in with an approved staff account. Permissions are checked by the server an
 - Never place secret tokens in public settings. Provider secrets belong in the server environment; social tokens entered in the connection form are encrypted.
 - Enable a provider only after setting a finite budget and testing its account. A credential alone does not activate sending.
 - Review uncertain external delivery before retrying a failed push/social/email job. Job controls do not prove whether a provider delivered a timed-out request.
+- A local shop ad is shown only when it is approved, marked paid or waived, and inside its start/end dates. Check every ad against the rules on /advertise before approving.
 - Paid status is a staff verification record. Check the payment dashboard and record the provider reference; billing approval and editorial approval are separate.
 - Mark sample material clearly and replace it with verified reporting before launch. Do not invent rates, rainfall, religious offsets or event dates.
 - Image uploads accept JPEG/PNG/WebP/AVIF up to 1 MB; the server strips metadata and resizes. Ad output is limited to 300 KB.

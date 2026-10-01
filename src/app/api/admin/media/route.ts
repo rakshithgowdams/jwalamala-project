@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getServerClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { sameOrigin, privateJson, limitRequest } from "@/lib/v4/server";
+import { posterSizes } from "@/lib/ads/posters";
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return privateJson({ error: "forbidden" }, 403);
   const db = await getServerClient(),
@@ -43,7 +44,12 @@ export async function POST(request: Request) {
       }),
       form = await bounded.formData(),
       file = form.get("file"),
-      ad = form.get("kind") === "ad";
+      ad = form.get("kind") === "ad",
+      shape = form.get("shape"),
+      poster =
+        ad && (shape === "landscape" || shape === "square")
+          ? posterSizes[shape]
+          : null;
     if (
       !(file instanceof File) ||
       !["image/jpeg", "image/png", "image/webp", "image/avif"].includes(
@@ -52,20 +58,29 @@ export async function POST(request: Request) {
       file.size > 1048576
     )
       return privateJson({ error: "image_required" }, 400);
-    const buffer = await sharp(Buffer.from(await file.arrayBuffer()), {
+    const source = sharp(Buffer.from(await file.arrayBuffer()), {
       limitInputPixels: 25000000,
       animated: false,
     })
       .rotate()
-      .resize({
-        width: 1600,
-        height: 1600,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 82 })
-      .toBuffer();
-    if (buffer.length > (ad ? 300000 : 1048576))
+      // A poster must match its space exactly, so it is centre-cropped to size
+      // rather than letterboxed; the editor previews the crop before saving.
+      .resize(
+        poster
+          ? { ...poster, fit: "cover", position: "centre" }
+          : {
+              width: 1600,
+              height: 1600,
+              fit: "inside",
+              withoutEnlargement: true,
+            },
+      );
+    const limit = ad ? 300000 : 1048576;
+    let buffer = await source.clone().webp({ quality: 82 }).toBuffer();
+    for (const quality of poster ? [72, 62] : [])
+      if (buffer.length > limit)
+        buffer = await source.clone().webp({ quality }).toBuffer();
+    if (buffer.length > limit)
       return privateJson({ error: "image_too_large" }, 400);
     const path = user.id + "/" + randomUUID() + ".webp";
     const { error } = await admin.storage
