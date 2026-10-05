@@ -647,7 +647,6 @@ export const v4 = {
   up: "ಮೇಲೆ",
   down: "ಕೆಳಗೆ",
   next6Hours: "ಮುಂದಿನ 6 ಗಂಟೆಗಳಲ್ಲಿ",
-  districts: "ಜಿಲ್ಲೆಗಳು",
   localShops: "ಸ್ಥಳೀಯ ಮಳಿಗೆಗಳು",
   districtNews: "ಜಿಲ್ಲಾವಾರು ಸುದ್ದಿ",
   districtNewsIntro:

@@ -14,8 +14,14 @@ import {
   Monitor,
   Sun,
   Moon,
+  ChevronDown,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  mainNavigation,
+  mainNavigationHrefs,
+  navLabel,
+} from "@/config/navigation";
 import {
   themeOrder,
   writeThemeCookie,
@@ -25,44 +31,137 @@ import {
 } from "@/lib/theme/shared";
 
 import type { Category } from "@/lib/types";
-export function CategoryNav({ categories }: { categories: Category[] }) {
-  const { kn, v4: t, locale } = useUiStrings();
+export type NavItemLink = { href: string; label: string };
+export type MenuSection = NavItemLink & {
+  key: string;
+  children: NavItemLink[];
+};
 
+export function CategoryNav({
+  categories,
+  districts,
+}: {
+  categories: Category[];
+  districts: NavItemLink[];
+}) {
+  const { kn, locale } = useUiStrings();
   const path = usePathname();
+  const [open, setOpen] = useState<string | null>(null);
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent | KeyboardEvent) => {
+      if (
+        event instanceof KeyboardEvent
+          ? event.key === "Escape"
+          : !nav.current?.contains(event.target as Node)
+      )
+        setOpen(null);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const sections: MenuSection[] = mainNavigation.map((section) => ({
+    key: section.key,
+    href: section.href,
+    label: navLabel(locale, section),
+    children:
+      section.children === "districts"
+        ? districts
+        : (section.children || []).map((child) => ({
+            href: child.href,
+            label: navLabel(locale, child),
+          })),
+  }));
+  const current = (href: string) =>
+    href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
+  // "Latest news" already covers the general news category.
+  const remaining = categories
+    .filter(
+      (c) =>
+        c.slug !== "news" && !mainNavigationHrefs.has(`/category/${c.slug}`),
+    )
+    .map((c): [string, string] => [
+      `/category/${c.slug}`,
+      pickText(locale, c.name_kn, c.name_en, c.name_hi),
+    ]);
   return (
     <div className="nav-wrap">
-      <nav className="container category-nav" aria-label={kn.categories}>
+      <nav
+        ref={nav}
+        className="container category-nav main-nav"
+        aria-label={kn.categories}
+      >
         <MoreMenu
-          primaryLinks={[
-            ["/", kn.home],
-            ["/news", kn.news],
-            ["/videos", kn.videos],
-            ...categories.map((c): [string, string] => [
-              `/category/${c.slug}`,
-              pickText(locale, c.name_kn, c.name_en, c.name_hi),
-            ]),
-            ["/events", kn.events],
-          ]}
+          primaryLinks={[["/videos", kn.videos], ...remaining]}
+          sections={sections}
         />
-        {[
-          { href: "/", label: kn.home },
-          { href: "/videos", label: kn.videos },
-          { href: "/districts", label: t.districts },
-          ...categories.slice(0, 7).map((c) => ({
-            href: `/category/${c.slug}`,
-            label: pickText(locale, c.name_kn, c.name_en, c.name_hi),
-          })),
-          { href: "/events", label: kn.events },
-        ].map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className={path === n.href ? "active" : ""}
-            aria-current={path === n.href ? "page" : undefined}
-          >
-            {n.label}
-          </Link>
-        ))}
+        <ul className="main-nav-list">
+          {sections.map((section) => {
+            const expanded = open === section.key;
+            const active =
+              current(section.href) ||
+              section.children.some((child) => current(child.href));
+            return (
+              <li
+                key={section.key}
+                className={
+                  "main-nav-item" +
+                  (section.children.length ? " has-menu" : "") +
+                  (expanded ? " open" : "")
+                }
+              >
+                <Link
+                  href={section.href}
+                  className={active ? "active" : ""}
+                  aria-current={path === section.href ? "page" : undefined}
+                  onClick={() => setOpen(null)}
+                >
+                  {section.label}
+                </Link>
+                {section.children.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="main-nav-toggle"
+                      aria-expanded={expanded}
+                      aria-controls={"menu-" + section.key}
+                      aria-label={section.label}
+                      onClick={() => setOpen(expanded ? null : section.key)}
+                    >
+                      <ChevronDown size={14} aria-hidden="true" />
+                    </button>
+                    <ul
+                      id={"menu-" + section.key}
+                      className={
+                        "main-nav-dropdown" +
+                        (section.children.length > 12 ? " columns" : "")
+                      }
+                    >
+                      {section.children.map((child) => (
+                        <li key={child.href}>
+                          <Link
+                            href={child.href}
+                            aria-current={
+                              path === child.href ? "page" : undefined
+                            }
+                            onClick={() => setOpen(null)}
+                          >
+                            {child.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
         <Link className="nav-search" href="/search" aria-label={kn.search}>
           <Search size={20} />
         </Link>

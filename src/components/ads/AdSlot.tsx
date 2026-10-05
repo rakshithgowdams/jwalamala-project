@@ -27,7 +27,8 @@ export function AdSlot({
   disabled = false,
 }: {
   placement: string;
-  format?: "banner" | "rectangle";
+  /** "wide" reserves a full-width 16:9 space; "banner" keeps the slimmer strip. */
+  format?: "banner" | "rectangle" | "wide";
   disabled?: boolean;
 }) {
   const pathname = usePathname();

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       placement: z.string().regex(/^[a-z0-9_-]{1,100}$/),
       path: z.string().startsWith("/").max(300),
       device: z.enum(["mobile", "desktop"]),
-      format: z.enum(["banner", "rectangle"]).default("banner"),
+      format: z.enum(["banner", "rectangle", "wide"]).default("banner"),
     })
     .safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success) return privateJson({ mode: "off" }, 400);

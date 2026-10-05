@@ -4,11 +4,15 @@ import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
+import type { MenuSection } from "./Navigation";
 
 export function MoreMenu({
   primaryLinks = [],
+  sections = [],
 }: {
   primaryLinks?: [string, string][];
+  /** The main menu, repeated here only on narrow screens where its dropdowns are hidden. */
+  sections?: MenuSection[];
 }) {
   const { v4: t, kn } = useUiStrings();
 
@@ -59,11 +63,12 @@ export function MoreMenu({
           onCancel={() => setOpen(false)}
           onKeyDown={(event) => {
             if (event.key !== "Tab") return;
+            // Only what is on screen: the main sections are hidden on wide screens.
             const items = Array.from(
               event.currentTarget.querySelectorAll<HTMLElement>(
-                "a[href], button:not([disabled])",
+                "a[href], button:not([disabled]), summary",
               ),
-            );
+            ).filter((item) => item.offsetParent !== null);
             const first = items[0],
               last = items.at(-1);
             if (event.shiftKey && document.activeElement === first) {
@@ -97,10 +102,47 @@ export function MoreMenu({
               <X aria-hidden="true" />
             </button>
           </div>
+          {sections.length > 0 && (
+            <div className="menu-sections">
+              {sections.map((section) =>
+                section.children.length ? (
+                  <details key={section.key} className="menu-section">
+                    <summary>{section.label}</summary>
+                    <Link
+                      href={section.href}
+                      prefetch={false}
+                      onClick={() => setOpen(false)}
+                    >
+                      {section.label}
+                    </Link>
+                    {section.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        prefetch={false}
+                        onClick={() => setOpen(false)}
+                      >
+                        {child.label}
+                      </Link>
+                    ))}
+                  </details>
+                ) : (
+                  <Link
+                    key={section.key}
+                    href={section.href}
+                    className="menu-section"
+                    prefetch={false}
+                    onClick={() => setOpen(false)}
+                  >
+                    {section.label}
+                  </Link>
+                ),
+              )}
+            </div>
+          )}
           <nav className="mega-menu" aria-label={t.openMenu}>
             {[
               ...primaryLinks,
-              ["/districts", t.districtNews],
               ["/local-shops", t.localShops],
               ["/topics", t.topics],
               ["/series", t.series],
@@ -111,7 +153,6 @@ export function MoreMenu({
               ["/jain-calendar", t.jainCalendar],
               ["/basadis", t.basadis],
               ["/notices", t.notices],
-              ["/opportunities", t.opportunities],
               ["/polls", t.polls],
               ["/quizzes", t.quizzes],
               ["/stories", t.stories],

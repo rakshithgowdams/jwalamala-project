@@ -53,7 +53,7 @@ export async function pickAd(
   path: string,
   device: "mobile" | "desktop",
   session: string,
-  format: "banner" | "rectangle" = "banner",
+  format: "banner" | "rectangle" | "wide" = "banner",
 ): Promise<AdPick> {
   if (!routeAllowsAds(path)) return { mode: "off" };
   const config = adSettingsSchema

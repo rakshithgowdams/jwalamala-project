@@ -624,7 +624,6 @@ export const v4en = {
   audioProgress: "Audio progress",
   audioSpeed: "Playback speed",
   next6Hours: "next 6 hours",
-  districts: "Districts",
   localShops: "Local shops",
   districtNews: "District-wise news",
   districtNewsIntro:

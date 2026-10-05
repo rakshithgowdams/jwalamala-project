@@ -630,7 +630,6 @@ export const v4hi = {
   up: "ऊपर",
   down: "नीचे",
   next6Hours: "अगले 6 घंटों में",
-  districts: "ज़िले",
   localShops: "स्थानीय दुकानें",
   districtNews: "ज़िलेवार समाचार",
   districtNewsIntro:

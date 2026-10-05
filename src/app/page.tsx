@@ -1,4 +1,3 @@
-import { LocationFilter } from "@/components/search/LocationFilter";
 import { getListing } from "@/lib/queries/listing";
 import { HomeExtras } from "@/components/discovery/HomeExtras";
 import { CategoryScrollShowcase } from "@/components/discovery/CategoryScrollShowcase";
@@ -56,10 +55,6 @@ export default async function Home() {
   return (
     <div className="container home-page">
       {(site.demo || posts.some((post) => post.is_seed)) && <SampleNotice />}
-      <details className="location-disclosure">
-        <summary>{kn.newsNearYou}</summary>
-        <LocationFilter filters={{}} action="/news" />
-      </details>
       <AdSlot placement="home-top" />
       {config.sections
         .filter((s) => s.enabled)
@@ -109,12 +104,9 @@ export default async function Home() {
                                   .map((p) => (
                                     <NewsCard key={p.id} post={p} compact />
                                   ))}
-                                <AdSlot
-                                  placement="home-sidebar"
-                                  format="rectangle"
-                                />
                               </aside>
                             </div>
+                            <AdSlot placement="home-after-hero" format="wide" />
                           </>
                         ) : (
                           <EmptyState />
