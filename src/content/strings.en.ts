@@ -116,6 +116,11 @@ export const en = {
   monthEvents: "This month’s events",
   footerText: "News, culture and community from Karnataka’s Jain society.",
   rights: "All rights reserved.",
+  protectedContent:
+    "This content is protected by copyright and cannot be copied.",
+  articleCopyright:
+    "All rights to this article and its images are reserved. Copying, republishing or redistributing it without written permission is prohibited.",
+  printBlocked: "Printing this page is not permitted.",
   madeBy: "Created by",
   notFound: "Page not found",
   notFoundText: "The page you are looking for is unavailable.",

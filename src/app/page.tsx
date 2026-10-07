@@ -12,13 +12,11 @@ import { AdSlot } from "@/components/ads/AdSlot";
 import Link from "next/link";
 import { ArrowRight, Send, CalendarDays, TrendingUp } from "lucide-react";
 
-import { site } from "@/config/site";
 import { getPosts, getEvents, getCategories } from "@/lib/queries/content";
 import { HeroStory, NewsCard } from "@/components/news/NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import {
   SectionTitle,
-  SampleNotice,
   EmptyState,
 } from "@/components/ui/Primitives";
 import { EventsTicker } from "@/components/events/EventsTicker";
@@ -54,7 +52,6 @@ export default async function Home() {
     posts[0];
   return (
     <div className="container home-page">
-      {(site.demo || posts.some((post) => post.is_seed)) && <SampleNotice />}
       <AdSlot placement="home-top" />
       {config.sections
         .filter((s) => s.enabled)

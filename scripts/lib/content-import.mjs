@@ -18,7 +18,9 @@ export const sqlValue = (value) => {
 
 /** Build a single atomic import from the content actually displayed by demo mode. */
 export async function buildContentImport() {
-  const demoUrl = await moduleUrl("src/lib/data/demo.ts");
+  const demoUrl = await moduleUrl("src/lib/data/demo.ts", {
+    "@/config/navigation": await moduleUrl("src/config/navigation.ts"),
+  });
   const { categories, demoPosts, demoEvents } = await import(demoUrl);
   const { v4Demo } = await import(await moduleUrl("src/lib/v4/demo.ts", {"@/lib/data/demo": demoUrl}));
   const { resolvePlace } = await import(await moduleUrl("src/lib/utils/geography.ts"));

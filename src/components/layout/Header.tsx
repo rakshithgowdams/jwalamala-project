@@ -36,7 +36,10 @@ export async function Header() {
     <ScrollHeader>
       <div className="utility-bar">
         <div className="container utility-inner">
-          <span>{kn.community}</span>
+          <span className="utility-tagline">
+            {kn.community}
+            <span className="utility-about">{kn.footerText}</span>
+          </span>
           <div>
             <Link href="/about">{kn.about}</Link>
             <Link href="/contact">{kn.contact}</Link>

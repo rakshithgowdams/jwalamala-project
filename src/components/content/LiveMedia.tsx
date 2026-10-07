@@ -1,6 +1,7 @@
 import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { LiteVideoEmbed } from "@/components/news/LiteVideoEmbed";
 import type { LiveUpdate } from "@/lib/v4/types";
+import { isHostedImage } from "@/lib/utils/images";
 export function LiveMedia({ media }: { media: LiveUpdate["media"] }) {
   if (!media) return null;
   if (media.type === "video")
@@ -14,13 +15,7 @@ export function LiveMedia({ media }: { media: LiveUpdate["media"] }) {
         <p className="meta">{media.credit}</p>
       </>
     );
-  if (!(
-    /^\/images\//.test(media.url) ||
-    /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\//.test(
-      media.url,
-    )
-  ))
-    return null;
+  if (!isHostedImage(media.url)) return null;
   return (
     <figure>
       <Image

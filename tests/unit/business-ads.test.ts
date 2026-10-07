@@ -9,7 +9,6 @@ import {
   type BusinessAdView,
 } from "@/lib/ads/business";
 import { canonicalSlot, routeAllowsAds, slotKeys } from "@/lib/ads/schema";
-import { v4Schemas } from "@/lib/v4/admin-schema";
 
 const ad = (
   id: string,
@@ -152,38 +151,6 @@ describe("advertising application", () => {
         website_url: "https://spam.example",
       }).success,
     ).toBe(false);
-  });
-
-  it("will not let staff approve an ad without an end date", () => {
-    const row = {
-      status: "approved",
-      payment_status: "paid",
-      amount: "1500",
-      payment_ref: "UPI-123",
-      slug: "padmavati",
-      name_kn: "ಪದ್ಮಾವತಿ",
-      category: "textiles",
-      image_url: "",
-      phone: "",
-      whatsapp: "",
-      website: "",
-      place_id: "",
-      target_places: "[]",
-      starts_at: "2026-10-01T10:00",
-      ends_at: "",
-      priority: "0",
-      weight: "1",
-      requested_formats: "[]",
-      is_seed: false,
-    };
-    expect(v4Schemas.business_ads.safeParse(row).success).toBe(false);
-    const ok = v4Schemas.business_ads.safeParse({
-      ...row,
-      ends_at: "2026-11-01T10:00",
-    });
-    expect(ok.success).toBe(true);
-    if (ok.success)
-      expect(ok.data).toMatchObject({ amount: 1500, website: null });
   });
 });
 

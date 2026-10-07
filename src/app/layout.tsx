@@ -25,9 +25,9 @@ import { Footer } from "@/components/layout/Footer";
 import { BottomNav } from "@/components/layout/Navigation";
 import { PwaControls } from "@/components/pwa/PwaControls";
 import { SiteMotion } from "@/components/motion/SiteMotion";
-import "./globals.css";
+import { ContentProtection } from "@/components/security/ContentProtection";import "./globals.css";
 export async function generateMetadata(): Promise<Metadata> {
-  const { locale } = await getUiStrings();
+  const { locale, kn } = await getUiStrings();
   const brand = brandName(locale);
   const description = brandDescription(locale);
   return {
@@ -55,7 +55,14 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       images: [{ url: "/images/jwalamala-logo.jpg", width: 900, height: 900 }],
     },
-    robots: site.demo ? { index: false, follow: false } : undefined,
+    robots: site.demo
+      ? { index: false, follow: false }
+      : { index: true, follow: true, noarchive: true },
+    publisher: brand,
+    other: {
+      copyright: `© ${new Date().getFullYear()} ${brand}. ${kn.rights}`,
+      "dcterms.rightsHolder": brand,
+    },
   };
 }
 export const viewport: Viewport = {
@@ -84,7 +91,7 @@ export default async function RootLayout({
       className="font-local"
       data-theme={preference === "system" ? scheme : preference}
     >
-      <body>
+      <body data-print-message={kn.printBlocked}>
         <noscript>
           <style>
             {
@@ -107,6 +114,7 @@ export default async function RootLayout({
                 <PwaControls />
                 <ReaderSync />
                 <SiteMotion />
+                <ContentProtection />
               </AudioProvider>
             </AdNonceProvider>
           </PlaceNamesProvider>

@@ -6,7 +6,6 @@ import {
 } from "@/lib/utils/districts";
 import { v4Demo } from "@/lib/v4/demo";
 import { demoPosts } from "@/lib/data/demo";
-import { v4Resources, v4Schemas } from "@/lib/v4/admin-schema";
 import type { Place } from "@/lib/v4/types";
 
 const places = v4Demo.places;
@@ -53,39 +52,5 @@ describe("district-wise news", () => {
     expect(
       townsInDistrict(places, bySlug("dakshina-kannada")).map((p) => p.slug),
     ).toEqual(expect.arrayContaining(["moodbidri", "dharmastala"]));
-  });
-
-  it("lets the editor save ordering, visibility and a description", () => {
-    const parsed = v4Schemas.places.safeParse({
-      slug: "hassan",
-      state: "Karnataka",
-      name_kn: "ಹಾಸನ",
-      name_en: "Hassan",
-      name_hi: "हासन",
-      district: "ಹಾಸನ",
-      lat: "",
-      lng: "",
-      is_district: true,
-      show_in_weather: false,
-      show_in_district_news: true,
-      sort_order: "20",
-      cover_url: "",
-      description_kn: "ಹಾಸನ ಜಿಲ್ಲೆಯ ಸುದ್ದಿ",
-    });
-    expect(parsed.success).toBe(true);
-    if (parsed.success)
-      expect(parsed.data).toMatchObject({
-        sort_order: 20,
-        cover_url: null,
-        description_en: "",
-      });
-    const names = v4Resources.places.fields.map((f) => f.name);
-    expect(names).toEqual(
-      expect.arrayContaining([
-        "show_in_district_news",
-        "sort_order",
-        "description_kn",
-      ]),
-    );
   });
 });

@@ -38,7 +38,6 @@ export async function Footer() {
             <Link href="/credits">{kn.imageCredit}</Link>
             <Link href="/login">{kn.login}</Link>
             <Link href="/signup">{kn.createAccount}</Link>
-            <Link href="/auth/admin">{kn.admin}</Link>
           </div>
         </div>
         <div className="footer-bottom">

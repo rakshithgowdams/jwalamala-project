@@ -351,7 +351,6 @@ export function LoginForm({
       <Link className="skip" href="/">
         {kn.skip}
       </Link>
-      <Link className="skip" href="/auth/admin">{kn.admin}</Link>
     </div>
   );
 }
