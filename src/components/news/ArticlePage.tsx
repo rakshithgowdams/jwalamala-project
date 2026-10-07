@@ -64,6 +64,7 @@ export async function articleMetadata(slug: string, language?: string) {
     robots: {
       index: !p.is_seed,
       follow: !p.is_seed,
+      noarchive: true,
       "max-image-preview": "large" as const,
     },
     title: p.seo_title || p.title_kn,
@@ -129,6 +130,8 @@ export async function ArticlePage({
         }
       : original;
   const articleLanguage = english ? "en" : hindi ? "hi" : "kn";
+  const copyrightYear = new Date(p.published_at).getFullYear();
+  const copyrightNotice = `© ${copyrightYear} ${brandName(locale)}. ${kn.rights}`;
   const eventPlace = localizePlace(
     await getPlaceNames(),
     locale,
@@ -304,6 +307,9 @@ export async function ArticlePage({
             hideAds={p.hide_ads}
             sponsored={!!p.sponsor_name}
           />
+          <p className="article-copyright">
+            © {copyrightYear} {brandName(locale)}. {kn.articleCopyright}
+          </p>
           <AdSlot disabled={p.hide_ads} placement={`${p.type}-after-content`} />
           <div className="category-chips">
             {(await getV4Rows("tags"))
@@ -432,7 +438,23 @@ export async function ArticlePage({
                 name: brandName(locale),
                 logo: { "@type": "ImageObject", url: site.url + site.logo },
               },
-              image: new URL(p.thumbnail_url, site.url).href,
+              image: {
+                "@type": "ImageObject",
+                url: new URL(p.thumbnail_url, site.url).href,
+                creditText: p.image_credit || brandName(locale),
+                copyrightNotice,
+                license: site.url + "/terms",
+                acquireLicensePage: site.url + "/contact",
+              },
+              copyrightHolder: {
+                "@type": "Organization",
+                name: brandName(locale),
+                url: site.url,
+              },
+              copyrightYear,
+              copyrightNotice,
+              license: site.url + "/terms",
+              isAccessibleForFree: true,
               author: author
                 ? {
                     "@type": "Person",

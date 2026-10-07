@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { site } from "@/config/site";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { Printer, Volume2, Square, Pause, Play } from "lucide-react";
+import { Volume2, Square, Pause, Play } from "lucide-react";
 
 import {
   useLocalValue,
@@ -170,10 +170,6 @@ export function ReadingTools({
         }
       >
         {t.lineSpace} +
-      </button>
-      <button className="chip" onClick={() => window.print()}>
-        <Printer size={16} />
-        {t.print}
       </button>
       {voices.length > 0 &&
         (!speaking ? (

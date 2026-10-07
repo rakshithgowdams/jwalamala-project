@@ -8,6 +8,7 @@ import Script from "next/script";
 import { site } from "@/config/site";
 import { pickText } from "@/lib/i18n/content";
 import { routeAllowsAds, type AdPick } from "@/lib/ads/schema";
+import { posterSizes, slotShape } from "@/lib/ads/posters";
 export const AdNonceContext = createContext<string | undefined>(undefined);
 export function AdNonceProvider({
   nonce,
@@ -26,7 +27,8 @@ export function AdSlot({
   disabled = false,
 }: {
   placement: string;
-  format?: "banner" | "rectangle";
+  /** "wide" reserves a full-width 16:9 space; "banner" keeps the slimmer strip. */
+  format?: "banner" | "rectangle" | "wide";
   disabled?: boolean;
 }) {
   const pathname = usePathname();
@@ -73,6 +75,7 @@ function Slot({
           device: matchMedia("(max-width:767px)").matches
             ? "mobile"
             : "desktop",
+          format,
         });
         void fetch("/api/ads/pick?" + params, {
           signal: controller.signal,
@@ -92,7 +95,7 @@ function Slot({
       controller.abort();
       observer.disconnect();
     };
-  }, [pathname, placement]);
+  }, [pathname, placement, format]);
   useEffect(() => {
     if (pick.mode !== "manual" || !root.current) return;
     let timer: ReturnType<typeof setTimeout> | undefined,
@@ -121,11 +124,57 @@ function Slot({
     };
   }, [pick]);
   const empty = (ready && pick.mode === "off") || unfilled;
+  const shape = slotShape(placement, format);
+  const poster =
+    pick.mode === "manual" && pick.creative.shape !== "any"
+      ? pick.creative.shape
+      : null;
+  const alt =
+    pick.mode === "manual"
+      ? pickText(
+          locale,
+          pick.creative.alt_kn,
+          pick.creative.alt_en,
+          pick.creative.alt_hi,
+        )
+      : "";
+  const image =
+    pick.mode !== "manual" ? null : poster ? (
+      // Upload already crops and compresses posters to their exact size.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className="ad-poster"
+        src={pick.creative.image_url}
+        alt={alt}
+        loading="lazy"
+        width={posterSizes[poster].width}
+        height={posterSizes[poster].height}
+      />
+    ) : (
+      <picture>
+        {pick.creative.mobile_image_url && (
+          <source
+            media="(max-width:767px)"
+            srcSet={pick.creative.mobile_image_url}
+          />
+        )}
+        <img
+          src={pick.creative.image_url}
+          alt={alt}
+          loading="lazy"
+          width={format === "rectangle" ? 300 : 728}
+          height={format === "rectangle" ? 250 : 90}
+        />
+      </picture>
+    );
   return (
     <div
       ref={root}
       className={
-        "ad-slot ad-slot--" + format + (empty ? " ad-slot--empty" : "")
+        "ad-slot ad-slot--" +
+        format +
+        (poster ? " ad-slot--poster-" + poster : "") +
+        (empty ? " ad-slot--empty" : "")
       }
       data-ad-placement={placement}
       role="region"
@@ -137,43 +186,34 @@ function Slot({
             {pick.mode === "manual" ? t.sponsored : kn.advertisement}
           </span>
           {pick.mode === "manual" ? (
-            <a
-              href={
-                "/api/ads/click/" +
-                pick.creative.id +
-                "?token=" +
-                encodeURIComponent(pick.creative.token)
-              }
-              target="_blank"
-              rel="sponsored noopener"
-            >
-              <picture>
-                {pick.creative.mobile_image_url && (
-                  <source
-                    media="(max-width:767px)"
-                    srcSet={pick.creative.mobile_image_url}
-                  />
-                )}
-                <img
-                  src={pick.creative.image_url}
-                  alt={pickText(
-                    locale,
-                    pick.creative.alt_kn,
-                    pick.creative.alt_en,
-                    pick.creative.alt_hi,
-                  )}
-                  loading="lazy"
-                  width={format === "rectangle" ? 300 : 728}
-                  height={format === "rectangle" ? 250 : 90}
-                />
-              </picture>
-            </a>
+            pick.creative.linked ? (
+              <a
+                href={
+                  "/api/ads/click/" +
+                  pick.creative.id +
+                  "?token=" +
+                  encodeURIComponent(pick.creative.token)
+                }
+                target="_blank"
+                rel="sponsored noopener"
+              >
+                {image}
+              </a>
+            ) : (
+              image
+            )
           ) : pick.mode === "google" ? (
             <GoogleAd value={pick} onEmpty={() => setUnfilled(true)} />
           ) : (
             <div className="ad-slot-placeholder">
               <span lang="en">Google AdSense</span>
               <span>{kn.adSpace}</span>
+              {shape !== "strip" && (
+                <span className="ad-slot-size" lang="en">
+                  {shape === "square" ? "1:1" : "16:9"} ·{" "}
+                  {posterSizes[shape].width}×{posterSizes[shape].height}
+                </span>
+              )}
             </div>
           )}
         </>

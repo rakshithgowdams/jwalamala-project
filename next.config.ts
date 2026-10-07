@@ -1,4 +1,16 @@
 import type { NextConfig } from "next";
+const imageKitHost = (() => {
+  try {
+    const url = new URL(process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || "");
+    return url.protocol === "https:" && url.hostname !== "ik.imagekit.io"
+      ? url.hostname
+      : "";
+  } catch {
+    return "";
+  }
+})();
+const imageHosts =
+  "https://ik.imagekit.io" + (imageKitHost ? " https://" + imageKitHost : "");
 const config: NextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
@@ -19,6 +31,10 @@ const config: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "i.ytimg.com" },
+      { protocol: "https", hostname: "ik.imagekit.io" },
+      ...(imageKitHost
+        ? [{ protocol: "https" as const, hostname: imageKitHost }]
+        : []),
       {
         protocol: "https",
         hostname: "*.supabase.co",
@@ -54,7 +70,9 @@ const config: NextConfig = {
                     (process.env.NODE_ENV === "development"
                       ? " 'unsafe-eval'"
                       : "") +
-                    " https://www.youtube.com https://s.ytimg.com https://challenges.cloudflare.com https://checkout.razorpay.com https://cdn.ampproject.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://*.supabase.co; font-src 'self'; media-src 'self' https://*.supabase.co; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.supabase.co wss://*.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321; frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube-nocookie.com https://www.facebook.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:",
+                    " https://www.youtube.com https://s.ytimg.com https://challenges.cloudflare.com https://checkout.razorpay.com https://cdn.ampproject.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://*.supabase.co " +
+                    imageHosts +
+                    "; font-src 'self'; media-src 'self' https://*.supabase.co; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.supabase.co wss://*.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321; frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube-nocookie.com https://www.facebook.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:",
                 },
               ]),
         ],

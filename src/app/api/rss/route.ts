@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     })
     .join("");
   return new Response(
-    `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${xml(site.fullName)}</title><link>${xml(site.url)}</link><description>${xml(site.description)}</description><language>kn-IN</language>${items}</channel></rss>`,
+    `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${xml(site.fullName)}</title><link>${xml(site.url)}</link><description>${xml(site.description)}</description><language>kn-IN</language><copyright>${xml(`© ${new Date().getFullYear()} ${site.fullName}. All rights reserved.`)}</copyright>${items}</channel></rss>`,
     {
       headers: {
         "Content-Type": "application/rss+xml; charset=utf-8",

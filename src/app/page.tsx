@@ -1,4 +1,3 @@
-import { LocationFilter } from "@/components/search/LocationFilter";
 import { getListing } from "@/lib/queries/listing";
 import { HomeExtras } from "@/components/discovery/HomeExtras";
 import { CategoryScrollShowcase } from "@/components/discovery/CategoryScrollShowcase";
@@ -13,16 +12,17 @@ import { AdSlot } from "@/components/ads/AdSlot";
 import Link from "next/link";
 import { ArrowRight, Send, CalendarDays, TrendingUp } from "lucide-react";
 
-import { site } from "@/config/site";
 import { getPosts, getEvents, getCategories } from "@/lib/queries/content";
 import { HeroStory, NewsCard } from "@/components/news/NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import {
   SectionTitle,
-  SampleNotice,
   EmptyState,
 } from "@/components/ui/Primitives";
 import { EventsTicker } from "@/components/events/EventsTicker";
+import { BusinessAdShelf } from "@/components/ads/BusinessAds";
+import { getBusinessAds } from "@/lib/ads/business-server";
+import { pickBusinessAds } from "@/lib/ads/business";
 export default async function Home() {
   const { kn, locale } = await getUiStrings();
 
@@ -43,17 +43,15 @@ export default async function Home() {
   const config = homeSchema
     .catch(defaultHome)
     .parse((await getSetting("homepage")) || defaultHome);
+  const shops = pickBusinessAds(await getBusinessAds().catch(() => []), {
+    count: 8,
+  });
   const lead =
     posts.find((p) => p.id === config.lead_id) ||
     posts.find((p) => p.is_featured) ||
     posts[0];
   return (
     <div className="container home-page">
-      {(site.demo || posts.some((post) => post.is_seed)) && <SampleNotice />}
-      <details className="location-disclosure">
-        <summary>{kn.newsNearYou}</summary>
-        <LocationFilter filters={{}} action="/news" />
-      </details>
       <AdSlot placement="home-top" />
       {config.sections
         .filter((s) => s.enabled)
@@ -103,12 +101,9 @@ export default async function Home() {
                                   .map((p) => (
                                     <NewsCard key={p.id} post={p} compact />
                                   ))}
-                                <AdSlot
-                                  placement="home-sidebar"
-                                  format="rectangle"
-                                />
                               </aside>
                             </div>
+                            <AdSlot placement="home-after-hero" format="wide" />
                           </>
                         ) : (
                           <EmptyState />
@@ -292,6 +287,7 @@ export default async function Home() {
           );
         })}
       <CategoryScrollShowcase posts={posts} categories={categoriesList} />
+      <BusinessAdShelf ads={shops} />
       <HomeExtras config={config} />
       <HeritageStrip />
       <AdSlot placement="home-bottom" />

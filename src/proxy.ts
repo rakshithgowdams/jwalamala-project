@@ -3,7 +3,7 @@ import { supabaseFetch } from "@/lib/supabase/fetch";
 import { localPath } from "@/lib/v4/redirects";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAdminPath, loginPath } from "@/lib/auth/paths";
+import { loginPath } from "@/lib/auth/paths";
 export async function proxy(request: NextRequest) {
   const strict = process.env.ADS_STRICT_CSP === "true";
   const nonce = strict
@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const path = request.nextUrl.pathname;
-  const restricted = isAdminPath(path) || path === "/account" || path.startsWith("/account/");
+  const restricted = path === "/account" || path.startsWith("/account/");
   const privatePage = restricted || /^\/(auth|login|signup|review)(\/|$)/.test(path);
   function finish(result: NextResponse) {
     if (result !== response) {
@@ -69,13 +69,6 @@ export async function proxy(request: NextRequest) {
     } = await db.auth.getUser();
     if (restricted && !user) {
       return toLogin();
-    }
-    if (isAdminPath(path) && user) {
-      const { data } = await db.rpc("has_permission", {
-        requested: "admin.access",
-      });
-      if (data !== true)
-        return finish(NextResponse.redirect(new URL(loginPath(path + request.nextUrl.search) + "&error=access", request.url)));
     }
     if (path === "/") {
       const q = request.nextUrl.searchParams;
