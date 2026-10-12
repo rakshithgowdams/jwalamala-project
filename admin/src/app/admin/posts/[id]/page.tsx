@@ -10,7 +10,7 @@ export default async function EditPost({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { db } = await requireStaff();
+  const { db, profile } = await requireStaff();
   const options = await editorChoices(db);
   const { id } = await params;
   const [{ data: p }, { data: categories }] = await Promise.all([
@@ -50,7 +50,12 @@ export default async function EditPost({
   ]);
   return (
     <>
-      <PostEditor post={post} categories={categories || []} {...options} />
+      <PostEditor
+        post={post}
+        categories={categories || []}
+        canDelete={profile.role === "admin"}
+        {...options}
+      />
       {post.sponsor_name && <SponsorReview postId={id} />}
       <ReviewPanel
         current={{ title_kn: post.title_kn, body_html: post.body_html }}

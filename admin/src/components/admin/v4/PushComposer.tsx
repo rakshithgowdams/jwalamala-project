@@ -2,12 +2,13 @@
 import { useState, useTransition } from "react";
 import { queuePush } from "@/app/admin/push/actions";
 import { pushTopics } from "@/lib/push/schema";
-import { pushLabels } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function PushComposer({
   posts,
 }: {
   posts: { id: string; title_kn: string; summary_kn: string }[];
 }) {
+  const { tr, pushLabels } = useUiStrings();
   const [selected, setSelected] = useState(""),
     [message, setMessage] = useState(""),
     [busy, start] = useTransition();
@@ -20,19 +21,32 @@ export function PushComposer({
         const f = new FormData(e.currentTarget);
         start(async () => {
           const r = await queuePush(Object.fromEntries(f));
-          setMessage(r.error || "ಕಳುಹಿಸುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಲಾಗಿದೆ.");
+          setMessage(
+            r.error ||
+              tr({
+                en: "Added to the send queue.",
+                kn: "ಕಳುಹಿಸುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
+                hi: "भेजने की कतार में जोड़ा गया।",
+              }),
+          );
         });
       }}
     >
       <label className="field wide">
-        ಪ್ರಕಟಿತ ಲೇಖನ
+        {tr({
+          en: "Published article",
+          kn: "ಪ್ರಕಟಿತ ಲೇಖನ",
+          hi: "प्रकाशित लेख",
+        })}
         <select
           required
           name="post_id"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
         >
-          <option value="">ಆಯ್ಕೆಮಾಡಿ</option>
+          <option value="">
+            {tr({ en: "Select", kn: "ಆಯ್ಕೆಮಾಡಿ", hi: "चुनें" })}
+          </option>
           {posts.map((p) => (
             <option value={p.id} key={p.id}>
               {p.title_kn}
@@ -41,7 +55,7 @@ export function PushComposer({
         </select>
       </label>
       <label className="field">
-        ವಿಷಯ
+        {tr({ en: "Topic", kn: "ವಿಷಯ", hi: "विषय" })}
         <select name="topic">
           {pushTopics.map((t) => (
             <option key={t} value={t}>
@@ -51,7 +65,7 @@ export function PushComposer({
         </select>
       </label>
       <label className="field">
-        ಶೀರ್ಷಿಕೆ
+        {tr({ en: "Title", kn: "ಶೀರ್ಷಿಕೆ", hi: "शीर्षक" })}
         <input
           key={selected}
           name="title"
@@ -61,7 +75,7 @@ export function PushComposer({
         />
       </label>
       <label className="field wide">
-        ಸಂದೇಶ
+        {tr({ en: "Message", kn: "ಸಂದೇಶ", hi: "संदेश" })}
         <textarea
           key={selected}
           name="body"
@@ -71,7 +85,11 @@ export function PushComposer({
         />
       </label>
       <button className="button button-ember" disabled={busy || !p}>
-        ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿ
+        {tr({
+          en: "Approve and send",
+          kn: "ಅನುಮೋದಿಸಿ ಕಳುಹಿಸಿ",
+          hi: "स्वीकृत करें और भेजें",
+        })}
       </button>
       <p role="status">{message}</p>
     </form>

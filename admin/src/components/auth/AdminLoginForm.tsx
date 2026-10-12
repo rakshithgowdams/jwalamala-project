@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { site } from "@/config/site";
 import { ShieldCheck } from "lucide-react";
 import { getBrowserClient } from "@/lib/supabase/client";
@@ -10,10 +11,11 @@ import { isAuthRateLimited, submitEmailAuth } from "@/lib/auth/email";
 import type { AuthMethods } from "@/lib/auth/settings";
 import { adminReturnPath } from "@/lib/auth/paths";
 
-export function AdminLoginForm({ next = "/admin", authError, methods }: {
+export function AdminLoginForm({ next = "/admin", authError, methods, problems = [] }: {
   next?: string;
   authError?: string;
   methods: AuthMethods;
+  problems?: string[];
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "reset">("login");
@@ -72,7 +74,13 @@ export function AdminLoginForm({ next = "/admin", authError, methods }: {
     <h1>{mode === "reset" ? "Reset Password" : "Admin Login"}</h1>
     <p>{mode === "reset" ? "Enter your email to receive a password reset link."
       : "Sign in with an account authorized by your site administrator."}</p>
-    {!configured && <div className="admin-auth-notice" role="status">Administrator sign-in is temporarily unavailable.</div>}
+    {!configured && <div className="admin-auth-notice" role="status">
+      Administrator sign-in is temporarily unavailable.
+      {problems.length > 0 && <ul className="admin-auth-problems">
+        {problems.map((problem) => <li key={problem}>{problem}</li>)}
+        <li>Fix these in admin/.env.local, then restart the admin app.</li>
+      </ul>}
+    </div>}
     <form onSubmit={submit} aria-busy={busy}>
       <label className="field" htmlFor="admin-email">Email
         <input id="admin-email" name="email" type="email" autoComplete="email"
@@ -89,6 +97,7 @@ export function AdminLoginForm({ next = "/admin", authError, methods }: {
       <button type="button" disabled={busy} onClick={() => {
         setMode(mode === "login" ? "reset" : "login"); setPassword(""); setMessage("");
       }}>{mode === "login" ? "Forgot password?" : "Back to Login"}</button>
+      {mode === "login" && <Link href="/auth/admin/signup">Create an admin account</Link>}
       <a href={site.url}>Back to the news site</a>
     </div>
   </div>;

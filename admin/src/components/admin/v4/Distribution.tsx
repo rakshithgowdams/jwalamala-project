@@ -2,12 +2,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  deleteDistribution,
   editDistributionDraft,
   makeDistributionDraft,
   queueDistribution,
   connectSocial,
 } from "@/app/admin/distribution/actions";
-import { v4 as t, kn } from "@/content/strings.kn";
+import { ConfirmDeleteButton } from "../ConfirmDeleteButton";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function Distribution({
   kind,
   posts,
@@ -17,6 +19,7 @@ export function Distribution({
   posts: { id: string; title_kn: string }[];
   rows: Record<string, unknown>[];
 }) {
+  const { kn, v4: t } = useUiStrings();
   const [selected, setSelected] = useState<string[]>([]),
     [message, setMessage] = useState(""),
     [text, setText] = useState(""),
@@ -142,12 +145,18 @@ export function Distribution({
               {t.approveAndQueue}
             </button>
           )}
+          {row.status !== "queued" && (
+            <div className="distribution-manage">
+              <ConfirmDeleteButton action={() => deleteDistribution(kind, String(row.id))} />
+            </div>
+          )}
         </section>
       ))}
     </>
   );
 }
 export function SocialConnection() {
+  const { kn, v4: t } = useUiStrings();
   const [message, setMessage] = useState("");
   return (
     <form
@@ -201,12 +210,19 @@ function DistributionDraft({
   kind: "newsletter" | "social";
   row: Record<string, unknown>;
 }) {
+  const { kn, v4: t, tr } = useUiStrings();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   return (
     <details>
-      <summary>Edit draft</summary>
+      <summary>
+        {tr({
+          en: "Edit draft",
+          kn: "ಕರಡು ತಿದ್ದಿ",
+          hi: "ड्राफ़्ट संपादित करें",
+        })}
+      </summary>
       <form
         className="form-grid"
         onSubmit={async (e) => {
@@ -231,7 +247,7 @@ function DistributionDraft({
       >
         {kind === "newsletter" && (
           <label className="field wide">
-            Subject
+            {tr({ en: "Subject", kn: "ವಿಷಯ", hi: "विषय" })}
             <input
               name="subject"
               defaultValue={String(row.subject || "")}
@@ -241,7 +257,13 @@ function DistributionDraft({
           </label>
         )}
         <label className="field wide">
-          {kind === "newsletter" ? "Newsletter HTML" : "Caption"}
+          {kind === "newsletter"
+            ? tr({
+                en: "Newsletter HTML",
+                kn: "ಸುದ್ದಿಪತ್ರ HTML",
+                hi: "न्यूज़लेटर HTML",
+              })
+            : tr({ en: "Caption", kn: "ಶೀರ್ಷಿಕೆ ಬರಹ", hi: "कैप्शन" })}
           <textarea
             name="content"
             defaultValue={String(

@@ -1,7 +1,9 @@
 import { requirePermission } from "@/lib/v4/permissions";
 import { NoticeBilling } from "@/components/admin/v4/NoticeBilling";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("ads.manage");
+  const { tr } = await getUiStrings();
   const [notices, bills] = await Promise.all([
     db
       .from("notices")
@@ -18,17 +20,31 @@ export default async function Page() {
     throw Error("Notice billing migration required");
   return (
     <>
-      <h1>Paid notices</h1>
+      <h1>
+        {tr({
+          en: "Paid notices",
+          kn: "ಪಾವತಿಸಿದ ಪ್ರಕಟಣೆಗಳು",
+          hi: "सशुल्क सूचनाएँ",
+        })}
+      </h1>
       <NoticeBilling notices={notices.data || []} />
       <div className="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Notice</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Payment link</th>
-              <th>Reference</th>
+              <th>{tr({ en: "Notice", kn: "ಪ್ರಕಟಣೆ", hi: "सूचना" })}</th>
+              <th>{tr({ en: "Amount", kn: "ಮೊತ್ತ", hi: "राशि" })}</th>
+              <th>{tr({ en: "Status", kn: "ಸ್ಥಿತಿ", hi: "स्थिति" })}</th>
+              <th>
+                {tr({
+                  en: "Payment link",
+                  kn: "ಪಾವತಿ ಲಿಂಕ್",
+                  hi: "भुगतान लिंक",
+                })}
+              </th>
+              <th>
+                {tr({ en: "Reference", kn: "ಉಲ್ಲೇಖ", hi: "संदर्भ" })}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -43,7 +59,11 @@ export default async function Page() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Open payment link
+                    {tr({
+                      en: "Open payment link",
+                      kn: "ಪಾವತಿ ಲಿಂಕ್ ತೆರೆಯಿರಿ",
+                      hi: "भुगतान लिंक खोलें",
+                    })}
                   </a>
                 </td>
                 <td>{b.payment_reference}</td>

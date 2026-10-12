@@ -104,7 +104,7 @@ export const groupsForPages = (pages: readonly string[]) =>
 const image = z
   .string()
   .trim()
-  .refine(isHostedImage, "Use an uploaded image or an ImageKit link");
+  .refine(isHostedImage, "Use an ImageKit image link");
 /** datetime-local values are entered in India time. */
 const istTime = z
   .string()

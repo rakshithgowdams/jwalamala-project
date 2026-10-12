@@ -16,21 +16,28 @@ export function normalizeVideo(input: string) {
         id,
         url: `https://www.youtube.com/watch?v=${id}`,
       };
-    if (
-      [
-        "facebook.com",
-        "www.facebook.com",
-        "m.facebook.com",
-        "fb.watch",
-      ].includes(url.hostname)
-    ) {
-      url.search = "";
-      url.hash = "";
+    if (url.hostname === "fb.watch" && url.pathname.length > 1)
       return {
         provider: "facebook" as const,
         id: url.pathname,
-        url: url.toString(),
+        url: `https://fb.watch${url.pathname}`,
       };
+    if (/^(?:www\.|m\.|web\.|mbasic\.)?facebook\.com$/.test(url.hostname)) {
+      // watch/?v=… and video.php?v=… carry the video only in the query string.
+      const v = url.searchParams.get("v");
+      if (v && /^\d+$/.test(v))
+        return {
+          provider: "facebook" as const,
+          id: v,
+          url: `https://www.facebook.com/watch/?v=${v}`,
+        };
+      const path = url.pathname.replace(/\/+$/, "");
+      if (path && !/^\/(?:watch|video\.php)$/.test(path))
+        return {
+          provider: "facebook" as const,
+          id: path,
+          url: `https://www.facebook.com${path}/`,
+        };
     }
   } catch {}
   return null;

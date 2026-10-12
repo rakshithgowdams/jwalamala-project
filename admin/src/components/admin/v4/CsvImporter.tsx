@@ -8,11 +8,14 @@ import {
 } from "@/lib/v4/import";
 import { toCsv } from "@/lib/v4/csv";
 import { beginImport, importBatch } from "@/app/admin/import/actions";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function CsvImporter({
   categories,
 }: {
   categories: { id: string; name_kn: string }[];
 }) {
+  const { tr } = useUiStrings();
+  const errorText = tr({ en: "Error", kn: "ದೋಷ", hi: "त्रुटि" });
   const [rows, setRows] = useState<Record<string, string>[]>([]),
     [mapping, setMapping] = useState<Record<string, string>>({}),
     [category, setCategory] = useState(categories[0]?.id || ""),
@@ -44,7 +47,7 @@ export function CsvImporter({
       if (!id) {
         const begun = await beginImport(name, rows.length);
         if (!begun.id) {
-          setMessage(begun.error || "ದೋಷ");
+          setMessage(begun.error || errorText);
           return;
         }
         id = begun.id;
@@ -70,9 +73,21 @@ export function CsvImporter({
           return;
         }
       }
-      setMessage("ಆಮದು ಪೂರ್ಣಗೊಂಡಿದೆ. ಪ್ರಕಟಿಸುವ ಮೊದಲು ಕರಡುಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.");
+      setMessage(
+        tr({
+          en: "Import complete. Review the drafts before publishing.",
+          kn: "ಆಮದು ಪೂರ್ಣಗೊಂಡಿದೆ. ಪ್ರಕಟಿಸುವ ಮೊದಲು ಕರಡುಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+          hi: "आयात पूरा हुआ। प्रकाशित करने से पहले ड्राफ़्ट जाँचें।",
+        }),
+      );
     } catch {
-      setMessage("ಸಂಪರ್ಕ ದೋಷ. ಮತ್ತೆ ಮುಂದುವರಿಸಬಹುದು.");
+      setMessage(
+        tr({
+          en: "Connection error. You can resume.",
+          kn: "ಸಂಪರ್ಕ ದೋಷ. ಮತ್ತೆ ಮುಂದುವರಿಸಬಹುದು.",
+          hi: "कनेक्शन त्रुटि। आप फिर से जारी रख सकते हैं।",
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -80,7 +95,11 @@ export function CsvImporter({
   return (
     <div className="form-grid">
       <label className="field wide">
-        CSV ಕಡತ (UTF-8, ಗರಿಷ್ಠ 1 MB / 200 ಸಾಲುಗಳು)
+        {tr({
+          en: "CSV file (UTF-8, max 1 MB / 200 rows)",
+          kn: "CSV ಕಡತ (UTF-8, ಗರಿಷ್ಠ 1 MB / 200 ಸಾಲುಗಳು)",
+          hi: "CSV फ़ाइल (UTF-8, अधिकतम 1 MB / 200 पंक्तियाँ)",
+        })}
         <input
           type="file"
           accept=".csv,text/csv"
@@ -89,7 +108,14 @@ export function CsvImporter({
             const file = e.target.files?.[0];
             if (!file) return;
             try {
-              if (file.size > 1000000) throw Error("ಕಡತ ತುಂಬಾ ದೊಡ್ಡದು.");
+              if (file.size > 1000000)
+                throw Error(
+                  tr({
+                    en: "File is too large.",
+                    kn: "ಕಡತ ತುಂಬಾ ದೊಡ್ಡದು.",
+                    hi: "फ़ाइल बहुत बड़ी है।",
+                  }),
+                );
               const parsed = parseCsv(await file.text());
               setRows(parsed);
               setName(file.name);
@@ -106,7 +132,7 @@ export function CsvImporter({
               setMessage("");
             } catch (error) {
               setRows([]);
-              setMessage(error instanceof Error ? error.message : "ದೋಷ");
+              setMessage(error instanceof Error ? error.message : errorText);
             }
           }}
         />
@@ -114,7 +140,7 @@ export function CsvImporter({
       {!!rows.length && (
         <>
           <label className="field">
-            ವರ್ಗ
+            {tr({ en: "Category", kn: "ವರ್ಗ", hi: "श्रेणी" })}
             <select
               disabled={busy || !!job}
               value={category}
@@ -137,7 +163,13 @@ export function CsvImporter({
                   setMapping({ ...mapping, [field]: e.target.value })
                 }
               >
-                <option value="">ಕಾಲಮ್ ಆಯ್ಕೆಮಾಡಿ</option>
+                <option value="">
+                  {tr({
+                    en: "Choose a column",
+                    kn: "ಕಾಲಮ್ ಆಯ್ಕೆಮಾಡಿ",
+                    hi: "कॉलम चुनें",
+                  })}
+                </option>
                 {headers.map((h) => (
                   <option key={h} value={h}>
                     {h}
@@ -150,9 +182,9 @@ export function CsvImporter({
             <table>
               <thead>
                 <tr>
-                  <th>ಸಾಲು</th>
-                  <th>ಶೀರ್ಷಿಕೆ</th>
-                  <th>ಪರಿಶೀಲನೆ</th>
+                  <th>{tr({ en: "Row", kn: "ಸಾಲು", hi: "पंक्ति" })}</th>
+                  <th>{tr({ en: "Title", kn: "ಶೀರ್ಷಿಕೆ", hi: "शीर्षक" })}</th>
+                  <th>{tr({ en: "Check", kn: "ಪರಿಶೀಲನೆ", hi: "जाँच" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,7 +197,11 @@ export function CsvImporter({
                       <td>{mapped.title_kn}</td>
                       <td>
                         {parsed.success
-                          ? "ಕರಡು ಸಿದ್ಧ"
+                          ? tr({
+                              en: "Draft ready",
+                              kn: "ಕರಡು ಸಿದ್ಧ",
+                              hi: "ड्राफ़्ट तैयार",
+                            })
                           : parsed.error.issues
                               .map((e) => e.path.join("."))
                               .join(", ")}
@@ -177,20 +213,33 @@ export function CsvImporter({
             </table>
           </div>
           <p className="wide">
-            ಒಟ್ಟು {rows.length} ಸಾಲುಗಳು. ಮೊದಲ 10 ಸಾಲುಗಳ ಮುನ್ನೋಟ. ನಕಲು slug /
-            ವೀಡಿಯೊಗಳು ಸೇರಿಸಲಾಗುವುದಿಲ್ಲ.
+            {tr({
+              en: `${rows.length} rows in total. Preview of the first 10 rows. Duplicate slugs / videos are not added.`,
+              kn: `ಒಟ್ಟು ${rows.length} ಸಾಲುಗಳು. ಮೊದಲ 10 ಸಾಲುಗಳ ಮುನ್ನೋಟ. ನಕಲು slug / ವೀಡಿಯೊಗಳು ಸೇರಿಸಲಾಗುವುದಿಲ್ಲ.`,
+              hi: `कुल ${rows.length} पंक्तियाँ। पहली 10 पंक्तियों का पूर्वावलोकन। डुप्लिकेट slug / वीडियो नहीं जोड़े जाते।`,
+            })}
           </p>
           <button
             className="button button-ember"
             disabled={busy || !category || results.length === rows.length}
             onClick={() => void run()}
           >
-            {job ? "ಮುಂದುವರಿಸಿ" : "ಕರಡುಗಳನ್ನು ಆಮದು ಮಾಡಿ"}
+            {job
+              ? tr({ en: "Resume", kn: "ಮುಂದುವರಿಸಿ", hi: "जारी रखें" })
+              : tr({
+                  en: "Import drafts",
+                  kn: "ಕರಡುಗಳನ್ನು ಆಮದು ಮಾಡಿ",
+                  hi: "ड्राफ़्ट आयात करें",
+                })}
           </button>
           <progress
             max={rows.length}
             value={results.length}
-            aria-label="ಆಮದು ಪ್ರಗತಿ"
+            aria-label={tr({
+              en: "Import progress",
+              kn: "ಆಮದು ಪ್ರಗತಿ",
+              hi: "आयात प्रगति",
+            })}
           />
         </>
       )}
@@ -200,7 +249,11 @@ export function CsvImporter({
       {!!results.length && (
         <div className="wide">
           <button className="button" onClick={download}>
-            CSV ವರದಿ ಡೌನ್‌ಲೋಡ್
+            {tr({
+              en: "Download CSV report",
+              kn: "CSV ವರದಿ ಡೌನ್‌ಲೋಡ್",
+              hi: "CSV रिपोर्ट डाउनलोड करें",
+            })}
           </button>
           <ul>
             {results.map((r) => (

@@ -7,7 +7,7 @@ import {
   restoreVersion,
   resolveReviewComment,
 } from "@/app/admin/desk/actions";
-import { v4 as t, kn } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function ReviewPanel({
   postId,
   versions,
@@ -28,6 +28,8 @@ export function ReviewPanel({
     resolved: boolean;
   }[];
 }) {
+  const { kn, v4: t, tr, locale } = useUiStrings();
+  const locked = t.locked;
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     router = useRouter();
@@ -37,7 +39,7 @@ export function ReviewPanel({
     let active = true;
     const lock = async () => {
       const { data, error } = await db.rpc("lock_v4_post", { target: postId });
-      if (active && (error || data === false)) setMessage(t.locked);
+      if (active && (error || data === false)) setMessage(locked);
     };
     void lock();
     const timer = window.setInterval(lock, 120000);
@@ -48,7 +50,7 @@ export function ReviewPanel({
         .rpc("lock_v4_post", { target: postId, release: true })
         .then(() => {});
     };
-  }, [postId]);
+  }, [postId, locked]);
   return (
     <section className="utility-panel">
       <h2>{t.reviewNote}</h2>
@@ -67,7 +69,11 @@ export function ReviewPanel({
             setMessage(!error && data ? t.saved : t.locked);
           }}
         >
-          Administrator: take over editing lock
+          {tr({
+            en: "Administrator: take over editing lock",
+            kn: "ನಿರ್ವಾಹಕರು: ಸಂಪಾದನೆಯ ಲಾಕ್ ವಹಿಸಿಕೊಳ್ಳಿ",
+            hi: "व्यवस्थापक: संपादन लॉक अपने हाथ में लें",
+          })}
         </button>
       )}
       {comments.map((c) => (
@@ -92,7 +98,9 @@ export function ReviewPanel({
               }
             }}
           >
-            {c.resolved ? "Reopen" : "Resolve"}
+            {c.resolved
+              ? tr({ en: "Reopen", kn: "ಮತ್ತೆ ತೆರೆಯಿರಿ", hi: "फिर से खोलें" })
+              : tr({ en: "Resolve", kn: "ಪರಿಹರಿಸಿ", hi: "हल करें" })}
           </button>
         </blockquote>
       ))}
@@ -133,20 +141,32 @@ export function ReviewPanel({
       {versions.map((v) => (
         <details key={v.id}>
           <summary>
-            {new Date(v.created_at).toLocaleString("kn-IN", {
+            {new Date(v.created_at).toLocaleString(locale + "-IN", {
               timeZone: "Asia/Kolkata",
             })}{" "}
             · {v.snapshot.title_kn}
           </summary>
           <div className="community-grid">
             <section>
-              <h3>Selected version</h3>
+              <h3>
+                {tr({
+                  en: "Selected version",
+                  kn: "ಆಯ್ಕೆಮಾಡಿದ ಆವೃತ್ತಿ",
+                  hi: "चुना गया संस्करण",
+                })}
+              </h3>
               <pre className="version-source">
                 {v.snapshot.title_kn + "\n" + v.snapshot.body_html}
               </pre>
             </section>
             <section>
-              <h3>Current version</h3>
+              <h3>
+                {tr({
+                  en: "Current version",
+                  kn: "ಪ್ರಸ್ತುತ ಆವೃತ್ತಿ",
+                  hi: "वर्तमान संस्करण",
+                })}
+              </h3>
               <pre className="version-source">
                 {current.title_kn + "\n" + current.body_html}
               </pre>
@@ -155,8 +175,16 @@ export function ReviewPanel({
           <p className="meta">
             {v.snapshot.body_html === current.body_html &&
             v.snapshot.title_kn === current.title_kn
-              ? "Text is unchanged"
-              : "Text differs from the current version"}
+              ? tr({
+                  en: "Text is unchanged",
+                  kn: "ಪಠ್ಯದಲ್ಲಿ ಬದಲಾವಣೆ ಇಲ್ಲ",
+                  hi: "पाठ में कोई बदलाव नहीं",
+                })
+              : tr({
+                  en: "Text differs from the current version",
+                  kn: "ಪಠ್ಯ ಪ್ರಸ್ತುತ ಆವೃತ್ತಿಗಿಂತ ಭಿನ್ನವಾಗಿದೆ",
+                  hi: "पाठ वर्तमान संस्करण से अलग है",
+                })}
           </p>
           <button
             disabled={busy}

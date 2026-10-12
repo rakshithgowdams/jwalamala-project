@@ -7,8 +7,9 @@ import { getPosts, getEvents } from "@/lib/queries/content";
 import { bulletin, newsletterHtml } from "@/lib/distribution/format";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { encryptToken } from "@/lib/providers/social";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export async function makeDistributionDraft(input: unknown) {
+  const { v4: t } = await getUiStrings();
   const parsed = z
     .object({
       kind: z.enum(["newsletter", "telegram", "facebook", "whatsapp"]),
@@ -60,6 +61,7 @@ export async function queueDistribution(
   kind: "newsletter" | "social",
   id: string,
 ) {
+  const { v4: t } = await getUiStrings();
   await requirePermission(
     kind === "newsletter" ? "newsletter.manage" : "social.manage",
   );
@@ -76,6 +78,7 @@ export async function queueDistribution(
 }
 export async function connectSocial(input: unknown) {
   await requirePermission("settings.manage");
+  const { v4: t } = await getUiStrings();
   const parsed = z
     .object({
       network: z.enum(["telegram", "facebook"]),
@@ -103,7 +106,35 @@ export async function connectSocial(input: unknown) {
   }
 }
 
+/** Deletes a newsletter issue or social post, except while it is queued for sending. */
+export async function deleteDistribution(kind: "newsletter" | "social", id: string) {
+  const { v4: t, tr } = await getUiStrings();
+  if (!["newsletter", "social"].includes(kind) || !z.uuid().safeParse(id).success) return { error: t.failed };
+  const { db } = await requirePermission(kind === "newsletter" ? "newsletter.manage" : "social.manage");
+  const table = kind === "newsletter" ? "newsletter_issues" : "social_posts";
+  const { data: row } = await db.from(table).select("status").eq("id", id).maybeSingle();
+  if (!row) return { error: t.failed };
+  if (row.status === "queued")
+    return {
+      error: tr({
+        en: "It is being sent right now. Delete it after sending finishes.",
+        kn: "ಇದು ಈಗ ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ. ಮುಗಿದ ನಂತರ ಅಳಿಸಿ.",
+        hi: "यह अभी भेजा जा रहा है। भेजना पूरा होने के बाद हटाएँ।",
+      }),
+    };
+  if (kind === "newsletter") {
+    // Delivery records have no ON DELETE rule and are hidden from the editor's session.
+    const admin = getAdminClient();
+    if (admin) await admin.from("newsletter_deliveries").delete().eq("issue_id", id);
+  }
+  const { data, error } = await db.from(table).delete().eq("id", id).select("id");
+  if (error || !data?.length) return { error: t.failed };
+  revalidatePath("/admin/" + kind);
+  return { ok: true };
+}
+
 export async function editDistributionDraft(input: unknown) {
+  const { v4: t } = await getUiStrings();
   const p = z
     .object({
       kind: z.enum(["newsletter", "social"]),

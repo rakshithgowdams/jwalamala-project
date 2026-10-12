@@ -3,7 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export async function editorChoices(db: SupabaseClient) {
   const [tags, places, authors, events, publish] = await Promise.all([
     db.from("tags").select("id,name_kn").order("name_kn").limit(500),
-    db.from("places").select("id,name_kn").order("name_kn").limit(500),
+    db
+      .from("places")
+      .select("id,name_kn,name_en,district,is_district")
+      .order("is_district", { ascending: false })
+      .order("name_kn")
+      .limit(2000),
     db
       .from("authors")
       .select("id,name_kn")

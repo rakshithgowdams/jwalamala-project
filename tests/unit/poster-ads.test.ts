@@ -12,7 +12,7 @@ const valid = {
   advertiser: "Padmavati Cotton House",
   shape: "landscape",
   image_url:
-    "https://abc.supabase.co/storage/v1/object/public/site-assets/u/poster.webp",
+    "https://ik.imagekit.io/jwalamala/ads/poster.webp",
   target_url: "",
   alt_kn: "ಹಬ್ಬದ ಹೊಸ ಸಂಗ್ರಹ",
   pages: ["home", "news"],

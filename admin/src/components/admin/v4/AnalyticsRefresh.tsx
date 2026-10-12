@@ -1,8 +1,9 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { v4 as t } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function AnalyticsRefresh() {
+  const { v4: t } = useUiStrings();
   const router = useRouter();
   useEffect(() => {
     const timer = setInterval(() => {

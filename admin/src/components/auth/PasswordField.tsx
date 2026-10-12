@@ -11,6 +11,7 @@ export function PasswordField({
   onChange,
   disabled,
   isNew = false,
+  hint = isNew,
 }: {
   id?: string;
   label?: string;
@@ -18,6 +19,7 @@ export function PasswordField({
   onChange: (value: string) => void;
   disabled?: boolean;
   isNew?: boolean;
+  hint?: boolean;
 }) {
   const { kn } = useUiStrings();
 
@@ -37,7 +39,7 @@ export function PasswordField({
           minLength={isNew ? MIN_PASSWORD_LENGTH : undefined}
           maxLength={128}
           disabled={disabled}
-          aria-describedby={isNew ? id + "-hint" : undefined}
+          aria-describedby={hint ? id + "-hint" : undefined}
         />
         <button
           type="button"
@@ -50,7 +52,7 @@ export function PasswordField({
           {visible ? <EyeOff size={19} /> : <Eye size={19} />}
         </button>
       </div>
-      {isNew && (
+      {hint && (
         <span className="meta" id={id + "-hint"}>
           {kn.passwordHint}
         </span>

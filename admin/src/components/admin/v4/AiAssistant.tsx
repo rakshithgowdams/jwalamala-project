@@ -2,7 +2,28 @@
 import { useState } from "react";
 import { draftSuggestions, acceptSuggestion } from "@/app/admin/ai/actions";
 import { aiKinds, type AiKind, type AiSuggestions } from "@/lib/ai/schema";
-import { v4 as t } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import type { Tri } from "@/lib/i18n/strings";
+const kindLabels: Record<AiKind, Tri> = {
+  headlines: { en: "Headlines", kn: "ಶೀರ್ಷಿಕೆಗಳು", hi: "शीर्षक" },
+  summary: { en: "Summary", kn: "ಸಾರಾಂಶ", hi: "सारांश" },
+  taxonomy: {
+    en: "Categories and tags",
+    kn: "ವರ್ಗ ಮತ್ತು ಟ್ಯಾಗ್",
+    hi: "श्रेणी और टैग",
+  },
+  event: { en: "Event details", kn: "ಕಾರ್ಯಕ್ರಮದ ವಿವರ", hi: "कार्यक्रम विवरण" },
+  seo: { en: "SEO", kn: "SEO", hi: "SEO" },
+  alt: { en: "Image description", kn: "ಚಿತ್ರದ ವಿವರಣೆ", hi: "चित्र का विवरण" },
+  transcript: { en: "Transcript", kn: "ಪ್ರತಿಲಿಪಿ", hi: "प्रतिलेख" },
+  translate: { en: "Translation", kn: "ಅನುವಾದ", hi: "अनुवाद" },
+  grammar: { en: "Grammar check", kn: "ವ್ಯಾಕರಣ ಪರಿಶೀಲನೆ", hi: "व्याकरण जाँच" },
+  social: {
+    en: "Social media post",
+    kn: "ಸಾಮಾಜಿಕ ಮಾಧ್ಯಮ ಪೋಸ್ಟ್",
+    hi: "सोशल मीडिया पोस्ट",
+  },
+};
 export function AiAssistant({
   postId,
   getText,
@@ -14,6 +35,7 @@ export function AiAssistant({
   getCategoryIds: () => string[];
   onAccept: (field: string, value: string) => void;
 }) {
+  const { v4: t, tr } = useUiStrings();
   const [kind, setKind] = useState<AiKind>("summary"),
     [result, setResult] = useState<{
       id: string;
@@ -34,7 +56,7 @@ export function AiAssistant({
         >
           {aiKinds.map((k) => (
             <option key={k} value={k}>
-              {k}
+              {tr(kindLabels[k])}
             </option>
           ))}
         </select>

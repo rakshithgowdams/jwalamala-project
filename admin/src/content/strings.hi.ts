@@ -642,6 +642,18 @@ export const v4hi = {
   noDistrictNews: "इस ज़िले से अभी कोई समाचार प्रकाशित नहीं हुआ है।",
   districtTowns: "ज़िले के स्थान",
   otherDistricts: "अन्य ज़िले",
+  showInDistrictNews: "ज़िलेवार समाचार में दिखाएँ",
+  districtOrder: "ज़िलेवार समाचार में ज़िलों का क्रम",
+  districtOrderHelp:
+    "सबसे ऊपर वाला ज़िला पहले दिखेगा। विभागों का क्रम ‘विभाग’ पृष्ठ की क्रम संख्या से बदलें।",
+  hiddenDistrict: "छिपाया गया",
+  moveFirst: "सबसे ऊपर",
+  moveLast: "सबसे नीचे",
+  delete: "हटाएँ",
+  confirmDelete: "क्या इस रिकॉर्ड को स्थायी रूप से हटाना है?",
+  deleted: "हटा दिया गया।",
+  deleteInUse:
+    "हटाया नहीं जा सका। समाचार या अन्य रिकॉर्ड इस स्थान का उपयोग करते हैं; इसके बजाय इसे छिपाएँ।",
 };
 export const monthsHi = [
   "जनवरी",

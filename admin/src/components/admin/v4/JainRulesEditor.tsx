@@ -2,7 +2,9 @@
 import { useState } from "react";
 import type { JainRules } from "@/lib/jain/times";
 import { saveJainTimes } from "@/app/admin/jain-times/actions";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function JainRulesEditor({ initial }: { initial: JainRules }) {
+  const { tr } = useUiStrings();
   const [value, setValue] = useState(initial),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -21,23 +23,40 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
         setBusy(true);
         try {
           const r = await saveJainTimes(value);
-          setMessage(r.error || "Saved");
+          setMessage(
+            r.error || tr({ en: "Saved", kn: "ಉಳಿಸಲಾಗಿದೆ", hi: "सहेजा गया" }),
+          );
         } catch {
-          setMessage("Save failed");
+          setMessage(
+            tr({
+              en: "Save failed",
+              kn: "ಉಳಿಸಲಾಗಲಿಲ್ಲ",
+              hi: "सहेजना विफल रहा",
+            }),
+          );
         } finally {
           setBusy(false);
         }
       }}
     >
-      <h1>ಜೈನ ದಿನದ ಸಮಯದ ನಿಯಮಗಳು</h1>
+      <h1>
+        {tr({
+          en: "Jain daily timing rules",
+          kn: "ಜೈನ ದಿನದ ಸಮಯದ ನಿಯಮಗಳು",
+          hi: "जैन दैनिक समय के नियम",
+        })}
+      </h1>
       <p>
-        Only advisor-approved rules appear publicly. Changing a rule clears
-        approval. Offsets are minutes; daylight fractions range from 0 to 1.
+        {tr({
+          en: "Only advisor-approved rules appear publicly. Changing a rule clears approval. Offsets are minutes; daylight fractions range from 0 to 1.",
+          kn: "ಸಲಹೆಗಾರರು ಅನುಮೋದಿಸಿದ ನಿಯಮಗಳು ಮಾತ್ರ ಸಾರ್ವಜನಿಕವಾಗಿ ಕಾಣಿಸುತ್ತವೆ. ನಿಯಮ ಬದಲಿಸಿದರೆ ಅನುಮೋದನೆ ರದ್ದಾಗುತ್ತದೆ. ಅಂತರಗಳು ನಿಮಿಷಗಳಲ್ಲಿ; ಹಗಲಿನ ಭಾಗ 0 ರಿಂದ 1 ರವರೆಗೆ.",
+          hi: "केवल सलाहकार द्वारा स्वीकृत नियम ही सार्वजनिक रूप से दिखते हैं। नियम बदलने पर स्वीकृति हट जाती है। अंतर मिनटों में हैं; दिन के उजाले का भाग 0 से 1 तक होता है।",
+        })}
       </p>
       {value.rules.map((r, i) => (
         <fieldset key={i} className="utility-panel">
           <label className="field">
-            Kannada name
+            {tr({ en: "Kannada name", kn: "ಕನ್ನಡ ಹೆಸರು", hi: "कन्नड़ नाम" })}
             <input
               value={r.name_kn}
               required
@@ -45,22 +64,34 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
             />
           </label>
           <label className="field">
-            Base
+            {tr({ en: "Base", kn: "ಆಧಾರ", hi: "आधार" })}
             <select
               value={r.base}
               onChange={(e) =>
                 update(i, { base: e.target.value as typeof r.base })
               }
             >
-              <option value="sunrise">Sunrise</option>
-              <option value="sunset">Sunset</option>
+              <option value="sunrise">
+                {tr({ en: "Sunrise", kn: "ಸೂರ್ಯೋದಯ", hi: "सूर्योदय" })}
+              </option>
+              <option value="sunset">
+                {tr({ en: "Sunset", kn: "ಸೂರ್ಯಾಸ್ತ", hi: "सूर्यास्त" })}
+              </option>
               <option value="daylight">
-                Fraction of daylight after sunrise
+                {tr({
+                  en: "Fraction of daylight after sunrise",
+                  kn: "ಸೂರ್ಯೋದಯದ ನಂತರದ ಹಗಲಿನ ಭಾಗ",
+                  hi: "सूर्योदय के बाद दिन के उजाले का भाग",
+                })}
               </option>
             </select>
           </label>
           <label className="field">
-            Offset minutes
+            {tr({
+              en: "Offset minutes",
+              kn: "ಅಂತರ ನಿಮಿಷಗಳು",
+              hi: "अंतर (मिनट)",
+            })}
             <input
               type="number"
               min={-240}
@@ -71,7 +102,11 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
           </label>
           {r.base === "daylight" && (
             <label className="field">
-              Daylight fraction
+              {tr({
+                en: "Daylight fraction",
+                kn: "ಹಗಲಿನ ಭಾಗ",
+                hi: "दिन के उजाले का भाग",
+              })}
               <input
                 type="number"
                 min={0}
@@ -90,7 +125,7 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
               checked={r.visible}
               onChange={(e) => update(i, { visible: e.target.checked })}
             />{" "}
-            Visible
+            {tr({ en: "Visible", kn: "ಕಾಣಿಸಲಿ", hi: "दृश्यमान" })}
           </label>
           <button
             type="button"
@@ -103,7 +138,11 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
               }))
             }
           >
-            Remove rule
+            {tr({
+              en: "Remove rule",
+              kn: "ನಿಯಮ ತೆಗೆದುಹಾಕಿ",
+              hi: "नियम हटाएँ",
+            })}
           </button>
         </fieldset>
       ))}
@@ -122,10 +161,14 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
           }))
         }
       >
-        Add rule
+        {tr({ en: "Add rule", kn: "ನಿಯಮ ಸೇರಿಸಿ", hi: "नियम जोड़ें" })}
       </button>
       <label className="field">
-        Approving community advisor
+        {tr({
+          en: "Approving community advisor",
+          kn: "ಅನುಮೋದಿಸುವ ಸಮುದಾಯ ಸಲಹೆಗಾರ",
+          hi: "स्वीकृति देने वाले सामुदायिक सलाहकार",
+        })}
         <input
           value={value.approved_by}
           onChange={(e) =>
@@ -145,10 +188,14 @@ export function JainRulesEditor({ initial }: { initial: JainRules }) {
             setValue((v) => ({ ...v, approved: e.target.checked }))
           }
         />{" "}
-        These exact rules have been approved by the named advisor
+        {tr({
+          en: "These exact rules have been approved by the named advisor",
+          kn: "ಹೆಸರಿಸಿದ ಸಲಹೆಗಾರರು ಇದೇ ನಿಯಮಗಳನ್ನು ಅನುಮೋದಿಸಿದ್ದಾರೆ",
+          hi: "नामित सलाहकार ने ठीक इन्हीं नियमों को स्वीकृत किया है",
+        })}
       </label>
       <button className="button button-ember" disabled={busy}>
-        Save rules
+        {tr({ en: "Save rules", kn: "ನಿಯಮಗಳನ್ನು ಉಳಿಸಿ", hi: "नियम सहेजें" })}
       </button>
       <p role="status">{message}</p>
     </form>

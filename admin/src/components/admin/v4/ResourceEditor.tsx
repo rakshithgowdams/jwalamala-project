@@ -1,5 +1,4 @@
 "use client";
-import { ImageUpload } from "./ImageUpload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { v4Resources, type V4Resource } from "@/lib/v4/admin-schema";
@@ -11,8 +10,147 @@ import {
   saveDistrictOrder,
 } from "@/app/admin/v4/actions";
 import { StructuredEditor } from "./StructuredEditor";
-import { kn, v4 as t, v4Choices } from "@/content/strings.kn";
-export type Choice = { id: string; label: string };
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import type { Tri } from "@/lib/i18n/strings";
+import { isHostedImage } from "@/lib/utils/images";
+import type { PlaceOption } from "@/lib/places/search";
+import { PlacePicker } from "../PlacePicker";
+export type Choice = { id: string; label: string } & Partial<Omit<PlaceOption, "id">>;
+const choiceLabels: Record<string, Tri> = {
+  draft: { en: "Draft", kn: "ಕರಡು", hi: "ड्राफ़्ट" },
+  published: { en: "Published", kn: "ಪ್ರಕಟಿತ", hi: "प्रकाशित" },
+  pending: { en: "Pending review", kn: "ಪರಿಶೀಲನೆಗೆ ಬಾಕಿ", hi: "समीक्षा लंबित" },
+  approved: { en: "Approved", kn: "ಅನುಮೋದಿತ", hi: "स्वीकृत" },
+  rejected: { en: "Rejected", kn: "ತಿರಸ್ಕೃತ", hi: "अस्वीकृत" },
+  active: { en: "Active", kn: "ಸಕ್ರಿಯ", hi: "सक्रिय" },
+  closed: { en: "Closed", kn: "ಮುಕ್ತಾಯ", hi: "बंद" },
+  tag: { en: "Tag", kn: "ಟ್ಯಾಗ್", hi: "टैग" },
+  topic: { en: "Topic", kn: "ವಿಷಯ", hi: "विषय" },
+  page: { en: "Page", kn: "ಪುಟ", hi: "पृष्ठ" },
+  category: { en: "Category", kn: "ವರ್ಗ", hi: "श्रेणी" },
+  external: { en: "External link", kn: "ಹೊರಗಿನ ಲಿಂಕ್", hi: "बाहरी लिंक" },
+  live: { en: "Live", kn: "ನೇರಪ್ರಸಾರ", hi: "लाइव" },
+  parva: { en: "Parva", kn: "ಪರ್ವ", hi: "पर्व" },
+  tithi: { en: "Tithi", kn: "ತಿಥಿ", hi: "तिथि" },
+  festival: { en: "Festival", kn: "ಹಬ್ಬ", hi: "त्योहार" },
+  note: { en: "Note", kn: "ಟಿಪ್ಪಣಿ", hi: "टिप्पणी" },
+  job: { en: "Job", kn: "ಉದ್ಯೋಗ", hi: "नौकरी" },
+  scholarship: { en: "Scholarship", kn: "ವಿದ್ಯಾರ್ಥಿವೇತನ", hi: "छात्रवृत्ति" },
+  competition: { en: "Competition", kn: "ಸ್ಪರ್ಧೆ", hi: "प्रतियोगिता" },
+  admission: { en: "Admission", kn: "ಪ್ರವೇಶಾತಿ", hi: "प्रवेश" },
+  shraddhanjali: { en: "Tribute", kn: "ಶ್ರದ್ಧಾಂಜಲಿ", hi: "श्रद्धांजलि" },
+  abhinandane: { en: "Congratulations", kn: "ಅಭಿನಂದನೆ", hi: "अभिनंदन" },
+  amantrana: { en: "Invitation", kn: "ಆಮಂತ್ರಣ", hi: "आमंत्रण" },
+  anniversary: { en: "Anniversary", kn: "ವಾರ್ಷಿಕೋತ್ಸವ", hi: "वर्षगांठ" },
+  sanmana: { en: "Felicitation", kn: "ಸನ್ಮಾನ", hi: "सम्मान" },
+  student_achievement: {
+    en: "Student achievement",
+    kn: "ವಿದ್ಯಾರ್ಥಿ ಸಾಧನೆ",
+    hi: "छात्र उपलब्धि",
+  },
+  gold22: { en: "Gold 22K", kn: "ಚಿನ್ನ 22K", hi: "सोना 22K" },
+  gold24: { en: "Gold 24K", kn: "ಚಿನ್ನ 24K", hi: "सोना 24K" },
+  silver: { en: "Silver", kn: "ಬೆಳ್ಳಿ", hi: "चांदी" },
+  petrol: { en: "Petrol", kn: "ಪೆಟ್ರೋಲ್", hi: "पेट्रोल" },
+  diesel: { en: "Diesel", kn: "ಡೀಸೆಲ್", hi: "डीज़ल" },
+};
+const fixedLabels: Record<string, Tri> = {
+  "ಪಾವತಿ / Payment": { en: "Payment", kn: "ಪಾವತಿ / Payment", hi: "भुगतान" },
+  "ಮೊತ್ತ (₹) / Amount": {
+    en: "Amount (₹)",
+    kn: "ಮೊತ್ತ (₹) / Amount",
+    hi: "राशि (₹)",
+  },
+  "ರಸೀದಿ / Receipt reference": {
+    en: "Receipt reference",
+    kn: "ರಸೀದಿ / Receipt reference",
+    hi: "रसीद संदर्भ",
+  },
+  "ಜಾಹೀರಾತಿನ ಸಂದೇಶ (160)": {
+    en: "Ad message (160)",
+    kn: "ಜಾಹೀರಾತಿನ ಸಂದೇಶ (160)",
+    hi: "विज्ञापन संदेश (160)",
+  },
+  "ಫೋನ್ / Phone": { en: "Phone", kn: "ಫೋನ್ / Phone", hi: "फ़ोन" },
+  "ವಿಳಾಸ / ಊರು": { en: "Address / town", kn: "ವಿಳಾಸ / ಊರು", hi: "पता / शहर" },
+  "ಅರ್ಜಿದಾರರು / Applicant": {
+    en: "Applicant",
+    kn: "ಅರ್ಜಿದಾರರು / Applicant",
+    hi: "आवेदक",
+  },
+  "ಪರಿಶೀಲನಾ ಟಿಪ್ಪಣಿ / Review note": {
+    en: "Review note",
+    kn: "ಪರಿಶೀಲನಾ ಟಿಪ್ಪಣಿ / Review note",
+    hi: "समीक्षा टिप्पणी",
+  },
+  "ರಾಜ್ಯ / State": { en: "State", kn: "ರಾಜ್ಯ / State", hi: "राज्य" },
+  "Website (https://)": {
+    en: "Website (https://)",
+    kn: "ವೆಬ್‌ಸೈಟ್ (https://)",
+    hi: "वेबसाइट (https://)",
+  },
+  "Applicant phone": {
+    en: "Applicant phone",
+    kn: "ಅರ್ಜಿದಾರರ ಫೋನ್",
+    hi: "आवेदक का फ़ोन",
+  },
+  "Requested formats": {
+    en: "Requested formats",
+    kn: "ಕೋರಿದ ಸ್ವರೂಪಗಳು",
+    hi: "अनुरोधित प्रारूप",
+  },
+};
+const languageNames: Record<string, Tri> = {
+  English: { en: "English", kn: "ಇಂಗ್ಲಿಷ್", hi: "अंग्रेज़ी" },
+  Hindi: { en: "Hindi", kn: "ಹಿಂದಿ", hi: "हिंदी" },
+};
+const translatedFields: Record<string, Tri> = {
+  title: { en: "title", kn: "ಶೀರ್ಷಿಕೆ", hi: "शीर्षक" },
+  alt: { en: "alt text", kn: "ಪರ್ಯಾಯ ಪಠ್ಯ", hi: "वैकल्पिक पाठ" },
+  name: { en: "name", kn: "ಹೆಸರು", hi: "नाम" },
+  offer: { en: "offer", kn: "ಜಾಹೀರಾತಿನ ಸಂದೇಶ", hi: "विज्ञापन संदेश" },
+  description: { en: "description", kn: "ವಿವರಣೆ", hi: "विवरण" },
+  role: { en: "role", kn: "ಹುದ್ದೆ", hi: "भूमिका" },
+  bio: { en: "bio", kn: "ಪರಿಚಯ", hi: "परिचय" },
+  credentials: { en: "credentials", kn: "ಅರ್ಹತೆಗಳು", hi: "योग्यताएँ" },
+  intro: { en: "intro", kn: "ಪೀಠಿಕೆ", hi: "प्रस्तावना" },
+  label: { en: "label", kn: "ಲೇಬಲ್", hi: "लेबल" },
+  deity: { en: "deity", kn: "ದೇವರು", hi: "देवता" },
+  history: { en: "history", kn: "ಇತಿಹಾಸ", hi: "इतिहास" },
+  timings: { en: "timings", kn: "ಸಮಯ", hi: "समय" },
+  body: { en: "body", kn: "ಮುಖ್ಯ ಪಠ್ಯ", hi: "मुख्य पाठ" },
+  summary: { en: "summary", kn: "ಸಾರಾಂಶ", hi: "सारांश" },
+};
+const labelSuffixes: [string, Tri][] = [
+  [" (English)", { en: " (English)", kn: " (English)", hi: " (अंग्रेज़ी)" }],
+  [" (हिंदी)", { en: " (Hindi)", kn: " (हिंदी)", hi: " (हिंदी)" }],
+  [
+    " (ಖಾಲಿ = ಎಲ್ಲೆಡೆ)",
+    {
+      en: " (empty = everywhere)",
+      kn: " (ಖಾಲಿ = ಎಲ್ಲೆಡೆ)",
+      hi: " (खाली = हर जगह)",
+    },
+  ],
+];
+/** Renders a module-level schema label, which is Kannada or English source text. */
+export function fieldLabel(
+  text: string,
+  tr: (text: Tri) => string,
+  l: (text: string) => string,
+): string {
+  if (fixedLabels[text]) return tr(fixedLabels[text]);
+  const translated = /^(English|Hindi)(?: (\w+))?$/.exec(text);
+  if (translated && (!translated[2] || translatedFields[translated[2]]))
+    return (
+      tr(languageNames[translated[1]]) +
+      (translated[2] ? " " + tr(translatedFields[translated[2]]) : "")
+    );
+  for (const [suffix, label] of labelSuffixes)
+    if (text.endsWith(suffix))
+      return fieldLabel(text.slice(0, -suffix.length), tr, l) + tr(label);
+  return l(text);
+}
 export function ResourceEditor({
   resource,
   rows,
@@ -24,6 +162,8 @@ export function ResourceEditor({
   choices: Record<string, Choice[]>;
   relationships: { parent: string; post: string; order: number }[];
 }) {
+  const { kn, v4: t, tr, l } = useUiStrings();
+  const label = (text: string) => fieldLabel(text, tr, l);
   const [selected, setSelected] = useState<Record<string, unknown>>({}),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -91,7 +231,7 @@ export function ResourceEditor({
               selected.id ? String(selected.id) : null,
               values,
             );
-            setMessage(result.error || t.saved);
+            setMessage(result.error ? l(result.error) : t.saved);
             if (!result.error) {
               router.refresh();
             }
@@ -133,24 +273,36 @@ export function ResourceEditor({
               <ImageField
                 key={field.name}
                 name={field.name}
-                label={field.label}
+                label={label(field.label)}
                 initial={String(value || "")}
-                ad={resource === "ads" || resource === "business_ads"}
               />
             );
           if (field.type === "structured")
             return (
               <fieldset className="field wide" key={field.name}>
-                <legend>{field.label}</legend>
+                <legend>{label(field.label)}</legend>
                 <StructuredEditor name={field.name} initial={value} />
               </fieldset>
+            );
+          if (field.name === "place_id")
+            return (
+              <PlacePicker
+                key={field.name}
+                name={field.name}
+                label={label(field.label)}
+                places={(choices.places || []).map((choice) => ({
+                  ...choice,
+                  name_kn: choice.name_kn || choice.label,
+                }))}
+                defaultValue={String(value ?? "")}
+              />
             );
           if (field.type === "ids")
             return (
               <MultiSelect
                 key={field.name}
                 name={field.name}
-                label={field.label}
+                label={label(field.label)}
                 choices={catalog || []}
                 initial={Array.isArray(value) ? value.map(String) : []}
               />
@@ -163,7 +315,7 @@ export function ResourceEditor({
               }
               key={field.name}
             >
-              {field.label}
+              {label(field.label)}
               {field.type === "checkbox" ? (
                 <input
                   type="checkbox"
@@ -181,7 +333,9 @@ export function ResourceEditor({
                     catalog ||
                     field.options?.map((option) => ({
                       id: option,
-                      label: v4Choices[option] || option,
+                      label: choiceLabels[option]
+                        ? tr(choiceLabels[option])
+                        : option,
                     })) ||
                     []
                   ).map((option) => (
@@ -250,7 +404,7 @@ export function ResourceEditor({
                 setMessage("");
                 try {
                   const result = await deleteV4(resource, String(selected.id));
-                  setMessage(result.error || t.deleted);
+                  setMessage(result.error ? l(result.error) : t.deleted);
                   if (!result.error) {
                     setSelected({});
                     router.refresh();
@@ -367,6 +521,7 @@ function RelationshipEditor({
   posts: Choice[];
   initial: string[];
 }) {
+  const { kn, v4: t } = useUiStrings();
   const [ids, setIds] = useState(initial),
     [message, setMessage] = useState("");
   function move(index: number, delta: number) {
@@ -437,6 +592,7 @@ function DistrictOrder({
 }: {
   districts: Record<string, unknown>[];
 }) {
+  const { kn, v4: t } = useUiStrings();
   const router = useRouter();
   const [ids, setIds] = useState(() => districts.map((row) => String(row.id))),
     [busy, setBusy] = useState(false),
@@ -527,26 +683,39 @@ function ImageField({
   name,
   label,
   initial,
-  ad,
 }: {
   name: string;
   label: string;
   initial: string;
-  ad: boolean;
 }) {
+  const { tr } = useUiStrings();
   const [url, setUrl] = useState(initial);
+  const valid = isHostedImage(url.trim());
   return (
     <fieldset className="field wide">
       <legend>{label}</legend>
-      <label className="field">
-        Image URL
-        <input
-          name={name}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-      </label>
-      <ImageUpload kind={ad ? "ad" : "post"} onUploaded={setUrl} />
+      <div className="image-link-field">
+        <label className="field">
+          {tr({ en: "Image link", kn: "ಚಿತ್ರದ ಲಿಂಕ್", hi: "चित्र लिंक" })}
+          <input
+            name={name}
+            value={url}
+            placeholder="https://ik.imagekit.io/your-id/photo.jpg"
+            onChange={(e) => setUrl(e.target.value)}
+          />
+          <small>
+            {tr({
+              en: "Paste an ImageKit link or an /images/ path. Images are not uploaded to our server.",
+              kn: "ImageKit ಲಿಂಕ್ ಅಥವಾ /images/ ವಿಳಾಸ ಅಂಟಿಸಿ. ಚಿತ್ರಗಳನ್ನು ನಮ್ಮ ಸರ್ವರ್‌ಗೆ ಅಪ್‌ಲೋಡ್ ಮಾಡುವುದಿಲ್ಲ.",
+              hi: "ImageKit लिंक या /images/ पथ चिपकाएँ। चित्र हमारे सर्वर पर अपलोड नहीं होते।",
+            })}
+          </small>
+        </label>
+        {valid && (
+          // eslint-disable-next-line @next/next/no-img-element -- admin-only preview of the pasted link
+          <img src={url.trim()} alt="" className="image-link-preview" />
+        )}
+      </div>
     </fieldset>
   );
 }

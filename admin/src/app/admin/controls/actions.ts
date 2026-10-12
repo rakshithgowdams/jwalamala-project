@@ -5,10 +5,11 @@ import {
   providerControlSchema,
   roleControlSchema,
 } from "@/lib/v4/control-schema";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export async function saveProvider(input: unknown) {
   const { db } = await requirePermission("settings.manage"),
     parsed = providerControlSchema.safeParse(input);
+  const { v4: t } = await getUiStrings();
   if (!parsed.success) return { error: t.failed };
   const { id, blocked_category_ids, ...fields } = parsed.data;
   const { data: existing } = await db
@@ -30,6 +31,7 @@ export async function saveProvider(input: unknown) {
 export async function saveRolePermission(input: unknown) {
   const { db } = await requirePermission("users.manage"),
     parsed = roleControlSchema.safeParse(input);
+  const { v4: t } = await getUiStrings();
   if (!parsed.success) return { error: t.failed };
   const { error } = await db.from("role_permissions").upsert(parsed.data);
   if (error) return { error: t.failed };

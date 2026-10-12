@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { saveProvider, saveRolePermission } from "@/app/admin/controls/actions";
 import { providerIds, roles, permissions } from "@/lib/v4/control-schema";
-import { v4 as t, kn } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function ProviderControls({
   rows,
   usage,
@@ -14,6 +14,7 @@ export function ProviderControls({
   configured: Record<string, boolean>;
   categories: { id: string; name_kn: string }[];
 }) {
+  const { kn, v4: t } = useUiStrings();
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
   return (
@@ -109,6 +110,7 @@ export function RoleMatrix({
 }: {
   rows: { role: string; permission: string; allowed: boolean }[];
 }) {
+  const { v4: t } = useUiStrings();
   const [values, setValues] = useState(rows),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);

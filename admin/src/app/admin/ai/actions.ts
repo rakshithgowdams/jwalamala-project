@@ -6,10 +6,11 @@ import { OpenAiNewsroomProvider } from "@/lib/ai/provider";
 import { providerOptions } from "@/lib/providers/budget";
 import { digest, limitRequest } from "@/lib/v4/server";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export async function draftSuggestions(input: unknown) {
   const { db, user } = await requirePermission("content.edit"),
     parsed = aiInputSchema.safeParse(input);
+  const { v4: t } = await getUiStrings();
   if (!parsed.success) return { error: t.failed };
   try {
     const options = await providerOptions("ai");
@@ -60,6 +61,7 @@ export async function draftSuggestions(input: unknown) {
 }
 export async function acceptSuggestion(id: string, index: number) {
   const { db, user } = await requirePermission("content.edit");
+  const { v4: t } = await getUiStrings();
   if (
     !z.uuid().safeParse(id).success ||
     !Number.isInteger(index) ||

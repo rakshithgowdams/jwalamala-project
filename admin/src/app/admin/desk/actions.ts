@@ -3,10 +3,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/v4/permissions";
 import { assignmentSchema, storyStates } from "@/lib/v4/workflow";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export async function saveAssignment(input: unknown) {
   const { db } = await requirePermission("content.edit"),
     parsed = assignmentSchema.safeParse(input);
+  const { v4: t } = await getUiStrings();
   if (!parsed.success) return { error: t.failed };
   const { id, ...fields } = parsed.data;
   const result = id
@@ -22,6 +23,7 @@ export async function moveAssignment(id: string, status: string) {
       ? "content.publish"
       : "content.edit",
   );
+  const { v4: t } = await getUiStrings();
   if (
     !z.uuid().safeParse(id).success ||
     !z.enum(storyStates).safeParse(status).success
@@ -41,6 +43,7 @@ export async function addReviewComment(
   paragraph: string,
 ) {
   const { db, user } = await requirePermission("content.edit");
+  const { v4: t } = await getUiStrings();
   const parsed = z
     .object({
       post_id: z.uuid(),
@@ -60,6 +63,7 @@ export async function addReviewComment(
 }
 export async function restoreVersion(id: string) {
   const { db } = await requirePermission("content.edit");
+  const { v4: t } = await getUiStrings();
   if (!z.uuid().safeParse(id).success) return { error: t.failed };
   const { error } = await db.rpc("restore_v4_version", { version_id: id });
   if (error) return { error: t.failed };
@@ -69,6 +73,7 @@ export async function restoreVersion(id: string) {
 
 export async function resolveReviewComment(id: string, resolved: boolean) {
   const { db } = await requirePermission("content.edit");
+  const { v4: t } = await getUiStrings();
   if (!z.uuid().safeParse(id).success || typeof resolved !== "boolean")
     return { error: t.failed };
   const { error } = await db

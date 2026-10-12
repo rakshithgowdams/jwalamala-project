@@ -51,6 +51,8 @@ export type Post = {
   transcript?: string;
   seo_title?: string;
   seo_description?: string;
+  /** Comma-separated, written by the editor for the page head. */
+  seo_keywords?: string | null;
   sponsor_name?: string;
   breaking_until?: string;
   allow_comments?: boolean;

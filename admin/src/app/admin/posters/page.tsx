@@ -4,7 +4,7 @@ import {
   PosterManager,
   type PosterRow,
 } from "@/components/admin/v4/PosterManager";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 
 async function load() {
   const { db } = await requirePermission("ads.manage");
@@ -22,17 +22,28 @@ async function load() {
 
 export default async function Page() {
   const { rows, now } = await load();
+  const { v4: t, tr } = await getUiStrings();
   return (
     <>
       <div className="page-heading">
-        <h1>ಪೋಸ್ಟರ್ ಮತ್ತು ಬ್ಯಾನರ್ ಜಾಹೀರಾತು</h1>
+        <h1>
+          {tr({
+            en: "Poster and banner ads",
+            kn: "ಪೋಸ್ಟರ್ ಮತ್ತು ಬ್ಯಾನರ್ ಜಾಹೀರಾತು",
+            hi: "पोस्टर और बैनर विज्ञापन",
+          })}
+        </h1>
       </div>
       <div className="article-actions">
         <Link href="/admin/ad-settings" className="button button-outline">
           {t.adSlots}
         </Link>
         <Link href="/admin/business-ads" className="button button-outline">
-          ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು
+          {tr({
+            en: "Local shop ads",
+            kn: "ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು",
+            hi: "स्थानीय दुकान विज्ञापन",
+          })}
         </Link>
       </div>
       <PosterManager rows={rows} now={now} />

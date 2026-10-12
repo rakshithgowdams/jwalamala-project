@@ -1,5 +1,5 @@
 import sanitizeHtml from "sanitize-html";
-import { isRemoteImage } from "@/lib/utils/images";
+import { isArticleImage } from "@/lib/utils/images";
 export function cleanHtml(html: string, sponsored = false) {
   return sanitizeHtml(html, {
     allowedTags: [
@@ -47,8 +47,7 @@ export function cleanHtml(html: string, sponsored = false) {
     exclusiveFilter: (frame) =>
       frame.tag === "img" &&
       !(
-        /^\/images\/[^?#]*$/.test(frame.attribs.src || "") ||
-        isRemoteImage(frame.attribs.src || "")
+        isArticleImage(frame.attribs.src || "")
       ),
   });
 }

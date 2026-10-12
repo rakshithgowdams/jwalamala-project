@@ -1,8 +1,9 @@
 import { requirePermission } from "@/lib/v4/permissions";
 import { StoryDesk, type Assignment } from "@/components/admin/v4/StoryDesk";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("content.edit");
+  const { v4: t } = await getUiStrings();
   const [rows, people, posts] = await Promise.all([
     db
       .from("story_assignments")

@@ -1,5 +1,6 @@
 "use server";
 import { requirePermission } from "@/lib/v4/permissions";
+import { getUiStrings } from "@/lib/i18n/server";
 import {
   parseUtilityRow,
   utilityFields,
@@ -12,6 +13,7 @@ export async function importUtility(
   rows: Record<string, string>[],
 ) {
   const { db } = await requirePermission("content.edit");
+  const { tr } = await getUiStrings();
   if (
     !Object.hasOwn(utilityFields, resource) ||
     !z
@@ -47,7 +49,13 @@ export async function importUtility(
     results.push({
       row: index + 1,
       status: error ? "failed" : "saved",
-      detail: error ? "Database rejected the row" : "",
+      detail: error
+        ? tr({
+            en: "Database rejected the row",
+            kn: "ಡೇಟಾಬೇಸ್ ಈ ಸಾಲನ್ನು ತಿರಸ್ಕರಿಸಿದೆ",
+            hi: "डेटाबेस ने यह पंक्ति अस्वीकार कर दी",
+          })
+        : "",
     });
   }
   revalidatePath("/", "layout");

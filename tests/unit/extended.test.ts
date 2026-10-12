@@ -12,14 +12,15 @@ describe("rich article safety", () => {
     expect(html).not.toContain("tracking.example");
     expect(html).not.toContain("script");
   });
-  it("keeps ImageKit images but not look-alike hosts", () => {
+  it("keeps ImageKit and other https image files, not pages or http", () => {
     const html = cleanHtml(
-      '<img src="https://ik.imagekit.io/jwalamala/news/temple.jpg?tr=w-1200" alt="Temple"><img src="https://ik.imagekit.io.evil.example/x/pixel.gif"><img src="http://ik.imagekit.io/jwalamala/plain.jpg">',
+      '<img src="https://ik.imagekit.io/jwalamala/news/temple.jpg?tr=w-1200" alt="Temple"><img src="https://cdn.example.com/photos/temple.webp"><img src="https://ik.imagekit.io.evil.example/x/not-a-picture"><img src="http://ik.imagekit.io/jwalamala/plain.jpg">',
     );
     expect(html).toContain(
       "https://ik.imagekit.io/jwalamala/news/temple.jpg?tr=w-1200",
     );
-    expect(html).not.toContain("evil.example");
+    expect(html).toContain("https://cdn.example.com/photos/temple.webp");
+    expect(html).not.toContain("not-a-picture");
     expect(html).not.toContain("http://ik.imagekit.io");
   });
   it("marks sponsored links and rejects javascript URLs", () => {

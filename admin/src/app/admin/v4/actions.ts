@@ -4,15 +4,17 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requirePermission } from "@/lib/v4/permissions";
 import { v4Schemas, v4Resources, type V4Resource } from "@/lib/v4/admin-schema";
-import { kn, v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 import { cleanHtml } from "@/lib/utils/sanitize";
 import { isHostedImage } from "@/lib/utils/images";
+import { videoFromInput } from "@/lib/utils/video";
 import { autoTranslateRows } from "@/lib/ai/autotranslate";
 export async function saveV4(
   resource: V4Resource,
   id: string | null,
   input: unknown,
 ) {
+  const { kn, v4: t } = await getUiStrings();
   if (!Object.hasOwn(v4Schemas, resource)) return { error: kn.validation };
   const { db } = await requirePermission(v4Resources[resource].permission);
   if (id && !z.uuid().safeParse(id).success) return { error: kn.validation };
@@ -37,6 +39,7 @@ export async function saveV4(
 }
 const deletable: ReadonlySet<V4Resource> = new Set(["places"]);
 export async function deleteV4(resource: V4Resource, id: string) {
+  const { kn, v4: t } = await getUiStrings();
   if (!deletable.has(resource)) return { error: kn.validation };
   const { db } = await requirePermission(v4Resources[resource].permission);
   if (!z.uuid().safeParse(id).success) return { error: kn.validation };
@@ -48,6 +51,7 @@ export async function deleteV4(resource: V4Resource, id: string) {
   return { ok: true };
 }
 export async function saveDistrictOrder(ids: string[]) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission(v4Resources.places.permission);
   if (
     !z.array(z.uuid()).min(1).max(200).safeParse(ids).success ||
@@ -73,6 +77,7 @@ export async function saveRelationships(
   id: string,
   postIds: string[],
 ) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("content.edit");
   if (
     !z.uuid().safeParse(id).success ||
@@ -90,6 +95,7 @@ export async function saveRelationships(
   return { ok: true };
 }
 export async function mergeTags(sourceId: string, destinationId: string) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("content.edit");
   if (
     !z.uuid().safeParse(sourceId).success ||
@@ -123,19 +129,17 @@ const updateSchema = z.object({
   is_pinned: z.boolean(),
 });
 export async function saveLiveUpdate(input: unknown) {
+  const { kn, v4: t } = await getUiStrings();
   const { db, user } = await requirePermission("content.edit"),
     parsed = updateSchema.safeParse(input);
   if (!parsed.success) return { error: kn.validation };
   if (parsed.data.media) {
     const media = parsed.data.media;
-    if (
-      media.type === "video"
-        ? !/^https:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|facebook\.com)\//.test(
-            media.url,
-          )
-        : !isHostedImage(media.url)
-    )
-      return { error: kn.validation };
+    if (media.type === "video") {
+      const video = videoFromInput(media.url);
+      if (!video) return { error: kn.validation };
+      media.url = video.url;
+    } else if (!isHostedImage(media.url)) return { error: kn.validation };
   }
   const payload = {
     ...parsed.data,
@@ -183,6 +187,7 @@ export async function saveLiveUpdate(input: unknown) {
   return { ok: true };
 }
 export async function endLiveBlog(id: string) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("content.publish");
   if (!z.uuid().safeParse(id).success) return { error: kn.validation };
   const { error } = await db
@@ -197,6 +202,7 @@ export async function moderateSubmission(
   id: string,
   decision: "approved" | "rejected",
 ) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("community.manage");
   if (
     !z.uuid().safeParse(id).success ||
@@ -213,6 +219,7 @@ export async function moderateSubmission(
 }
 
 export async function deleteLiveUpdate(id: string) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("content.publish");
   if (!z.uuid().safeParse(id).success) return { error: kn.validation };
   const { error } = await db.from("liveblog_updates").delete().eq("id", id);

@@ -1,5 +1,6 @@
 "use server";
 import { requirePermission } from "@/lib/v4/permissions";
+import { getUiStrings } from "@/lib/i18n/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 export async function reviewContributor(
@@ -7,6 +8,7 @@ export async function reviewContributor(
   decision: "approved" | "rejected",
 ) {
   const { db } = await requirePermission("users.manage");
+  const { tr } = await getUiStrings();
   if (
     !z.uuid().safeParse(user).success ||
     !["approved", "rejected"].includes(decision)
@@ -18,6 +20,12 @@ export async function reviewContributor(
   });
   revalidatePath("/admin/contributors");
   return {
-    error: error ? "Review failed; verify the phone and permissions." : "",
+    error: error
+      ? tr({
+          en: "Review failed; verify the phone and permissions.",
+          kn: "ಪರಿಶೀಲನೆ ವಿಫಲವಾಯಿತು; ಫೋನ್ ಮತ್ತು ಅನುಮತಿಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+          hi: "समीक्षा विफल रही; फ़ोन और अनुमतियाँ जाँचें।",
+        })
+      : "",
   };
 }

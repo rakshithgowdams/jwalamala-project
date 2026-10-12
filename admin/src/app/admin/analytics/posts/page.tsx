@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/v4/permissions";
 import { LazyValueChart as ValueChart } from "@/components/ui/LazyComponents";
+import { getUiStrings } from "@/lib/i18n/server";
 import { z } from "zod";
 function reportStart() {
   return new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
@@ -11,6 +12,7 @@ export default async function Page({
   searchParams: Promise<{ post?: string }>;
 }) {
   const { db } = await requirePermission("analytics.read");
+  const { tr } = await getUiStrings();
   const id = (await searchParams).post;
   const { data: posts } = await db
     .from("posts")
@@ -33,13 +35,23 @@ export default async function Page({
     values.reduce((sum, r) => sum + Number(r[key] || 0), 0);
   return (
     <>
-      <h1>Article performance · 30 days</h1>
+      <h1>
+        {tr({
+          en: "Article performance · 30 days",
+          kn: "ಲೇಖನದ ಸಾಧನೆ · 30 ದಿನಗಳು",
+          hi: "लेख का प्रदर्शन · 30 दिन",
+        })}
+      </h1>
       <Link className="chip" href="/admin/analytics/live">
-        Live readers
+        {tr({
+          en: "Live readers",
+          kn: "ಈಗಿನ ಓದುಗರು",
+          hi: "लाइव पाठक",
+        })}
       </Link>
       <form method="get" className="form-grid">
         <label className="field wide">
-          Article
+          {tr({ en: "Article", kn: "ಲೇಖನ", hi: "लेख" })}
           <select name="post" defaultValue={selected}>
             {posts?.map((p) => (
               <option key={p.id} value={p.id}>
@@ -48,14 +60,33 @@ export default async function Page({
             ))}
           </select>
         </label>
-        <button className="button button-outline">View report</button>
+        <button className="button button-outline">
+          {tr({
+            en: "View report",
+            kn: "ವರದಿ ನೋಡಿ",
+            hi: "रिपोर्ट देखें",
+          })}
+        </button>
       </form>
       <div className="utility-grid">
         {[
-          ["Views", total("views")],
-          ["Engaged seconds", total("engaged_seconds")],
-          ["Shares", total("share_clicks")],
-          ["Listens", total("listen_plays")],
+          [tr({ en: "Views", kn: "ವೀಕ್ಷಣೆಗಳು", hi: "व्यू" }), total("views")],
+          [
+            tr({
+              en: "Engaged seconds",
+              kn: "ತೊಡಗಿಸಿಕೊಂಡ ಸೆಕೆಂಡುಗಳು",
+              hi: "जुड़ाव के सेकंड",
+            }),
+            total("engaged_seconds"),
+          ],
+          [
+            tr({ en: "Shares", kn: "ಹಂಚಿಕೆಗಳು", hi: "शेयर" }),
+            total("share_clicks"),
+          ],
+          [
+            tr({ en: "Listens", kn: "ಆಲಿಕೆಗಳು", hi: "सुना गया" }),
+            total("listen_plays"),
+          ],
         ].map(([label, value]) => (
           <div className="stat-tile" key={label}>
             <span>{label}</span>
@@ -66,16 +97,24 @@ export default async function Page({
       {values.length > 0 ? (
         <>
           <ValueChart
-            label="Daily views"
-            unit="views"
+            label={tr({
+              en: "Daily views",
+              kn: "ದಿನನಿತ್ಯದ ವೀಕ್ಷಣೆಗಳು",
+              hi: "दैनिक व्यू",
+            })}
+            unit={tr({ en: "views", kn: "ವೀಕ್ಷಣೆಗಳು", hi: "व्यू" })}
             points={values.map((r) => ({
               date: r.day,
               value: Number(r.views),
             }))}
           />
           <ValueChart
-            label="Engaged reading"
-            unit="seconds"
+            label={tr({
+              en: "Engaged reading",
+              kn: "ತೊಡಗಿಸಿಕೊಂಡ ಓದು",
+              hi: "जुड़ाव के साथ पढ़ना",
+            })}
+            unit={tr({ en: "seconds", kn: "ಸೆಕೆಂಡುಗಳು", hi: "सेकंड" })}
             points={values.map((r) => ({
               date: r.day,
               value: Number(r.engaged_seconds),
@@ -83,12 +122,23 @@ export default async function Page({
           />
         </>
       ) : (
-        <p>No recorded activity in this period.</p>
+        <p>
+          {tr({
+            en: "No recorded activity in this period.",
+            kn: "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವುದೇ ಚಟುವಟಿಕೆ ದಾಖಲಾಗಿಲ್ಲ.",
+            hi: "इस अवधि में कोई गतिविधि दर्ज नहीं हुई।",
+          })}
+        </p>
       )}
       <div className="utility-grid">
         {["scroll_25", "scroll_50", "scroll_75", "scroll_100"].map((k) => (
           <div className="stat-tile" key={k}>
-            <span>{k.replace("scroll_", "Scroll ") + "%"}</span>
+            <span>
+              {tr({ en: "Scroll", kn: "ಸ್ಕ್ರೋಲ್", hi: "स्क्रॉल" }) +
+                " " +
+                k.replace("scroll_", "") +
+                "%"}
+            </span>
             <strong>{total(k)}</strong>
           </div>
         ))}
@@ -98,7 +148,11 @@ export default async function Page({
         href="/api/admin/analytics-report"
         download
       >
-        Export report
+        {tr({
+          en: "Export report",
+          kn: "ವರದಿ ರಫ್ತು ಮಾಡಿ",
+          hi: "रिपोर्ट निर्यात करें",
+        })}
       </a>
     </>
   );

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveAssignment, moveAssignment } from "@/app/admin/desk/actions";
 import { storyStates } from "@/lib/v4/workflow";
-import { v4 as t, kn } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import type { Tri } from "@/lib/i18n/strings";
 export type Assignment = {
   id: string;
   title_kn: string;
@@ -15,6 +16,22 @@ export type Assignment = {
   notes: string;
   post_id: string | null;
 };
+const stateLabels: Record<(typeof storyStates)[number], Tri> = {
+  idea: { en: "Idea", kn: "ಆಲೋಚನೆ", hi: "विचार" },
+  assigned: { en: "Assigned", kn: "ನಿಯೋಜಿಸಲಾಗಿದೆ", hi: "सौंपा गया" },
+  draft: { en: "Draft", kn: "ಕರಡು", hi: "ड्राफ़्ट" },
+  review: { en: "In review", kn: "ಪರಿಶೀಲನೆಯಲ್ಲಿ", hi: "समीक्षा में" },
+  changes_requested: {
+    en: "Changes requested",
+    kn: "ಬದಲಾವಣೆ ಕೋರಲಾಗಿದೆ",
+    hi: "बदलाव का अनुरोध",
+  },
+  approved: { en: "Approved", kn: "ಅನುಮೋದಿತ", hi: "स्वीकृत" },
+  scheduled: { en: "Scheduled", kn: "ನಿಗದಿಪಡಿಸಲಾಗಿದೆ", hi: "निर्धारित" },
+  published: { en: "Published", kn: "ಪ್ರಕಟಿತ", hi: "प्रकाशित" },
+  updated: { en: "Updated", kn: "ನವೀಕರಿಸಲಾಗಿದೆ", hi: "अपडेट किया गया" },
+  archived: { en: "Archived", kn: "ಸಂಗ್ರಹಿಸಲಾಗಿದೆ", hi: "संग्रहीत" },
+};
 export function StoryDesk({
   rows,
   people,
@@ -24,6 +41,7 @@ export function StoryDesk({
   people: { id: string; full_name: string }[];
   posts: { id: string; title_kn: string }[];
 }) {
+  const { kn, v4: t, tr, locale } = useUiStrings();
   const [selected, setSelected] = useState<Assignment | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
@@ -34,7 +52,7 @@ export function StoryDesk({
       <div className="desk-board">
         {storyStates.map((status) => (
           <section key={status} className="desk-column">
-            <h2>{status}</h2>
+            <h2>{tr(stateLabels[status])}</h2>
             {rows
               .filter((row) => row.status === status)
               .map((row) => (
@@ -47,9 +65,12 @@ export function StoryDesk({
                   </p>
                   {row.deadline_at && (
                     <time>
-                      {new Date(row.deadline_at).toLocaleString("kn-IN", {
-                        timeZone: "Asia/Kolkata",
-                      })}
+                      {new Date(row.deadline_at).toLocaleString(
+                        locale + "-IN",
+                        {
+                          timeZone: "Asia/Kolkata",
+                        },
+                      )}
                     </time>
                   )}
                   <p>{row.notes}</p>
@@ -76,7 +97,9 @@ export function StoryDesk({
                       }}
                     >
                       {storyStates.map((s) => (
-                        <option key={s}>{s}</option>
+                        <option key={s} value={s}>
+                          {tr(stateLabels[s])}
+                        </option>
                       ))}
                     </select>
                   </label>

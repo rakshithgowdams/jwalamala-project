@@ -3,10 +3,18 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/v4/permissions";
 import { importRowSchema, textToHtml } from "@/lib/v4/import";
 import { normalizeVideo } from "@/lib/utils/video";
+import { getUiStrings } from "@/lib/i18n/server";
 export async function beginImport(fileName: string, total: number) {
   const { db, user } = await requirePermission("content.edit");
+  const { tr } = await getUiStrings();
   if (!Number.isInteger(total) || total < 1 || total > 200)
-    return { error: "ಗರಿಷ್ಠ 200 ಸಾಲುಗಳು." };
+    return {
+      error: tr({
+        en: "At most 200 rows.",
+        kn: "ಗರಿಷ್ಠ 200 ಸಾಲುಗಳು.",
+        hi: "अधिकतम 200 पंक्तियाँ।",
+      }),
+    };
   const { data, error } = await db
     .from("import_jobs")
     .insert({
@@ -17,7 +25,15 @@ export async function beginImport(fileName: string, total: number) {
     })
     .select("id")
     .single();
-  return error ? { error: "ಆಮದು ಆರಂಭವಾಗಲಿಲ್ಲ." } : { id: String(data.id) };
+  return error
+    ? {
+        error: tr({
+          en: "The import could not start.",
+          kn: "ಆಮದು ಆರಂಭವಾಗಲಿಲ್ಲ.",
+          hi: "आयात शुरू नहीं हो सका।",
+        }),
+      }
+    : { id: String(data.id) };
 }
 export async function importBatch(
   job: string,
@@ -25,6 +41,7 @@ export async function importBatch(
   rows: { number: number; data: unknown }[],
 ) {
   const { db } = await requirePermission("content.edit");
+  const { tr } = await getUiStrings();
   if (
     !z.uuid().safeParse(job).success ||
     !z.uuid().safeParse(category).success ||
@@ -39,7 +56,13 @@ export async function importBatch(
       .max(10)
       .safeParse(rows).success
   )
-    return { error: "ವಿವರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ." };
+    return {
+      error: tr({
+        en: "Check the details.",
+        kn: "ವಿವರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        hi: "विवरण जाँचें।",
+      }),
+    };
   const results: { row: number; result: string; message: string }[] = [];
   for (const row of rows) {
     const parsed = importRowSchema.safeParse(row.data);
@@ -53,7 +76,12 @@ export async function importBatch(
     else {
       const r = parsed.data,
         video = r.video_url ? normalizeVideo(r.video_url) : null;
-      if (r.video_url && !video) problem = "ವೀಡಿಯೊ URL ಬೆಂಬಲಿತವಲ್ಲ.";
+      if (r.video_url && !video)
+        problem = tr({
+          en: "Video URL is not supported.",
+          kn: "ವೀಡಿಯೊ URL ಬೆಂಬಲಿತವಲ್ಲ.",
+          hi: "वीडियो URL समर्थित नहीं है।",
+        });
       payload = {
         ...r,
         body_html: textToHtml(r.body_text),
@@ -88,7 +116,11 @@ export async function importBatch(
     });
     if (error)
       return {
-        error: "ಆಮದು ಸ್ಥಗಿತಗೊಂಡಿದೆ. ಅದೇ ಕೆಲಸವನ್ನು ಮತ್ತೆ ಮುಂದುವರಿಸಿ.",
+        error: tr({
+          en: "The import stopped. Resume the same job again.",
+          kn: "ಆಮದು ಸ್ಥಗಿತಗೊಂಡಿದೆ. ಅದೇ ಕೆಲಸವನ್ನು ಮತ್ತೆ ಮುಂದುವರಿಸಿ.",
+          hi: "आयात रुक गया है। उसी काम को फिर से जारी रखें।",
+        }),
         results,
       };
     results.push({

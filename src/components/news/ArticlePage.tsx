@@ -25,6 +25,7 @@ import { NewsCard } from "./NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import { BookmarkButton, ShareButtons } from "./PostActions";
 import { LiteVideoEmbed } from "./LiteVideoEmbed";
+import { ArticleSidebar } from "./ArticleSidebar";
 /**
  * Which language the article body is shown in. `?lang=` wins so the
  * "read in ..." chips still work either way, but with no parameter the reader's
@@ -69,6 +70,11 @@ export async function articleMetadata(slug: string, language?: string) {
     },
     title: p.seo_title || p.title_kn,
     description: p.seo_description || p.summary_kn,
+    keywords:
+      original.seo_keywords
+        ?.split(",")
+        .map((keyword) => keyword.trim())
+        .filter(Boolean) || undefined,
     alternates: {
       // Keyed off the query parameter, not the reader's cookie, so one URL
       // always reports the same canonical to crawlers.
@@ -307,6 +313,17 @@ export async function ArticlePage({
             hideAds={p.hide_ads}
             sponsored={!!p.sponsor_name}
           />
+          {p.type === "article" && p.video_url && (
+            <div className="article-video">
+              <LiteVideoEmbed
+                postId={p.id}
+                keyPoints={p.key_points}
+                url={p.video_url}
+                thumbnail={p.thumbnail_url}
+                title={p.title_kn}
+              />
+            </div>
+          )}
           <p className="article-copyright">
             © {copyrightYear} {brandName(locale)}. {kn.articleCopyright}
           </p>
@@ -380,17 +397,7 @@ export async function ArticlePage({
             </dl>
           </div>
         </article>
-        <aside>
-          <AdSlot
-            disabled={p.hide_ads}
-            placement={`${p.type}-sidebar`}
-            format="rectangle"
-          />
-          <SectionTitle>{kn.related}</SectionTitle>
-          {related.map((p) => (
-            <NewsCard key={p.id} post={p} compact />
-          ))}
-        </aside>
+        <ArticleSidebar post={p} posts={allPosts} />
       </div>
       <section className="section">
         <SectionTitle>{kn.related}</SectionTitle>

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/v4/permissions";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 import { AnalyticsRefresh } from "@/components/admin/v4/AnalyticsRefresh";
 function since(milliseconds: number) {
   return new Date(Date.now() - milliseconds).toISOString();
 }
 export default async function Page() {
   const { db } = await requirePermission("analytics.read");
+  const { v4: t, tr } = await getUiStrings();
   const [live, daily] = await Promise.all([
     db
       .from("page_pulse")
@@ -25,10 +26,16 @@ export default async function Page() {
   return (
     <>
       <h1>{t.analytics}</h1>
-      <AnalyticsRefresh />
-      <Link className="chip" href="/admin/analytics/posts">
-        Article performance
-      </Link>
+      <div className="page-actions">
+        <AnalyticsRefresh />
+        <Link className="chip" href="/admin/analytics/posts">
+          {tr({
+            en: "Article performance",
+            kn: "ಲೇಖನಗಳ ಕಾರ್ಯಕ್ಷಮತೆ",
+            hi: "लेखों का प्रदर्शन",
+          })}
+        </Link>
+      </div>
       <section className="utility-panel">
         <h2>{t.liveReaders}</h2>
         <strong className="stat-number">{readers}</strong>

@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n/strings";
 export function formatDate(
   value: string,
   short = false,
-  locale: Locale = "kn",
+  locale: Locale = "en",
 ) {
   const [year, month, day] = value.slice(0, 10).split("-").map(Number);
   if (!year || !month || !day) return "";

@@ -1,50 +1,57 @@
 "use client";
-import { ImageUpload } from "./ImageUpload";
 import { useState } from "react";
-import { kn, v4 as t } from "@/content/strings.kn";
-const fieldSets: Record<
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+function fieldSets({
+  kn,
+  v4: t,
+  tr,
+}: ReturnType<typeof useUiStrings>): Record<
   string,
   { key: string; label: string; type?: string }[]
-> = {
-  timeline: [
-    { key: "date", label: kn.eventDate, type: "date" },
-    { key: "text", label: t.note },
-    { key: "text_en", label: t.note + " (English)" },
-    { key: "text_hi", label: t.note + " (हिंदी)" },
-  ],
-  images: [
-    { key: "url", label: kn.link },
-    { key: "caption", label: t.caption },
-    { key: "caption_en", label: t.caption + " (English)" },
-    { key: "caption_hi", label: t.caption + " (हिंदी)" },
-    { key: "credit", label: t.credit },
-  ],
-  photos: [
-    { key: "url", label: kn.link },
-    { key: "caption", label: t.caption },
-    { key: "credit", label: t.credit },
-  ],
-  slides: [
-    { key: "image", label: kn.link },
-    { key: "text", label: kn.title },
-    { key: "text_en", label: kn.title + " (English)" },
-    { key: "text_hi", label: kn.title + " (हिंदी)" },
-    { key: "credit", label: t.credit },
-    { key: "href", label: t.read },
-  ],
-  questions: [
-    { key: "question", label: t.question },
-    { key: "question_en", label: t.question + " (English)" },
-    { key: "question_hi", label: t.question + " (हिंदी)" },
-    { key: "options", label: t.options, type: "lines" },
-    { key: "options_en", label: t.options + " (English)", type: "lines" },
-    { key: "options_hi", label: t.options + " (हिंदी)", type: "lines" },
-    { key: "answer", label: t.answer, type: "number" },
-    { key: "explanation", label: t.explanation },
-    { key: "explanation_en", label: t.explanation + " (English)" },
-    { key: "explanation_hi", label: t.explanation + " (हिंदी)" },
-  ],
-};
+> {
+  const en = tr({ en: " (English)", kn: " (English)", hi: " (अंग्रेज़ी)" }),
+    hi = tr({ en: " (Hindi)", kn: " (हिंदी)", hi: " (हिंदी)" });
+  return {
+    timeline: [
+      { key: "date", label: kn.eventDate, type: "date" },
+      { key: "text", label: t.note },
+      { key: "text_en", label: t.note + en },
+      { key: "text_hi", label: t.note + hi },
+    ],
+    images: [
+      { key: "url", label: kn.link },
+      { key: "caption", label: t.caption },
+      { key: "caption_en", label: t.caption + en },
+      { key: "caption_hi", label: t.caption + hi },
+      { key: "credit", label: t.credit },
+    ],
+    photos: [
+      { key: "url", label: kn.link },
+      { key: "caption", label: t.caption },
+      { key: "credit", label: t.credit },
+    ],
+    slides: [
+      { key: "image", label: kn.link },
+      { key: "text", label: kn.title },
+      { key: "text_en", label: kn.title + en },
+      { key: "text_hi", label: kn.title + hi },
+      { key: "credit", label: t.credit },
+      { key: "href", label: t.read },
+    ],
+    questions: [
+      { key: "question", label: t.question },
+      { key: "question_en", label: t.question + en },
+      { key: "question_hi", label: t.question + hi },
+      { key: "options", label: t.options, type: "lines" },
+      { key: "options_en", label: t.options + en, type: "lines" },
+      { key: "options_hi", label: t.options + hi, type: "lines" },
+      { key: "answer", label: t.answer, type: "number" },
+      { key: "explanation", label: t.explanation },
+      { key: "explanation_en", label: t.explanation + en },
+      { key: "explanation_hi", label: t.explanation + hi },
+    ],
+  };
+}
 export function StructuredEditor({
   name,
   initial,
@@ -52,6 +59,9 @@ export function StructuredEditor({
   name: string;
   initial: unknown;
 }) {
+  const strings = useUiStrings(),
+    t = strings.v4,
+    fields = fieldSets(strings)[name] || [];
   const [rows, setRows] = useState<Record<string, unknown>[]>(
     Array.isArray(initial) ? initial : [],
   );
@@ -66,7 +76,7 @@ export function StructuredEditor({
       {rows.map((row, i) => (
         <div className="structured-row" key={i}>
           <strong>{i + 1}</strong>
-          {(fieldSets[name] || []).map((field) => (
+          {fields.map((field) => (
             <label className="field" key={field.key}>
               {field.label}
               {field.type === "lines" ? (
@@ -97,13 +107,6 @@ export function StructuredEditor({
               )}
             </label>
           ))}
-          {["images", "photos", "slides"].includes(name) && (
-            <ImageUpload
-              onUploaded={(url) =>
-                update(i, name === "slides" ? "image" : "url", url)
-              }
-            />
-          )}
           {name === "questions" && <p className="meta">{t.answerNumberHint}</p>}
           <button
             type="button"

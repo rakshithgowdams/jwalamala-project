@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { moderateSubmission } from "@/app/admin/v4/actions";
-import { v4 as t } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function ModerationQueue({
   rows,
 }: {
@@ -13,6 +13,7 @@ export function ModerationQueue({
     payload: Record<string, unknown>;
   }[];
 }) {
+  const { v4: t } = useUiStrings();
   const [busy, setBusy] = useState(""),
     [message, setMessage] = useState("");
   const router = useRouter();

@@ -1,7 +1,12 @@
 "use client";
 import { createContext, useContext } from "react";
-import { uiStrings, type Locale } from "@/lib/i18n/strings";
-const Context = createContext<Locale>("kn");
+import {
+  uiStrings,
+  DEFAULT_LOCALE,
+  LANGUAGE_COOKIE,
+  type Locale,
+} from "@/lib/i18n/strings";
+const Context = createContext<Locale>(DEFAULT_LOCALE);
 export function LanguageProvider({
   locale,
   children,
@@ -14,26 +19,24 @@ export function LanguageProvider({
 export function useUiStrings() {
   return uiStrings(useContext(Context));
 }
-export function LanguageSwitch() {
+export function LanguageSwitch({ className = "language-switch" }: { className?: string }) {
   const { locale, kn } = useUiStrings();
   return (
     <select
-      className="language-switch"
+      className={className}
       aria-label={kn.siteLanguage}
       value={locale}
-      onChange={async (e) => {
+      onChange={(e) => {
         document.cookie =
-          "jwalamala-language=" +
+          LANGUAGE_COOKIE +
+          "=" +
           e.target.value +
           "; Path=/; Max-Age=31536000; SameSite=Lax";
-        try {
-          if ("caches" in window) await caches.delete("jwalamala-pages");
-        } catch {}
         window.location.reload();
       }}
     >
-      <option value="kn">ಕನ್ನಡ</option>
       <option value="en">English</option>
+      <option value="kn">ಕನ್ನಡ</option>
       <option value="hi">हिंदी</option>
     </select>
   );

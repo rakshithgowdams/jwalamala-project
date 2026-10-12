@@ -3,10 +3,14 @@ import { chapterTextSchema } from "@/lib/v4/chapters";
 import { z } from "zod";
 import { requireStaff } from "@/lib/auth/require-user";
 import { cleanHtml } from "@/lib/utils/sanitize";
-import { isHostedImage } from "@/lib/utils/images";
-import { normalizeVideo } from "@/lib/utils/video";
+import { coverImageUrl, isCoverImage, isHostedImage } from "@/lib/utils/images";
+import { videoFromInput } from "@/lib/utils/video";
+import { slugify, transliterateKannada } from "@/lib/utils/slug";
+import { isoToday } from "@/lib/utils/dates";
+import { site } from "@/config/site";
+import { databaseError, issueError, postErrors, type PostError } from "@/lib/admin/post-errors";
 import { resourceSchemas, type Resource } from "@/lib/admin/resources";
-import { kn } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import {
@@ -15,6 +19,7 @@ import {
   clearReviewedTranslations,
 } from "@/lib/ai/autotranslate";
 import { hasTranslatablePass } from "@/lib/ai/rows";
+import { getAdminClient } from "@/lib/supabase/admin";
 const translationColumns = [
   "title_en",
   "summary_en",
@@ -52,12 +57,8 @@ const postSchema = z.object({
     .string()
     .trim()
     .max(2000)
-    .refine(
-      (v) =>
-        /^https:\/\/i\.ytimg\.com\/vi\/[A-Za-z0-9_-]{11}\/(?:hqdefault|maxresdefault)\.jpg$/.test(
-          v,
-        ) || isHostedImage(v),
-    ),
+    .transform((v) => coverImageUrl(v) || v)
+    .refine(isCoverImage),
   tag_ids: z.array(z.uuid()).max(20).default([]),
   public_author_id: z.union([z.uuid(), z.literal("")]).default(""),
   place_id: z.union([z.uuid(), z.literal("")]).default(""),
@@ -65,6 +66,7 @@ const postSchema = z.object({
   transcript: z.string().max(50000).default(""),
   seo_title: z.string().max(110).default(""),
   seo_description: z.string().max(300).default(""),
+  seo_keywords: z.string().max(500).default(""),
   sponsor_name: z.string().max(150).default(""),
   is_featured: z.boolean().default(false),
   is_breaking: z.boolean().default(false),
@@ -73,19 +75,19 @@ const postSchema = z.object({
   breaking_until: z.string().optional(),
   id: z.uuid().optional(),
   title_kn: z.string().min(3).max(300),
-  title_en: z.string().max(300),
+  title_en: z.string().max(300).default(""),
   summary_en: z.string().max(1000).default(""),
   body_en: z.string().max(200000).default(""),
   title_hi: z.string().max(300).default(""),
   summary_hi: z.string().max(1000).default(""),
   body_hi: z.string().max(200000).default(""),
-  slug: z.string().regex(/^[a-z0-9-]+$/),
-  summary_kn: z.string().max(1000),
+  slug: z.string().max(150).regex(/^[a-z0-9-]*$/).default(""),
+  summary_kn: z.string().max(1000).default(""),
   body_html: z.string().max(200000),
   body_json: z.string().max(200000),
-  event_date: z.iso.date(),
-  event_place: z.string().max(150),
-  image_credit: z.string().trim().max(200),
+  event_date: z.union([z.iso.date(), z.literal("")]).default(""),
+  event_place: z.string().max(150).default(""),
+  image_credit: z.string().trim().max(200).default(""),
   embargo_until: z.string().optional(),
   summary_points: z
     .string()
@@ -101,27 +103,51 @@ const postSchema = z.object({
   meaningful_edit: z.boolean().default(false),
   status: z.enum(["draft", "published", "scheduled"]),
   scheduled_for: z.string().optional(),
-  video_url: z.string().max(2000),
+  video_url: z.string().max(5000).default(""),
   primary_category: z.uuid(),
-  category_ids: z.array(z.uuid()).min(1),
+  category_ids: z.array(z.uuid()).max(30).default([]),
 });
-export async function savePost(input: unknown) {
-  const { db, user } = await requireStaff();
+/** First ~220 characters of the article text, cut at a word. */
+function excerpt(html: string) {
+  const text = html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= 220) return text;
+  return text.slice(0, 220).replace(/\s+\S*$/, "") + "…";
+}
+
+/** Slugs are unique across posts; a clash gets -2, -3 and so on. */
+async function uniqueSlug(
+  db: Awaited<ReturnType<typeof requireStaff>>["db"],
+  base: string,
+  id?: string,
+) {
+  const { data } = await db.from("posts").select("id,slug").like("slug", base + "%").limit(200);
+  const taken = new Set((data || []).filter((row) => row.id !== id).map((row) => row.slug));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+}
+
+export async function savePost(input: unknown): Promise<{ id?: string; error?: string; field?: string }> {
+  const [{ db, user }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+  const fail = (problem: PostError | null) =>
+    problem ? { error: tr(problem.message), field: problem.field } : { error: kn.validation };
   const parsed = postSchema.safeParse(input);
-  if (!parsed.success) return { error: kn.validation };
+  if (!parsed.success) {
+    console.error("[posts] invalid fields:", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.code}`).join(", "));
+    return fail(issueError(parsed.error.issues[0]));
+  }
   const p = parsed.data;
-  const { data: canEdit } = await db.rpc("has_permission", {
-    requested: "content.edit",
-  });
-  const { data: canCreate } = await db.rpc("has_permission", {
-    requested: "content.create",
-  });
-  const { data: canPublish } = await db.rpc("has_permission", {
-    requested: "content.publish",
-  });
-  if (!canEdit && !canCreate) return { error: kn.validation };
-  if (p.status !== "draft" && !canPublish) return { error: kn.validation };
-  if (!canEdit && p.status !== "draft") return { error: kn.validation };
+  const [{ data: canEdit }, { data: canCreate }, { data: canPublish }] = await Promise.all(
+    ["content.edit", "content.create", "content.publish"].map((requested) =>
+      db.rpc("has_permission", { requested }),
+    ),
+  );
+  if (!canEdit && !canCreate) return fail(postErrors.noEditPermission);
+  if (p.status !== "draft" && (!canPublish || !canEdit)) return fail(postErrors.noPublishPermission);
   if (
     p.status === "scheduled" &&
     (!p.scheduled_for ||
@@ -131,30 +157,46 @@ export async function savePost(input: unknown) {
           : p.scheduled_for,
       ) <= new Date())
   )
-    return { error: kn.validation };
-  if (!p.category_ids.includes(p.primary_category))
-    return { error: kn.validation };
-  const video = p.video_url ? normalizeVideo(p.video_url) : null;
-  if ((p.video_url && !video) || (p.type === "short" && !video))
-    return { error: kn.validation };
+    return fail(postErrors.scheduleInPast);
+  const publishing = p.status !== "draft";
+  if (publishing && p.title_kn.trim().length > 110) return fail(postErrors.titleTooLong);
+  const video = p.video_url.trim() ? videoFromInput(p.video_url) : null;
+  if (p.video_url.trim() && !video) return fail(postErrors.badVideo);
+  if (p.type === "short" && !video) return fail(postErrors.shortNeedsVideo);
+  const text = excerpt(p.body_html);
+  if (publishing && !text && !video) return fail(postErrors.bodyRequired);
+  // Editors write only the Kannada article; everything below is derived so a
+  // story can be published with a title, a category and a body.
+  const summary = p.summary_kn.trim() || text || p.title_kn.trim();
+  const eventDate = p.event_date || isoToday();
+  const categoryIds = [...new Set([p.primary_category, ...p.category_ids])];
+  const type = video && (p.type === "video" || p.type === "short") ? p.type : "article";
   let body;
   try {
     body = JSON.parse(p.body_json);
   } catch {
-    return { error: kn.validation };
+    return fail({ field: "body_html", message: postErrors.bodyRequired.message });
   }
-  // Read the stored translations before the write replaces them, so we can tell
-  // which ones the editor actually changed.
-  const { data: prior } = p.id
-    ? await db
-        .from("posts")
-        .select(["machine_translated", ...translationColumns].join(","))
-        .eq("id", p.id)
-        .maybeSingle()
-    : { data: null };
+  // The stored translations are read before the write replaces them, so we can
+  // tell which ones the editor actually changed.
+  const [slug, { data: prior }] = await Promise.all([
+    uniqueSlug(db, p.slug || slugify(p.title_kn) || "article", p.id),
+    p.id
+      ? db
+          .from("posts")
+          .select(["machine_translated", ...translationColumns].join(","))
+          .eq("id", p.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
   const { data, error } = await db.rpc("save_editor_post", {
     payload: {
       ...p,
+      slug,
+      summary_kn: summary,
+      event_date: eventDate,
+      image_credit: p.image_credit || site.fullName,
+      category_ids: categoryIds,
       early_access_until: p.early_access_until
         ? p.early_access_until.length === 16
           ? p.early_access_until + "+05:30"
@@ -188,27 +230,92 @@ export async function savePost(input: unknown) {
           ? p.breaking_until + "+05:30"
           : p.breaking_until
         : null,
-      type: video ? (p.type === "short" ? "short" : "video") : "article",
-      title_translit: p.title_en.toLowerCase(),
+      type,
+      title_translit: transliterateKannada(p.title_kn).toLowerCase(),
     },
   });
-  if (error) return { error: kn.unavailable };
-  const id = String(data);
-  if (prior)
-    await clearReviewedTranslations(
-      id,
-      prior as unknown as Record<string, unknown>,
-      p as unknown as Record<string, unknown>,
-    );
-  // Drafts are not worth spending translation budget on. Headline and summary are
-  // short enough to finish before the editor sees the response, which keeps cards
-  // and listings whole; the body follows once the response has been sent.
-  if (p.status !== "draft") {
-    await autoTranslatePost(id, "short");
-    after(() => autoTranslatePost(id, "body"));
+  if (error) {
+    console.error("[posts] save failed:", error.code, error.message);
+    const problem = databaseError(error);
+    return problem ? fail(problem) : { error: kn.unavailable };
   }
-  revalidatePath("/", "layout");
+  const id = String(data);
+  const [{ error: keywordError }] = await Promise.all([
+    // A new article without keywords has nothing to store or clear.
+    p.id || p.seo_keywords.trim()
+      ? db
+          .from("posts")
+          .update({ seo_keywords: p.seo_keywords.trim() || null })
+          .eq("id", id)
+      : Promise.resolve({ error: null }),
+    prior &&
+      clearReviewedTranslations(
+        id,
+        prior as unknown as Record<string, unknown>,
+        p as unknown as Record<string, unknown>,
+      ),
+  ]);
+  if (keywordError) console.error("[posts] SEO keywords not saved:", keywordError.message);
+  // Translation calls the AI provider and takes seconds, so it runs after the
+  // response: the article is live in Kannada at once and the English and Hindi
+  // versions appear when ready. Drafts are not worth the translation budget.
+  if (publishing)
+    after(async () => {
+      await autoTranslatePost(id, "short");
+      await autoTranslatePost(id, "body");
+    });
+  // Only the pages that list articles; refreshing the whole layout would make
+  // this response re-render the editor the admin is looking at.
+  revalidatePath("/admin/posts");
+  revalidatePath("/admin");
   return { id };
+}
+
+/** Records that keep their own history but point at an article; deleting it unlinks them. */
+const postLinks = [
+  ["submissions", "converted_post_id"],
+  ["import_rows", "post_id"],
+  ["polls", "post_id"],
+  ["story_assignments", "post_id"],
+  ["ai_suggestions", "post_id"],
+  ["social_posts", "post_id"],
+] as const;
+
+/** Permanently deletes an article. Only administrators may, as the database also enforces. */
+export async function deletePost(postId: unknown): Promise<{ ok?: true; error?: string }> {
+  const [{ db, profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+  const id = z.uuid().safeParse(postId);
+  if (!id.success) return { error: kn.validation };
+  if (profile.role !== "admin")
+    return {
+      error: tr({
+        en: "Only administrators can delete articles. Set the status to Draft to take it off the site instead.",
+        kn: "ಲೇಖನ ಅಳಿಸಲು ನಿರ್ವಾಹಕರಿಗೆ ಮಾತ್ರ ಅನುಮತಿ. ಸೈಟ್‌ನಿಂದ ತೆಗೆಯಲು ಸ್ಥಿತಿಯನ್ನು ಕರಡು ಮಾಡಿ.",
+        hi: "केवल व्यवस्थापक लेख हटा सकते हैं। साइट से हटाने के लिए स्थिति ड्राफ़्ट करें।",
+      }),
+    };
+  // These references have no ON DELETE rule and RLS hides most of them from the
+  // editor's session, so the service client clears them after the role check above.
+  const admin = getAdminClient();
+  if (admin) {
+    const results = await Promise.all([
+      ...postLinks.map(([table, column]) =>
+        admin.from(table).update({ [column]: null }).eq(column, id.data),
+      ),
+      admin.from("push_campaigns").delete().eq("post_id", id.data),
+    ]);
+    for (const { error } of results)
+      if (error) console.error("[posts] unlinking before delete:", error.message);
+  }
+  // The delete itself runs as the admin, so the audit log records who removed it.
+  const { data, error } = await db.from("posts").delete().eq("id", id.data).select("id");
+  if (error || !data?.length) {
+    if (error) console.error("[posts] delete failed:", error.code, error.message);
+    return { error: kn.unavailable };
+  }
+  revalidatePath("/admin/posts");
+  revalidatePath("/admin");
+  return { ok: true };
 }
 export async function saveResource(
   resource: Resource,
@@ -216,6 +323,7 @@ export async function saveResource(
   input: unknown,
 ) {
   const { db } = await requireStaff();
+  const { kn } = await getUiStrings();
   if (!Object.hasOwn(resourceSchemas, resource))
     return { error: kn.validation };
   const permission =

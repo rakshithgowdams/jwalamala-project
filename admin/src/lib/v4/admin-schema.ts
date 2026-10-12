@@ -16,7 +16,7 @@ const nullableId = z
 const image = z
   .string()
   .trim()
-  .refine(isHostedImage, "Use an uploaded image or an ImageKit link")
+  .refine(isHostedImage, "Use an ImageKit image link")
   .default("/images/jwalamala-logo.jpg");
 const jsonArray = <T extends z.ZodType>(schema: T) =>
   z

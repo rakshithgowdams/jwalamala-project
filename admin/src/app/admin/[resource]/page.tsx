@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/require-user";
 import { resources, type Resource } from "@/lib/admin/resources";
 import { ResourceManager } from "@/components/admin/ResourceManager";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function ResourcePage({
   params,
 }: {
@@ -32,10 +33,11 @@ export default async function ResourcePage({
         : resource;
   const { data, error } = await db.from(table).select("*").limit(100);
   if (error) throw error;
+  const { l } = await getUiStrings();
   return (
     <>
       <div className="page-heading">
-        <h1>{resources[resource as Resource].title}</h1>
+        <h1>{l(resources[resource as Resource].title)}</h1>
       </div>
       <ResourceManager resource={resource as Resource} rows={data || []} />
     </>

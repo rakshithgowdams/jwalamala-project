@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { resources, type Resource } from "@/lib/admin/resources";
 import { saveResource } from "@/app/admin/actions";
-import { kn } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { fieldLabel } from "@/components/admin/v4/ResourceEditor";
 export function ResourceManager({
   resource,
   rows,
@@ -12,6 +13,7 @@ export function ResourceManager({
   resource: Resource;
   rows: Record<string, unknown>[];
 }) {
+  const { kn, tr, l } = useUiStrings();
   const [selected, setSelected] = useState<Record<string, unknown>>({}),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -60,7 +62,7 @@ export function ResourceManager({
                   : null,
               values,
             );
-            setMessage(result.error || kn.saved);
+            setMessage(result.error ? l(result.error) : kn.saved);
             setBusy(false);
             if (!result.error) router.refresh();
           } catch {
@@ -75,7 +77,7 @@ export function ResourceManager({
             className={"field " + (type === "textarea" ? "wide" : "")}
             key={name}
           >
-            {label}
+            {fieldLabel(label, tr, l)}
             {resource === "users" && name === "role" ? (
               <select
                 name="role"

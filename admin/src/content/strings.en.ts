@@ -636,6 +636,18 @@ export const v4en = {
   noDistrictNews: "No news has been published from this district yet.",
   districtTowns: "Towns in this district",
   otherDistricts: "Other districts",
+  showInDistrictNews: "Show in district news",
+  districtOrder: "Order of districts in district news",
+  districtOrderHelp:
+    "The district at the top appears first. Change the order of sections with the sort number on the ‘Categories’ page.",
+  hiddenDistrict: "Hidden",
+  moveFirst: "Move to top",
+  moveLast: "Move to bottom",
+  delete: "Delete",
+  confirmDelete: "Delete this record permanently?",
+  deleted: "Deleted.",
+  deleteInUse:
+    "Could not delete. News or other records use this place; hide it instead.",
 };
 export const monthsEn = [
   "January",

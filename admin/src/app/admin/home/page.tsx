@@ -1,8 +1,10 @@
 import { requirePermission } from "@/lib/v4/permissions";
 import { HomeBuilder } from "@/components/admin/v4/HomeBuilder";
 import { homeSchema, defaultHome } from "@/lib/v4/home";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("content.edit");
+  const { tr } = await getUiStrings();
   const [settings, posts, categories, galleries] = await Promise.all([
     db
       .from("site_settings")
@@ -27,7 +29,9 @@ export default async function Page() {
     throw Error("Unable to load homepage editor data");
   return (
     <>
-      <h1>ಮುಖಪುಟ ವಿನ್ಯಾಸ</h1>
+      <h1>
+        {tr({ en: "Home layout", kn: "ಮುಖಪುಟ ವಿನ್ಯಾಸ", hi: "होम लेआउट" })}
+      </h1>
       <HomeBuilder
         initial={homeSchema
           .catch(defaultHome)

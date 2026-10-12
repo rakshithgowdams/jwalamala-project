@@ -3,9 +3,10 @@ import {
   Distribution,
   SocialConnection,
 } from "@/components/admin/v4/Distribution";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("social.manage");
+  const { v4: t } = await getUiStrings();
   const [posts, rows, settings] = await Promise.all([
     db
       .from("posts")

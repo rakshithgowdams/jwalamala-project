@@ -1,8 +1,9 @@
 import { requirePermission } from "@/lib/v4/permissions";
 import { ProviderControls } from "@/components/admin/v4/ProviderControls";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("settings.manage");
+  const { v4: t } = await getUiStrings();
   const month =
     new Date()
       .toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })

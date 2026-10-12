@@ -6,6 +6,7 @@ import {
   blockCommenter,
   saveComments,
 } from "@/app/admin/comments/actions";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function CommentModeration({
   rows,
   reports,
@@ -24,6 +25,7 @@ export function CommentModeration({
   config: { enabled: boolean; blocked_words: string[]; slow_seconds: number };
   canConfigure: boolean;
 }) {
+  const { tr } = useUiStrings();
   const [message, setMessage] = useState(""),
     [busy, start] = useTransition(),
     router = useRouter();
@@ -31,10 +33,18 @@ export function CommentModeration({
     start(async () => {
       try {
         const r = await action();
-        setMessage(r.error || "ಉಳಿಸಲಾಗಿದೆ.");
+        setMessage(
+          r.error || tr({ en: "Saved.", kn: "ಉಳಿಸಲಾಗಿದೆ.", hi: "सहेजा गया।" }),
+        );
         router.refresh();
       } catch {
-        setMessage("ಉಳಿಸಲಾಗಲಿಲ್ಲ.");
+        setMessage(
+          tr({
+            en: "Could not save.",
+            kn: "ಉಳಿಸಲಾಗಲಿಲ್ಲ.",
+            hi: "सहेजा नहीं जा सका।",
+          }),
+        );
       }
     });
   }
@@ -64,10 +74,18 @@ export function CommentModeration({
               name="enabled"
               defaultChecked={config.enabled}
             />
-            ಅಭಿಪ್ರಾಯಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ
+            {tr({
+              en: "Enable comments",
+              kn: "ಅಭಿಪ್ರಾಯಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
+              hi: "टिप्पणियाँ सक्रिय करें",
+            })}
           </label>
           <label className="field">
-            ಎರಡು ಅಭಿಪ್ರಾಯಗಳ ನಡುವಿನ ಸೆಕೆಂಡ್‌ಗಳು
+            {tr({
+              en: "Seconds between two comments",
+              kn: "ಎರಡು ಅಭಿಪ್ರಾಯಗಳ ನಡುವಿನ ಸೆಕೆಂಡ್‌ಗಳು",
+              hi: "दो टिप्पणियों के बीच सेकंड",
+            })}
             <input
               type="number"
               name="slow_seconds"
@@ -77,14 +95,22 @@ export function CommentModeration({
             />
           </label>
           <label className="field wide">
-            ಪರಿಶೀಲನೆಗೆ ಗುರುತಿಸುವ ಪದಗಳು (ಕನ್ನಡ / English, ಸಾಲಿಗೆ ಒಂದು)
+            {tr({
+              en: "Words that flag for review (Kannada / English, one per line)",
+              kn: "ಪರಿಶೀಲನೆಗೆ ಗುರುತಿಸುವ ಪದಗಳು (ಕನ್ನಡ / English, ಸಾಲಿಗೆ ಒಂದು)",
+              hi: "समीक्षा के लिए चिह्नित करने वाले शब्द (कन्नड़ / English, प्रति पंक्ति एक)",
+            })}
             <textarea
               name="blocked_words"
               defaultValue={config.blocked_words.join("\n")}
             />
           </label>
           <button className="button" disabled={busy}>
-            ಸಂಯೋಜನೆ ಉಳಿಸಿ
+            {tr({
+              en: "Save settings",
+              kn: "ಸಂಯೋಜನೆ ಉಳಿಸಿ",
+              hi: "सेटिंग्स सहेजें",
+            })}
           </button>
         </form>
       )}
@@ -93,14 +119,21 @@ export function CommentModeration({
         <article className="utility-panel" key={r.id}>
           <strong>
             {r.display_name} · {r.status}
-            {r.flagged ? " · ಗುರುತಿಸಲಾಗಿದೆ" : ""}
+            {r.flagged
+              ? tr({
+                  en: " · Flagged",
+                  kn: " · ಗುರುತಿಸಲಾಗಿದೆ",
+                  hi: " · चिह्नित",
+                })
+              : ""}
           </strong>
           <p>{r.body}</p>
           {reports
             .filter((report) => report.comment_id === r.id)
             .map((report, i) => (
               <p className="notice" key={i}>
-                ವರದಿ: {report.reason}
+                {tr({ en: "Report:", kn: "ವರದಿ:", hi: "रिपोर्ट:" })}{" "}
+                {report.reason}
               </p>
             ))}
           <div className="category-chips">
@@ -109,21 +142,25 @@ export function CommentModeration({
               disabled={busy}
               onClick={() => run(() => moderateComment(r.id, "approved"))}
             >
-              ಅನುಮೋದಿಸಿ
+              {tr({ en: "Approve", kn: "ಅನುಮೋದಿಸಿ", hi: "स्वीकृत करें" })}
             </button>
             <button
               className="button"
               disabled={busy}
               onClick={() => run(() => moderateComment(r.id, "rejected"))}
             >
-              ತಿರಸ್ಕರಿಸಿ
+              {tr({ en: "Reject", kn: "ತಿರಸ್ಕರಿಸಿ", hi: "अस्वीकार करें" })}
             </button>
             <button
               className="button"
               disabled={busy}
               onClick={() => run(() => blockCommenter(r.user_id))}
             >
-              ಈ ಓದುಗರ ಅಭಿಪ್ರಾಯಗಳನ್ನು ಮರೆಮಾಡಿ
+              {tr({
+                en: "Hide this reader's comments",
+                kn: "ಈ ಓದುಗರ ಅಭಿಪ್ರಾಯಗಳನ್ನು ಮರೆಮಾಡಿ",
+                hi: "इस पाठक की टिप्पणियाँ छिपाएँ",
+              })}
             </button>
           </div>
         </article>

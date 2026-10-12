@@ -7,7 +7,7 @@ import {
   deleteLiveUpdate,
 } from "@/app/admin/v4/actions";
 import type { LiveUpdate } from "@/lib/v4/types";
-import { kn, v4 as t } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function LiveConsole({
   blogId,
   updates,
@@ -17,6 +17,7 @@ export function LiveConsole({
   updates: LiveUpdate[];
   isLive: boolean;
 }) {
+  const { kn, v4: t, tr } = useUiStrings();
   const [selected, setSelected] = useState<LiveUpdate | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -69,7 +70,8 @@ export function LiveConsole({
           />
         </label>
         <label className="field">
-          {kn.body + " (English)"}
+          {kn.body +
+            tr({ en: " (English)", kn: " (English)", hi: " (अंग्रेज़ी)" })}
           <textarea
             name="body_en"
             rows={6}
@@ -77,7 +79,7 @@ export function LiveConsole({
           />
         </label>
         <label className="field">
-          {kn.body + " (हिंदी)"}
+          {kn.body + tr({ en: " (Hindi)", kn: " (हिंदी)", hi: " (हिंदी)" })}
           <textarea
             name="body_hi"
             rows={6}
@@ -85,21 +87,40 @@ export function LiveConsole({
           />
         </label>
         <label className="field">
-          Media type
+          {tr({
+            en: "Media type",
+            kn: "ಮಾಧ್ಯಮದ ಪ್ರಕಾರ",
+            hi: "मीडिया का प्रकार",
+          })}
           <select
             name="media_type"
             defaultValue={selected?.media?.type || "image"}
           >
-            <option value="image">Image</option>
-            <option value="video">Video</option>
+            <option value="image">
+              {tr({ en: "Image", kn: "ಚಿತ್ರ", hi: "चित्र" })}
+            </option>
+            <option value="video">
+              {tr({ en: "Video", kn: "ವಿಡಿಯೋ", hi: "वीडियो" })}
+            </option>
           </select>
         </label>
         <label className="field">
-          Media URL
-          <input name="media_url" defaultValue={selected?.media?.url || ""} />
+          {tr({ en: "Media link or embed code", kn: "ಮಾಧ್ಯಮ ಲಿಂಕ್ ಅಥವಾ ಎಂಬೆಡ್ ಕೋಡ್", hi: "मीडिया लिंक या एम्बेड कोड" })}
+          <input
+            name="media_url"
+            defaultValue={selected?.media?.url || ""}
+            placeholder="https://ik.imagekit.io/…  /  YouTube link  /  <iframe …>"
+          />
+          <small>
+            {tr({
+              en: "Image: an ImageKit link. Video: a YouTube or Facebook link, or its <iframe> embed code.",
+              kn: "ಚಿತ್ರ: ImageKit ಲಿಂಕ್. ವಿಡಿಯೋ: YouTube ಅಥವಾ Facebook ಲಿಂಕ್, ಅಥವಾ ಅದರ <iframe> ಎಂಬೆಡ್ ಕೋಡ್.",
+              hi: "चित्र: ImageKit लिंक। वीडियो: YouTube या Facebook लिंक, या उसका <iframe> एम्बेड कोड।",
+            })}
+          </small>
         </label>
         <label className="field">
-          Media credit
+          {tr({ en: "Media credit", kn: "ಮಾಧ್ಯಮ ಕೃಪೆ", hi: "मीडिया श्रेय" })}
           <input
             name="media_credit"
             defaultValue={selected?.media?.credit || ""}
@@ -157,7 +178,11 @@ export function LiveConsole({
               }
             }}
           >
-            Delete update
+            {tr({
+              en: "Delete update",
+              kn: "ಅಪ್‌ಡೇಟ್ ಅಳಿಸಿ",
+              hi: "अपडेट हटाएँ",
+            })}
           </button>
           <button className="chip" onClick={() => setSelected(update)}>
             {t.edit}

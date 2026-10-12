@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { manageJob } from "@/app/admin/jobs/actions";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function JobControls({
   id,
   status,
@@ -10,6 +11,7 @@ export function JobControls({
   status: string;
   kind: string;
 }) {
+  const { v4: t, tr } = useUiStrings();
   const [checked, setChecked] = useState(false),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
@@ -18,9 +20,15 @@ export function JobControls({
     setBusy(true);
     try {
       const r = await manageJob({ id, action, checked });
-      setMessage(r.error || "Saved");
+      setMessage(r.error || t.saved);
     } catch {
-      setMessage("Could not update job");
+      setMessage(
+        tr({
+          en: "Could not update job",
+          kn: "ಕೆಲಸವನ್ನು ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ",
+          hi: "जॉब अपडेट नहीं हो सकी",
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -34,7 +42,11 @@ export function JobControls({
             checked={checked}
             onChange={(e) => setChecked(e.target.checked)}
           />
-          I checked the provider; this delivery was not sent.
+          {tr({
+            en: "I checked the provider; this delivery was not sent.",
+            kn: "ನಾನು ಸೇವಾದಾರರಲ್ಲಿ ಪರಿಶೀಲಿಸಿದ್ದೇನೆ; ಈ ವಿತರಣೆ ಕಳುಹಿಸಲಾಗಿಲ್ಲ.",
+            hi: "मैंने सेवा प्रदाता से जाँच की है; यह डिलीवरी नहीं भेजी गई।",
+          })}
         </label>
       )}
       {status === "failed" && (
@@ -43,11 +55,11 @@ export function JobControls({
           disabled={busy || (kind !== "article-audio" && !checked)}
           onClick={() => run("retry")}
         >
-          Retry
+          {tr({ en: "Retry", kn: "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ", hi: "फिर से कोशिश करें" })}
         </button>
       )}
       <button className="chip" disabled={busy} onClick={() => run("cancel")}>
-        Cancel
+        {tr({ en: "Cancel", kn: "ರದ್ದುಮಾಡಿ", hi: "रद्द करें" })}
       </button>
       <p role="status">{message}</p>
     </div>

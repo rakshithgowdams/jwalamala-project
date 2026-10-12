@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { saveAdSettings, saveAdSlot } from "@/app/admin/ad-settings/actions";
 import type { AdSettings, SlotConfig } from "@/lib/ads/schema";
-import { v4 as t, kn } from "@/content/strings.kn";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
 export function AdControls({
   settings,
   slots,
@@ -12,6 +12,7 @@ export function AdControls({
   slots: SlotConfig[];
   cspReady: boolean;
 }) {
+  const { kn, v4: t, tr } = useUiStrings();
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
   return (
@@ -53,7 +54,11 @@ export function AdControls({
           </label>
         ))}
         <label className="field">
-          AdSense publisher ID
+          {tr({
+            en: "AdSense publisher ID",
+            kn: "AdSense ಪ್ರಕಾಶಕ ID",
+            hi: "AdSense प्रकाशक ID",
+          })}
           <input
             name="adsense_client_id"
             pattern="ca-pub-[0-9]{16}"
@@ -104,7 +109,11 @@ export function AdControls({
               </select>
             </label>
             <label className="field">
-              AdSense slot ID
+              {tr({
+                en: "AdSense slot ID",
+                kn: "AdSense ಸ್ಲಾಟ್ ID",
+                hi: "AdSense स्लॉट ID",
+              })}
               <input
                 name="adsense_slot_id"
                 inputMode="numeric"

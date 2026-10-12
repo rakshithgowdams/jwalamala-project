@@ -30,6 +30,36 @@ export type Locale = (typeof locales)[number];
 export function isLocale(value: unknown): value is Locale {
   return locales.includes(value as Locale);
 }
+
+/** The admin keeps its own language, separate from the news site's reader cookie. */
+export const LANGUAGE_COOKIE = "jwalamala-admin-language";
+export const DEFAULT_LOCALE: Locale = "en";
+
+/** Text written inline in all three languages. */
+export type Tri = Record<Locale, string>;
+
+const fromKannada = new Map<string, Partial<Record<Locale, string>>>();
+for (const [source, english, hindi] of [
+  [kn, en, hi],
+  [v4, v4en, v4hi],
+] as const)
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value !== "string" || fromKannada.has(value)) continue;
+    fromKannada.set(value, {
+      en: (english as Record<string, string>)[key],
+      hi: (hindi as Record<string, string>)[key],
+    });
+  }
+
+/**
+ * Translates a Kannada string from the shared tables. Labels defined once at
+ * module level (resource fields, menus) are Kannada values, so they are
+ * translated at render time instead of import time.
+ */
+export function localize(locale: Locale, text: string) {
+  return locale === "kn" ? text : fromKannada.get(text)?.[locale] || text;
+}
+
 export function uiStrings(locale: Locale) {
   // Kannada is the source of record: a translation table only overrides the
   // keys it actually carries, so a missing entry falls back rather than blanks.
@@ -50,5 +80,9 @@ export function uiStrings(locale: Locale) {
       hi: weatherLabelsHi,
     }[locale],
     pushLabels: { kn: pushLabels, en: pushLabelsEn, hi: pushLabelsHi }[locale],
+    /** Picks the active language from inline trilingual text. */
+    tr: (text: Tri) => text[locale],
+    /** Translates a module-level Kannada label from the shared tables. */
+    l: (text: string) => localize(locale, text),
   };
 }

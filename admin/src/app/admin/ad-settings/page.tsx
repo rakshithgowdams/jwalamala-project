@@ -6,9 +6,10 @@ import {
   defaultAds,
   type SlotConfig,
 } from "@/lib/ads/schema";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("ads.manage");
+  const { v4: t, tr } = await getUiStrings();
   const [settings, slots, stats] = await Promise.all([
     db.from("site_settings").select("value").eq("key", "ads").maybeSingle(),
     db.from("ad_slots").select("*").order("slot_key"),
@@ -30,10 +31,18 @@ export default async function Page() {
           {t.campaigns}
         </Link>
         <Link href="/admin/posters" className="button button-outline">
-          ಪೋಸ್ಟರ್/ಬ್ಯಾನರ್ ಜಾಹೀರಾತು
+          {tr({
+            en: "Poster/banner ads",
+            kn: "ಪೋಸ್ಟರ್/ಬ್ಯಾನರ್ ಜಾಹೀರಾತು",
+            hi: "पोस्टर/बैनर विज्ञापन",
+          })}
         </Link>
         <Link href="/admin/business-ads" className="button button-outline">
-          ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು
+          {tr({
+            en: "Local shop ads",
+            kn: "ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು",
+            hi: "स्थानीय दुकान विज्ञापन",
+          })}
         </Link>
         <a
           download

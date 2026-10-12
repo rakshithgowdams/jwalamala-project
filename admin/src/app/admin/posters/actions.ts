@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/v4/permissions";
 import { posterRow, posterSchema } from "@/lib/ads/posters";
 import { autoTranslateRows } from "@/lib/ai/autotranslate";
-import { kn, v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 
 const id = z.uuid();
 
 export async function savePoster(posterId: string | null, input: unknown) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("ads.manage");
   if (posterId && !id.safeParse(posterId).success)
     return { error: kn.validation };
@@ -33,6 +34,7 @@ export async function savePoster(posterId: string | null, input: unknown) {
 }
 
 export async function setPosterActive(posterId: string, active: boolean) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("ads.manage");
   if (!id.safeParse(posterId).success) return { error: kn.validation };
   const { error } = await db
@@ -46,6 +48,7 @@ export async function setPosterActive(posterId: string, active: boolean) {
 }
 
 export async function deletePoster(posterId: string) {
+  const { kn, v4: t } = await getUiStrings();
   const { db } = await requirePermission("ads.manage");
   if (!id.safeParse(posterId).success) return { error: kn.validation };
   const { error } = await db

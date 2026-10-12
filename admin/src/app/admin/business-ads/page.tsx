@@ -6,24 +6,49 @@ import {
   type Choice,
 } from "@/components/admin/v4/ResourceEditor";
 import { businessAdState, type BusinessAdState } from "@/lib/ads/business";
-import { kn, v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
+import type { Tri } from "@/lib/i18n/strings";
 
-const states: Record<BusinessAdState, string> = {
-  live: "ಪ್ರಕಟವಾಗಿದೆ",
-  pending: "ಪರಿಶೀಲನೆ ಬಾಕಿ",
-  paused: "ತಡೆಹಿಡಿಯಲಾಗಿದೆ",
-  rejected: "ನಿರಾಕರಿಸಲಾಗಿದೆ",
-  unpaid: "ಪಾವತಿ ಬಾಕಿ",
-  scheduled: "ಇನ್ನೂ ಆರಂಭವಾಗಿಲ್ಲ",
-  expired: "ಅವಧಿ ಮುಗಿದಿದೆ",
-  undated: "ದಿನಾಂಕ ಬೇಕು",
+const states: Record<BusinessAdState, Tri> = {
+  live: { en: "Live", kn: "ಪ್ರಕಟವಾಗಿದೆ", hi: "प्रकाशित" },
+  pending: { en: "Review pending", kn: "ಪರಿಶೀಲನೆ ಬಾಕಿ", hi: "समीक्षा लंबित" },
+  paused: { en: "Paused", kn: "ತಡೆಹಿಡಿಯಲಾಗಿದೆ", hi: "रोका गया" },
+  rejected: { en: "Rejected", kn: "ನಿರಾಕರಿಸಲಾಗಿದೆ", hi: "अस्वीकृत" },
+  unpaid: { en: "Payment pending", kn: "ಪಾವತಿ ಬಾಕಿ", hi: "भुगतान लंबित" },
+  scheduled: {
+    en: "Not started yet",
+    kn: "ಇನ್ನೂ ಆರಂಭವಾಗಿಲ್ಲ",
+    hi: "अभी शुरू नहीं हुआ",
+  },
+  expired: { en: "Expired", kn: "ಅವಧಿ ಮುಗಿದಿದೆ", hi: "समाप्त" },
+  undated: { en: "Needs dates", kn: "ದಿನಾಂಕ ಬೇಕು", hi: "तारीख चाहिए" },
 };
-const checklist = [
-  "ಅರ್ಜಿಯ ಫೋನ್/WhatsApp ಸಂಖ್ಯೆಗೆ ಕರೆ ಮಾಡಿ ಜಾಹೀರಾತುದಾರರನ್ನು ದೃಢಪಡಿಸಿ; ಲೋಗೋ ಅಥವಾ ಚಿತ್ರವನ್ನು ಪಡೆದು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.",
-  "ಸಂದೇಶ ಮತ್ತು ಚಿತ್ರ /advertise ಪುಟದ ನಿಯಮಗಳನ್ನು ಪಾಲಿಸುತ್ತವೆಯೇ, ಸ್ವೀಕರಿಸದ ವಿಭಾಗಕ್ಕೆ ಸೇರಿಲ್ಲವೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ರಿಯಾಯಿತಿಗೆ ಷರತ್ತು ಮತ್ತು ಮಾನ್ಯತೆ ಇರಲಿ.",
-  "ಆರಂಭ ಮತ್ತು ಮುಕ್ತಾಯ ದಿನಾಂಕ ಹಾಕಿ. ಕೆಲವು ಜಿಲ್ಲೆಗಳಿಗೆ ಮಾತ್ರ ತೋರಿಸಲು ಆ ಜಿಲ್ಲೆಗಳನ್ನು ಆರಿಸಿ; ಖಾಲಿ ಬಿಟ್ಟರೆ ಎಲ್ಲೆಡೆ ಕಾಣಿಸುತ್ತದೆ.",
-  "ಪಾವತಿಯನ್ನು ಬ್ಯಾಂಕ್/UPI ದಾಖಲೆಯಲ್ಲಿ ಖಚಿತಪಡಿಸಿ 'paid' ಮತ್ತು ರಸೀದಿ ಸಂಖ್ಯೆ ದಾಖಲಿಸಿ; ಉಚಿತವಾದರೆ 'waived'.",
-  "ಕೊನೆಗೆ ಸ್ಥಿತಿಯನ್ನು 'approved' ಮಾಡಿ. ಅನುಮೋದನೆ, ಪಾವತಿ ಮತ್ತು ದಿನಾಂಕ ಮೂರೂ ಸರಿಯಿದ್ದಾಗ ಮಾತ್ರ ಜಾಹೀರಾತು ಓದುಗರಿಗೆ ಕಾಣಿಸುತ್ತದೆ.",
+const checklist: Tri[] = [
+  {
+    en: "Call the phone/WhatsApp number on the request to confirm the advertiser; get the logo or image, put it on ImageKit and paste the link.",
+    kn: "ಅರ್ಜಿಯ ಫೋನ್/WhatsApp ಸಂಖ್ಯೆಗೆ ಕರೆ ಮಾಡಿ ಜಾಹೀರಾತುದಾರರನ್ನು ದೃಢಪಡಿಸಿ; ಲೋಗೋ ಅಥವಾ ಚಿತ್ರವನ್ನು ಪಡೆದು ImageKit ನಲ್ಲಿ ಇರಿಸಿ ಅದರ ಲಿಂಕ್ ಅಂಟಿಸಿ.",
+    hi: "आवेदन के फ़ोन/WhatsApp नंबर पर कॉल करके विज्ञापनदाता की पुष्टि करें; लोगो या चित्र लेकर ImageKit पर रखें और उसका लिंक चिपकाएँ।",
+  },
+  {
+    en: "Check that the message and image follow the rules on the /advertise page and do not fall in a category we do not accept. Discounts must state their conditions and validity.",
+    kn: "ಸಂದೇಶ ಮತ್ತು ಚಿತ್ರ /advertise ಪುಟದ ನಿಯಮಗಳನ್ನು ಪಾಲಿಸುತ್ತವೆಯೇ, ಸ್ವೀಕರಿಸದ ವಿಭಾಗಕ್ಕೆ ಸೇರಿಲ್ಲವೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ರಿಯಾಯಿತಿಗೆ ಷರತ್ತು ಮತ್ತು ಮಾನ್ಯತೆ ಇರಲಿ.",
+    hi: "जाँचें कि संदेश और चित्र /advertise पेज के नियमों का पालन करते हैं और किसी अस्वीकृत श्रेणी में नहीं आते। छूट के साथ शर्तें और वैधता लिखी हों।",
+  },
+  {
+    en: "Set the start and end dates. To show it only in some districts, pick those districts; left empty, it shows everywhere.",
+    kn: "ಆರಂಭ ಮತ್ತು ಮುಕ್ತಾಯ ದಿನಾಂಕ ಹಾಕಿ. ಕೆಲವು ಜಿಲ್ಲೆಗಳಿಗೆ ಮಾತ್ರ ತೋರಿಸಲು ಆ ಜಿಲ್ಲೆಗಳನ್ನು ಆರಿಸಿ; ಖಾಲಿ ಬಿಟ್ಟರೆ ಎಲ್ಲೆಡೆ ಕಾಣಿಸುತ್ತದೆ.",
+    hi: "शुरू और समाप्ति की तारीख डालें। केवल कुछ ज़िलों में दिखाने के लिए वे ज़िले चुनें; खाली छोड़ने पर हर जगह दिखेगा।",
+  },
+  {
+    en: "Confirm the payment in the bank/UPI record, then set 'paid' and enter the receipt number; if it is free, use 'waived'.",
+    kn: "ಪಾವತಿಯನ್ನು ಬ್ಯಾಂಕ್/UPI ದಾಖಲೆಯಲ್ಲಿ ಖಚಿತಪಡಿಸಿ 'paid' ಮತ್ತು ರಸೀದಿ ಸಂಖ್ಯೆ ದಾಖಲಿಸಿ; ಉಚಿತವಾದರೆ 'waived'.",
+    hi: "बैंक/UPI रिकॉर्ड में भुगतान की पुष्टि करके 'paid' और रसीद संख्या दर्ज करें; मुफ़्त हो तो 'waived'।",
+  },
+  {
+    en: "Finally set the status to 'approved'. The ad reaches readers only when approval, payment and dates are all in order.",
+    kn: "ಕೊನೆಗೆ ಸ್ಥಿತಿಯನ್ನು 'approved' ಮಾಡಿ. ಅನುಮೋದನೆ, ಪಾವತಿ ಮತ್ತು ದಿನಾಂಕ ಮೂರೂ ಸರಿಯಿದ್ದಾಗ ಮಾತ್ರ ಜಾಹೀರಾತು ಓದುಗರಿಗೆ ಕಾಣಿಸುತ್ತದೆ.",
+    hi: "अंत में स्थिति 'approved' करें। अनुमोदन, भुगतान और तारीख तीनों सही होने पर ही विज्ञापन पाठकों को दिखेगा।",
+  },
 ];
 
 async function load() {
@@ -62,10 +87,17 @@ async function load() {
 
 export default async function Page() {
   const { rows, totals, choices, now } = await load();
+  const { kn, v4: t, tr } = await getUiStrings();
   return (
     <>
       <div className="page-heading">
-        <h1>ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು</h1>
+        <h1>
+          {tr({
+            en: "Local shop ads",
+            kn: "ಸ್ಥಳೀಯ ಮಳಿಗೆ ಜಾಹೀರಾತು",
+            hi: "स्थानीय दुकान विज्ञापन",
+          })}
+        </h1>
       </div>
       <div className="article-actions">
         <a href={site.url + "/advertise"} className="button button-outline">
@@ -79,14 +111,26 @@ export default async function Page() {
         </Link>
       </div>
       <section className="utility-panel">
-        <h2>ಪ್ರಕಟಣೆಗೆ ಮೊದಲು ಪರಿಶೀಲನೆ</h2>
+        <h2>
+          {tr({
+            en: "Checks before publishing",
+            kn: "ಪ್ರಕಟಣೆಗೆ ಮೊದಲು ಪರಿಶೀಲನೆ",
+            hi: "प्रकाशन से पहले जाँच",
+          })}
+        </h2>
         <ol>
           {checklist.map((item) => (
-            <li key={item}>{item}</li>
+            <li key={item.en}>{tr(item)}</li>
           ))}
         </ol>
       </section>
-      <h2>ಸ್ಥಿತಿ ಮತ್ತು ಅಂಕಿಅಂಶ (90 ದಿನ)</h2>
+      <h2>
+        {tr({
+          en: "Status and stats (90 days)",
+          kn: "ಸ್ಥಿತಿ ಮತ್ತು ಅಂಕಿಅಂಶ (90 ದಿನ)",
+          hi: "स्थिति और आँकड़े (90 दिन)",
+        })}
+      </h2>
       <div className="table-scroll">
         <table>
           <thead>
@@ -109,7 +153,7 @@ export default async function Page() {
               return (
                 <tr key={row.id}>
                   <td>{row.name_kn}</td>
-                  <td>{states[businessAdState(row, now)]}</td>
+                  <td>{tr(states[businessAdState(row, now)])}</td>
                   <td>{row.starts_at?.slice(0, 10) || "—"}</td>
                   <td>{row.ends_at?.slice(0, 10) || "—"}</td>
                   <td>{total.impressions}</td>

@@ -70,7 +70,7 @@ const config: NextConfig = {
                     (process.env.NODE_ENV === "development"
                       ? " 'unsafe-eval'"
                       : "") +
-                    " https://www.youtube.com https://s.ytimg.com https://challenges.cloudflare.com https://checkout.razorpay.com https://cdn.ampproject.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://*.supabase.co " +
+                    " https://www.youtube.com https://s.ytimg.com https://challenges.cloudflare.com https://checkout.razorpay.com https://cdn.ampproject.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://*.supabase.co " +
                     imageHosts +
                     "; font-src 'self'; media-src 'self' https://*.supabase.co; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.supabase.co wss://*.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321; frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube-nocookie.com https://www.facebook.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:",
                 },

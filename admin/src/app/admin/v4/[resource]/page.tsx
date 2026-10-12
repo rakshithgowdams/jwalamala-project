@@ -5,6 +5,7 @@ import {
   ResourceEditor,
   type Choice,
 } from "@/components/admin/v4/ResourceEditor";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page({
   params,
 }: {
@@ -43,13 +44,21 @@ export default async function Page({
             ? "id,title_kn"
             : table === "liveblogs"
               ? "id,title_kn"
-              : "id,name_kn",
+              : table === "places"
+                ? "id,name_kn,name_en,district,is_district"
+                : "id,name_kn",
       )
-      .limit(500);
+      .limit(table === "places" ? 2000 : 500);
     choices[table] = (result.data || []).map(
       (row: Record<string, unknown>) => ({
         id: String(row.id),
         label: String(row.advertiser || row.title_kn || row.name_kn),
+        ...(table === "places" && {
+          name_kn: String(row.name_kn),
+          name_en: (row.name_en as string) || "",
+          district: (row.district as string) || "",
+          is_district: Boolean(row.is_district),
+        }),
       }),
     );
   }
@@ -64,10 +73,11 @@ export default async function Page({
       order: row.sort_order ?? row.episode_no,
     }));
   }
+  const { l } = await getUiStrings();
   return (
     <>
       <div className="page-heading">
-        <h1>{config.title}</h1>
+        <h1>{l(config.title)}</h1>
       </div>
       <ResourceEditor
         resource={name}

@@ -1,8 +1,9 @@
 import { JobControls } from "@/components/admin/v4/JobControls";
 import { requirePermission } from "@/lib/v4/permissions";
-import { v4 as t } from "@/content/strings.kn";
+import { getUiStrings } from "@/lib/i18n/server";
 export default async function Page() {
   const { db } = await requirePermission("settings.manage");
+  const { v4: t, tr } = await getUiStrings();
   const { data, error } = await db
     .from("automation_jobs")
     .select("id,kind,status,attempts,run_after,last_error")
@@ -20,7 +21,7 @@ export default async function Page() {
               <th>{t.status}</th>
               <th>{t.attempts}</th>
               <th>{t.note}</th>
-              <th>Actions</th>
+              <th>{tr({ en: "Actions", kn: "ಕ್ರಮಗಳು", hi: "कार्रवाइयाँ" })}</th>
             </tr>
           </thead>
           <tbody>
