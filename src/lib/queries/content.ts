@@ -1,6 +1,7 @@
 import { supabaseFetch } from "@/lib/supabase/fetch";
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { site } from "@/config/site";
 import { v4Demo } from "@/lib/v4/demo";
@@ -14,6 +15,16 @@ import type { Post, NewsEvent, Category } from "@/lib/types";
  */
 const postColumns =
   "*,key_points(*),post_categories(categories(slug)),post_tags(tags(*))";
+/** List pages do not need the article body or transcript, which are the heavy columns. */
+const listColumns =
+  "id,slug,title_kn,title_en,title_hi,summary_kn,summary_en,summary_hi,title_translit,type,status,event_date,published_at,updated_at,event_place,thumbnail_url,video_url,video_id,video_provider,is_featured,is_breaking,is_live,duration_seconds,view_count,is_seed,place_id,image_credit,post_categories(categories(slug)),post_tags(tags(slug,name_kn,name_en,name_hi))";
+
+/** The publication cutoff is stable for a minute so repeated page loads share one database response. */
+function publishedCutoff() {
+  const now = new Date();
+  now.setSeconds(0, 0);
+  return now.toISOString();
+}
 function publicDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -23,6 +34,35 @@ function publicDb() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+const loadPosts = unstable_cache(
+  async (): Promise<Post[]> => {
+    const db = publicDb();
+    if (!db) return [];
+    const { data, error } = await db
+      .from("posts")
+      .select(listColumns)
+      .eq("status", "published")
+      .is("deleted_at", null)
+      .lte("published_at", publishedCutoff())
+      .order("published_at", { ascending: false })
+      .limit(80);
+    if (error) throw error;
+    return (data || []).map((p) => ({
+      ...p,
+      tags: (
+        (p.post_tags as {
+          tags: { slug: string; name_kn: string; name_hi?: string } | null;
+        }[]) || []
+      ).flatMap((link) => (link.tags ? [link.tags] : [])),
+      category_slugs: (
+        p.post_categories as { categories: { slug: string } | null }[]
+      ).flatMap((c) => (c.categories ? [c.categories.slug] : [])),
+    })) as Post[];
+  },
+  ["public-posts"],
+  { revalidate: 60, tags: ["public-content"] },
+);
+
 export const getPosts = cache(async (): Promise<Post[]> => {
   if (site.demo)
     return demoPosts.map((post) => ({
@@ -31,74 +71,72 @@ export const getPosts = cache(async (): Promise<Post[]> => {
         .filter((link) => link.post_id === post.id)
         .flatMap((link) => v4Demo.tags.filter((tag) => tag.id === link.tag_id)),
     }));
-  const db = publicDb();
-  if (!db) return [];
-  const { data, error } = await db
-    .from("posts")
-    .select(postColumns)
-    .eq("status", "published")
-    .is("deleted_at", null)
-    .lte("published_at", new Date().toISOString())
-    .order("published_at", { ascending: false })
-    .limit(200);
-  if (error) throw error;
-  return (data || []).map((p) => ({
-    ...p,
-    tags: (
-      (p.post_tags as {
-        tags: { slug: string; name_kn: string; name_hi?: string } | null;
-      }[]) || []
-    ).flatMap((link) => (link.tags ? [link.tags] : [])),
-    category_slugs: (
-      p.post_categories as { categories: { slug: string } | null }[]
-    ).flatMap((c) => (c.categories ? [c.categories.slug] : [])),
-  })) as Post[];
+  return loadPosts();
 });
+const loadCategories = unstable_cache(
+  async (): Promise<Category[]> => {
+    const db = publicDb();
+    if (!db) return [];
+    const { data, error } = await db.from("categories").select("*").order("sort_order");
+    if (error) throw error;
+    return data || [];
+  },
+  ["public-categories"],
+  { revalidate: 300, tags: ["public-content"] },
+);
+
 export const getCategories = cache(async (): Promise<Category[]> => {
   if (site.demo) return categories;
-  const db = publicDb();
-  if (!db) return [];
-  const { data, error } = await db
-    .from("categories")
-    .select("*")
-    .order("sort_order");
-  if (error) throw error;
-  return data || [];
+  return loadCategories();
 });
+const loadEvents = unstable_cache(
+  async (): Promise<NewsEvent[]> => {
+    const db = publicDb();
+    if (!db) return [];
+    const { data, error } = await db.from("events").select("*").order("start_date");
+    if (error) throw error;
+    return data || [];
+  },
+  ["public-events"],
+  { revalidate: 300, tags: ["public-content"] },
+);
+
 export const getEvents = cache(async (): Promise<NewsEvent[]> => {
   if (site.demo) return demoEvents;
-  const db = publicDb();
-  if (!db) return [];
-  const { data, error } = await db
-    .from("events")
-    .select("*")
-    .order("start_date");
-  if (error) throw error;
-  return data || [];
+  return loadEvents();
 });
+
+const loadPost = unstable_cache(
+  async (slug: string) => {
+    const db = publicDb();
+    if (!db) return null;
+    const { data, error } = await db
+      .from("posts")
+      .select(postColumns)
+      .eq("slug", slug)
+      .eq("status", "published")
+      .is("deleted_at", null)
+      .lte("published_at", publishedCutoff())
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      ...data,
+      tags: (
+        (data.post_tags as {
+          tags: { slug: string; name_kn: string; name_hi?: string } | null;
+        }[]) || []
+      ).flatMap((link) => (link.tags ? [link.tags] : [])),
+      category_slugs: (
+        data.post_categories as { categories: { slug: string } | null }[]
+      ).flatMap((c) => (c.categories ? [c.categories.slug] : [])),
+    } as Post;
+  },
+  ["public-post"],
+  { revalidate: 60, tags: ["public-content"] },
+);
+
 export async function getPost(slug: string) {
   if (site.demo) return demoPosts.find((p) => p.slug === slug);
-  const db = publicDb();
-  if (!db) return undefined;
-  const { data, error } = await db
-    .from("posts")
-    .select(postColumns)
-    .eq("slug", slug)
-    .eq("status", "published")
-    .is("deleted_at", null)
-    .lte("published_at", new Date().toISOString())
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return undefined;
-  return {
-    ...data,
-    tags: (
-      (data.post_tags as {
-        tags: { slug: string; name_kn: string; name_hi?: string } | null;
-      }[]) || []
-    ).flatMap((link) => (link.tags ? [link.tags] : [])),
-    category_slugs: (
-      data.post_categories as { categories: { slug: string } | null }[]
-    ).flatMap((c) => (c.categories ? [c.categories.slug] : [])),
-  } as Post;
+  return (await loadPost(slug)) ?? undefined;
 }

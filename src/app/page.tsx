@@ -26,26 +26,18 @@ import { pickBusinessAds } from "@/lib/ads/business";
 export default async function Home() {
   const { kn, locale } = await getUiStrings();
 
-  let posts: Awaited<ReturnType<typeof getPosts>> = [];
-  let events: Awaited<ReturnType<typeof getEvents>> = [];
-  let categoriesList: Awaited<ReturnType<typeof getCategories>> = [];
-  try {
-    [posts, events, categoriesList] = await Promise.all([
-      getPosts(),
-      getEvents(),
-      getCategories(),
-    ]);
-  } catch {}
-  let trending: Awaited<ReturnType<typeof getListing>>["rows"] = [];
-  try {
-    trending = (await getListing({ sort: "most_viewed" }, "1", 4)).rows;
-  } catch {}
-  const config = homeSchema
-    .catch(defaultHome)
-    .parse((await getSetting("homepage")) || defaultHome);
-  const shops = pickBusinessAds(await getBusinessAds().catch(() => []), {
-    count: 8,
-  });
+  const [posts, events, categoriesList, trending, homeSetting, shopRows] = await Promise.all([
+    getPosts().catch(() => []),
+    getEvents().catch(() => []),
+    getCategories().catch(() => []),
+    getListing({ sort: "most_viewed" }, "1", 4)
+      .then((result) => result.rows)
+      .catch(() => []),
+    getSetting("homepage").catch(() => null),
+    getBusinessAds().catch(() => []),
+  ]);
+  const config = homeSchema.catch(defaultHome).parse(homeSetting || defaultHome);
+  const shops = pickBusinessAds(shopRows, { count: 8 });
   const lead =
     posts.find((p) => p.id === config.lead_id) ||
     posts.find((p) => p.is_featured) ||

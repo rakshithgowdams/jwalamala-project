@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { site } from "@/config/site";
 import { supabaseFetch } from "@/lib/supabase/fetch";
@@ -98,7 +99,8 @@ const demoAds = [
   ),
 ];
 
-async function liveAds(): Promise<BusinessAd[]> {
+const liveAds = unstable_cache(
+  async (): Promise<BusinessAd[]> => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return [];
@@ -110,7 +112,10 @@ async function liveAds(): Promise<BusinessAd[]> {
   // An ad outage must never take a news page down with it.
   if (error) return [];
   return (data || []) as BusinessAd[];
-}
+  },
+  ["business-ads"],
+  { revalidate: 120, tags: ["public-content"] },
+);
 
 export const getBusinessAds = cache(async (): Promise<BusinessAdView[]> => {
   const places = await getV4Rows("places");

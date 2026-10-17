@@ -186,31 +186,40 @@ export async function ArticlePage({
   const articleLanguage = english ? "en" : hindi ? "hi" : "kn";
   const copyrightYear = new Date(p.published_at).getFullYear();
   const copyrightNotice = `© ${copyrightYear} ${brandName(locale)}. ${kn.rights}`;
-  const eventPlace = localizePlace(
-    await getPlaceNames(),
-    locale,
-    p.event_place,
-  );
+  const [
+    placeNames,
+    commentsSetting,
+    authors,
+    correctionRows,
+    episodes,
+    seriesRows,
+    tagLinks,
+    allPosts,
+    categories,
+  ] = await Promise.all([
+    getPlaceNames(),
+    getSetting("comments"),
+    getV4Rows("authors"),
+    getV4Rows("corrections_log"),
+    getV4Rows("series_items"),
+    getV4Rows("series"),
+    getV4Rows("post_tags"),
+    getPosts(),
+    getCategories().catch(() => []),
+  ]);
+  const eventPlace = localizePlace(placeNames, locale, p.event_place);
   const commentSettings = commentSettingsSchema
     .catch(defaultComments)
-    .parse((await getSetting("comments")) || defaultComments);
-  const author = (await getV4Rows("authors")).find(
-    (a) => a.id === p.public_author_id,
-  );
-  const corrections = (await getV4Rows("corrections_log")).filter(
-    (row) => row.post_id === p.id,
-  );
-  const episodes = await getV4Rows("series_items");
+    .parse(commentsSetting || defaultComments);
+  const author = authors.find((a) => a.id === p.public_author_id);
+  const corrections = correctionRows.filter((row) => row.post_id === p.id);
   const inSeries = episodes.find((row) => row.post_id === p.id);
   const series = inSeries
-    ? (await getV4Rows("series")).find((row) => row.id === inSeries.series_id)
+    ? seriesRows.find((row) => row.id === inSeries.series_id)
     : null;
   const awaitPostTagIds = new Set(
-    (await getV4Rows("post_tags"))
-      .filter((link) => link.post_id === p.id)
-      .map((link) => link.tag_id),
+    tagLinks.filter((link) => link.post_id === p.id).map((link) => link.tag_id),
   );
-  const allPosts = await getPosts();
   const related = allPosts
     .filter(
       (x) =>
@@ -218,7 +227,7 @@ export async function ArticlePage({
         x.category_slugs.some((c) => p.category_slugs.includes(c)),
     )
     .slice(0, 4);
-  const section = (await getCategories().catch(() => [])).find((category) =>
+  const section = categories.find((category) =>
     p.category_slugs.includes(category.slug),
   );
   const sectionName = section
