@@ -200,6 +200,7 @@ const postTags = demoPosts.flatMap((p) => [
   },
   { post_id: p.id, tag_id: tags[0].id },
 ]);
+const retiredTrending = new Set(["/tag/ahimsa", "/basadis", "/place/hassan"]);
 export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
   tags,
   places,
@@ -349,7 +350,9 @@ export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
     ends_at: null,
     sort_order: i,
     is_active: true,
-  })),
+  }))
+    // Ids come from list position, so retired links are filtered, not deleted.
+    .filter((item) => !retiredTrending.has(item.url)),
   series: [
     {
       id: id("series", 1),

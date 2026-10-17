@@ -17,7 +17,8 @@ import { AdSlot } from "@/components/ads/AdSlot";
 import Link from "next/link";
 import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { notFound } from "next/navigation";
-import { getPost, getPosts } from "@/lib/queries/content";
+import { getCategories, getPost, getPosts } from "@/lib/queries/content";
+import { articleDescription, articleKeywords } from "@/lib/seo/article-meta";
 import { site } from "@/config/site";
 import { formatDate } from "@/lib/utils/dates";
 import { EventDateBadge, SectionTitle } from "@/components/ui/Primitives";
@@ -25,6 +26,7 @@ import { NewsCard } from "./NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import { BookmarkButton, ShareButtons } from "./PostActions";
 import { LiteVideoEmbed } from "./LiteVideoEmbed";
+import { ArticleSidebar } from "./ArticleSidebar";
 /**
  * Which language the article body is shown in. `?lang=` wins so the
  * "read in ..." chips still work either way, but with no parameter the reader's
@@ -36,18 +38,24 @@ function articleLanguageFor(requested: string | undefined, locale: Locale) {
 }
 export async function articleMetadata(slug: string, language?: string) {
   const { kn, locale } = await getUiStrings();
-  const original = await getPost(slug);
+  const [original, categories, authors] = await Promise.all([
+    getPost(slug),
+    getCategories().catch(() => []),
+    getV4Rows("authors").catch(() => []),
+  ]);
   if (!original) return { title: kn.notFound };
   const hasEnglish = !!original.body_en && !!original.title_en;
   const hasHindi = !!original.body_hi && !!original.title_hi;
   const shown = articleLanguageFor(language, locale);
   const english = shown === "en" && hasEnglish;
   const hindi = shown === "hi" && hasHindi;
+  const articleLanguage: Locale = english ? "en" : hindi ? "hi" : "kn";
   const p = english
     ? {
         ...original,
         title_kn: original.title_en,
         summary_kn: original.summary_en || "",
+        body_html: original.body_en || "",
         seo_title: original.title_en,
         seo_description: original.summary_en || "",
       }
@@ -56,24 +64,63 @@ export async function articleMetadata(slug: string, language?: string) {
           ...original,
           title_kn: original.title_hi!,
           summary_kn: original.summary_hi || "",
+          body_html: original.body_hi || "",
           seo_title: original.title_hi,
           seo_description: original.summary_hi || "",
         }
       : original;
+  const description = articleDescription(
+    p.seo_description,
+    p.summary_kn,
+    p.body_html,
+    p.title_kn,
+  );
+  const section = categories.find((category) =>
+    p.category_slugs.includes(category.slug),
+  );
+  const sectionName = section
+    ? pickText(articleLanguage, section.name_kn, section.name_en, section.name_hi)
+    : undefined;
+  const tagNames = (p.tags || []).map((tag) =>
+    pickText(articleLanguage, tag.name_kn, tag.name_en, tag.name_hi),
+  );
+  const keywords = articleKeywords([
+    p.seo_keywords,
+    tagNames.join(", "),
+    sectionName,
+    p.event_place,
+  ]);
+  const author = authors.find((row) => row.id === p.public_author_id);
+  const authorName = author
+    ? pickText(articleLanguage, author.name_kn, author.name_en, author.name_hi)
+    : brandName(locale);
+  const canonicalPath =
+    postHref(p) + (language === "en" ? "?lang=en" : language === "hi" ? "?lang=hi" : "");
+  const pageUrl = new URL(canonicalPath, site.url).href;
+  const image = new URL(p.thumbnail_url, site.url).href;
+  const modified = p.meaningful_update_at || p.published_at;
   return {
     robots: {
       index: !p.is_seed,
       follow: !p.is_seed,
+      noarchive: true,
       "max-image-preview": "large" as const,
+      "max-snippet": -1,
+      "max-video-preview": -1,
     },
     title: p.seo_title || p.title_kn,
-    description: p.seo_description || p.summary_kn,
+    description,
+    keywords: keywords.length ? keywords : undefined,
+    authors: [
+      author
+        ? { name: authorName, url: site.url + "/author/" + author.slug }
+        : { name: authorName, url: site.url },
+    ],
+    category: sectionName,
     alternates: {
       // Keyed off the query parameter, not the reader's cookie, so one URL
       // always reports the same canonical to crawlers.
-      canonical:
-        postHref(p) +
-        (language === "en" ? "?lang=en" : language === "hi" ? "?lang=hi" : ""),
+      canonical: canonicalPath,
       languages: {
         kn: postHref(p),
         ...(hasEnglish ? { en: postHref(p) + "?lang=en" } : {}),
@@ -82,16 +129,24 @@ export async function articleMetadata(slug: string, language?: string) {
       },
     },
     openGraph: {
-      title: p.title_kn,
-      description: p.summary_kn,
+      title: p.seo_title || p.title_kn,
+      description,
       type: "article" as const,
-      images: [new URL(p.thumbnail_url, site.url).href],
+      url: pageUrl,
+      siteName: brandName(locale),
+      locale: { kn: "kn_IN", en: "en_IN", hi: "hi_IN" }[articleLanguage],
+      publishedTime: p.published_at,
+      modifiedTime: modified,
+      authors: [author ? site.url + "/author/" + author.slug : site.url],
+      section: sectionName,
+      tags: tagNames,
+      images: [{ url: image, alt: p.title_kn }],
     },
     twitter: {
       card: "summary_large_image" as const,
-      title: p.title_kn,
-      description: p.summary_kn,
-      images: [new URL(p.thumbnail_url, site.url).href],
+      title: p.seo_title || p.title_kn,
+      description,
+      images: [image],
     },
   };
 }
@@ -129,31 +184,42 @@ export async function ArticlePage({
         }
       : original;
   const articleLanguage = english ? "en" : hindi ? "hi" : "kn";
-  const eventPlace = localizePlace(
-    await getPlaceNames(),
-    locale,
-    p.event_place,
-  );
+  const copyrightYear = new Date(p.published_at).getFullYear();
+  const copyrightNotice = `© ${copyrightYear} ${brandName(locale)}. ${kn.rights}`;
+  const [
+    placeNames,
+    commentsSetting,
+    authors,
+    correctionRows,
+    episodes,
+    seriesRows,
+    tagLinks,
+    allPosts,
+    categories,
+  ] = await Promise.all([
+    getPlaceNames(),
+    getSetting("comments"),
+    getV4Rows("authors"),
+    getV4Rows("corrections_log"),
+    getV4Rows("series_items"),
+    getV4Rows("series"),
+    getV4Rows("post_tags"),
+    getPosts(),
+    getCategories().catch(() => []),
+  ]);
+  const eventPlace = localizePlace(placeNames, locale, p.event_place);
   const commentSettings = commentSettingsSchema
     .catch(defaultComments)
-    .parse((await getSetting("comments")) || defaultComments);
-  const author = (await getV4Rows("authors")).find(
-    (a) => a.id === p.public_author_id,
-  );
-  const corrections = (await getV4Rows("corrections_log")).filter(
-    (row) => row.post_id === p.id,
-  );
-  const episodes = await getV4Rows("series_items");
+    .parse(commentsSetting || defaultComments);
+  const author = authors.find((a) => a.id === p.public_author_id);
+  const corrections = correctionRows.filter((row) => row.post_id === p.id);
   const inSeries = episodes.find((row) => row.post_id === p.id);
   const series = inSeries
-    ? (await getV4Rows("series")).find((row) => row.id === inSeries.series_id)
+    ? seriesRows.find((row) => row.id === inSeries.series_id)
     : null;
   const awaitPostTagIds = new Set(
-    (await getV4Rows("post_tags"))
-      .filter((link) => link.post_id === p.id)
-      .map((link) => link.tag_id),
+    tagLinks.filter((link) => link.post_id === p.id).map((link) => link.tag_id),
   );
-  const allPosts = await getPosts();
   const related = allPosts
     .filter(
       (x) =>
@@ -161,6 +227,27 @@ export async function ArticlePage({
         x.category_slugs.some((c) => p.category_slugs.includes(c)),
     )
     .slice(0, 4);
+  const section = categories.find((category) =>
+    p.category_slugs.includes(category.slug),
+  );
+  const sectionName = section
+    ? pickText(articleLanguage, section.name_kn, section.name_en, section.name_hi)
+    : undefined;
+  const schemaDescription = articleDescription(
+    p.seo_description,
+    p.summary_kn,
+    p.body_html,
+    p.title_kn,
+    300,
+  );
+  const schemaKeywords = articleKeywords([
+    original.seo_keywords,
+    (p.tags || [])
+      .map((tag) => pickText(articleLanguage, tag.name_kn, tag.name_en, tag.name_hi))
+      .join(", "),
+    sectionName,
+    p.event_place,
+  ]);
   return (
     <div className="container page-shell">
       <ArticlePulse postId={p.id} demo={p.is_seed} />
@@ -304,6 +391,20 @@ export async function ArticlePage({
             hideAds={p.hide_ads}
             sponsored={!!p.sponsor_name}
           />
+          {p.type === "article" && p.video_url && (
+            <div className="article-video">
+              <LiteVideoEmbed
+                postId={p.id}
+                keyPoints={p.key_points}
+                url={p.video_url}
+                thumbnail={p.thumbnail_url}
+                title={p.title_kn}
+              />
+            </div>
+          )}
+          <p className="article-copyright">
+            © {copyrightYear} {brandName(locale)}. {kn.articleCopyright}
+          </p>
           <AdSlot disabled={p.hide_ads} placement={`${p.type}-after-content`} />
           <div className="category-chips">
             {(await getV4Rows("tags"))
@@ -374,17 +475,7 @@ export async function ArticlePage({
             </dl>
           </div>
         </article>
-        <aside>
-          <AdSlot
-            disabled={p.hide_ads}
-            placement={`${p.type}-sidebar`}
-            format="rectangle"
-          />
-          <SectionTitle>{kn.related}</SectionTitle>
-          {related.map((p) => (
-            <NewsCard key={p.id} post={p} compact />
-          ))}
-        </aside>
+        <ArticleSidebar post={p} posts={allPosts} />
       </div>
       <section className="section">
         <SectionTitle>{kn.related}</SectionTitle>
@@ -404,13 +495,8 @@ export async function ArticlePage({
               "@type": p.type === "article" ? "NewsArticle" : "VideoObject",
               ...(p.type !== "article"
                 ? {
-                    name: pickText(locale, p.title_kn, p.title_en, p.title_hi),
-                    description: pickText(
-                      locale,
-                      p.summary_kn,
-                      p.summary_en,
-                      p.summary_hi,
-                    ),
+                    name: p.title_kn,
+                    description: schemaDescription,
                     uploadDate: p.published_at,
                     thumbnailUrl: new URL(p.thumbnail_url, site.url).href,
                     ...(p.video_url ? { contentUrl: p.video_url } : {}),
@@ -419,10 +505,26 @@ export async function ArticlePage({
                       : {}),
                   }
                 : {}),
-              headline: pickText(locale, p.title_kn, p.title_en, p.title_hi),
+              headline: p.title_kn,
+              description: schemaDescription,
+              keywords: schemaKeywords.join(", ") || undefined,
+              articleSection: sectionName,
               inLanguage: articleLanguage,
+              url:
+                site.url +
+                postHref(p) +
+                (english ? "?lang=en" : hindi ? "?lang=hi" : ""),
               datePublished: p.published_at,
               dateModified: p.meaningful_update_at || p.published_at,
+              speakable: {
+                "@type": "SpeakableSpecification",
+                cssSelector: p.summary_kn ? ["h1", ".article-summary"] : ["h1"],
+              },
+              isPartOf: {
+                "@type": "WebSite",
+                name: brandName(locale),
+                url: site.url,
+              },
               mainEntityOfPage:
                 site.url +
                 postHref(p) +
@@ -432,7 +534,23 @@ export async function ArticlePage({
                 name: brandName(locale),
                 logo: { "@type": "ImageObject", url: site.url + site.logo },
               },
-              image: new URL(p.thumbnail_url, site.url).href,
+              image: {
+                "@type": "ImageObject",
+                url: new URL(p.thumbnail_url, site.url).href,
+                creditText: p.image_credit || brandName(locale),
+                copyrightNotice,
+                license: site.url + "/terms",
+                acquireLicensePage: site.url + "/contact",
+              },
+              copyrightHolder: {
+                "@type": "Organization",
+                name: brandName(locale),
+                url: site.url,
+              },
+              copyrightYear,
+              copyrightNotice,
+              license: site.url + "/terms",
+              isAccessibleForFree: true,
               author: author
                 ? {
                     "@type": "Person",

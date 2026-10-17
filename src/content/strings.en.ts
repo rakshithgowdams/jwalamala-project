@@ -116,6 +116,11 @@ export const en = {
   monthEvents: "This month’s events",
   footerText: "News, culture and community from Karnataka’s Jain society.",
   rights: "All rights reserved.",
+  protectedContent:
+    "This content is protected by copyright and cannot be copied.",
+  articleCopyright:
+    "All rights to this article and its images are reserved. Copying, republishing or redistributing it without written permission is prohibited.",
+  printBlocked: "Printing this page is not permitted.",
   madeBy: "Created by",
   notFound: "Page not found",
   notFoundText: "The page you are looking for is unavailable.",
@@ -624,6 +629,18 @@ export const v4en = {
   audioProgress: "Audio progress",
   audioSpeed: "Playback speed",
   next6Hours: "next 6 hours",
+  localShops: "Local shops",
+  districtNews: "District-wise news",
+  districtNewsIntro:
+    "News, reports and programmes from every district of Karnataka, in one place.",
+  allDistricts: "All districts",
+  findDistrict: "Find a district",
+  noDistrictMatch: "No district matches that name.",
+  districtLatest: "Latest from the district",
+  districtAllNews: "All news from this district",
+  noDistrictNews: "No news has been published from this district yet.",
+  districtTowns: "Towns in this district",
+  otherDistricts: "Other districts",
 };
 export const monthsEn = [
   "January",

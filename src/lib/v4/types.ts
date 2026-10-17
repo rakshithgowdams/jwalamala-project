@@ -19,6 +19,12 @@ export type Place = {
   lng: number | null;
   show_in_weather: boolean;
   is_district?: boolean;
+  sort_order?: number;
+  show_in_district_news?: boolean;
+  cover_url?: string | null;
+  description_kn?: string;
+  description_en?: string;
+  description_hi?: string;
 };
 export type Author = {
   id: string;

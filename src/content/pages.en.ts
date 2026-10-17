@@ -31,18 +31,14 @@ export const pagesEn: Record<string, { title: string; paragraphs: string[] }> =
         en.sampleNote,
       ],
     },
-    advertise: {
-      title: en.advertise,
-      paragraphs: [
-        "To carry news of your organisation or event to our community, send us the details through the contact page. Advertisements are published with clear labelling. Rates and the duration of publication can be settled with the editorial team.",
-      ],
-    },
     privacy: {
       title: en.privacy,
       paragraphs: [
         "This is a pre-launch sample edition. The organisation’s contact details and the final privacy policy will be added before the service opens to the public.",
         "Once the account service is live, the information needed for signing in and for saved stories will be used. Notifications are switched on only after you give permission. Playing a video creates a connection to the relevant external service.",
         "Limited information may be stored on this device for the install prompt and for offline reading. You can clear it through your browser settings.",
+        "Advertising: third-party vendors, including Google, use cookies to serve ads based on your prior visits to this and other websites. You can opt out of personalised advertising at adssettings.google.com; see policies.google.com/technologies/ads for details.",
+        "Views and clicks on our direct ads are counted against a hashed device identifier only; your name and contact details are never shared with advertisers. Contact details sent with an advertising application are used only for review and billing.",
       ],
     },
     terms: {

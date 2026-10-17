@@ -1,4 +1,3 @@
-import { LocationFilter } from "@/components/search/LocationFilter";
 import { getListing } from "@/lib/queries/listing";
 import { HomeExtras } from "@/components/discovery/HomeExtras";
 import { CategoryScrollShowcase } from "@/components/discovery/CategoryScrollShowcase";
@@ -13,47 +12,50 @@ import { AdSlot } from "@/components/ads/AdSlot";
 import Link from "next/link";
 import { ArrowRight, Send, CalendarDays, TrendingUp } from "lucide-react";
 
-import { site } from "@/config/site";
 import { getPosts, getEvents, getCategories } from "@/lib/queries/content";
 import { HeroStory, NewsCard } from "@/components/news/NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import {
   SectionTitle,
-  SampleNotice,
   EmptyState,
 } from "@/components/ui/Primitives";
 import { EventsTicker } from "@/components/events/EventsTicker";
+import { BusinessAdShelf } from "@/components/ads/BusinessAds";
+import { getBusinessAds } from "@/lib/ads/business-server";
+import { pickBusinessAds } from "@/lib/ads/business";
+import { toCardPost } from "@/lib/utils/card-post";
 export default async function Home() {
   const { kn, locale } = await getUiStrings();
 
-  let posts: Awaited<ReturnType<typeof getPosts>> = [];
-  let events: Awaited<ReturnType<typeof getEvents>> = [];
-  let categoriesList: Awaited<ReturnType<typeof getCategories>> = [];
-  try {
-    [posts, events, categoriesList] = await Promise.all([
-      getPosts(),
-      getEvents(),
-      getCategories(),
-    ]);
-  } catch {}
-  let trending: Awaited<ReturnType<typeof getListing>>["rows"] = [];
-  try {
-    trending = (await getListing({ sort: "most_viewed" }, "1", 4)).rows;
-  } catch {}
-  const config = homeSchema
-    .catch(defaultHome)
-    .parse((await getSetting("homepage")) || defaultHome);
+  const [allPosts, events, categoriesList, trending, homeSetting, shopRows] = await Promise.all([
+    getPosts().catch(() => []),
+    getEvents().catch(() => []),
+    getCategories().catch(() => []),
+    getListing({ sort: "most_viewed" }, "1", 4)
+      .then((result) => result.rows)
+      .catch(() => []),
+    getSetting("homepage").catch(() => null),
+    getBusinessAds().catch(() => []),
+  ]);
+  const config = homeSchema.catch(defaultHome).parse(homeSetting || defaultHome);
+  const shops = pickBusinessAds(shopRows, { count: 8 });
+  const posts = allPosts.map(toCardPost);
+  const showcaseIds = new Set<string>();
+  let showcaseRows = 0;
+  for (const category of categoriesList) {
+    if (showcaseRows === 8) break;
+    const items = posts.filter((p) => p.category_slugs.includes(category.slug)).slice(0, 10);
+    if (items.length < 2) continue;
+    showcaseRows++;
+    for (const item of items) showcaseIds.add(item.id);
+  }
+  const showcasePosts = posts.filter((p) => showcaseIds.has(p.id));
   const lead =
     posts.find((p) => p.id === config.lead_id) ||
     posts.find((p) => p.is_featured) ||
     posts[0];
   return (
     <div className="container home-page">
-      {(site.demo || posts.some((post) => post.is_seed)) && <SampleNotice />}
-      <details className="location-disclosure">
-        <summary>{kn.newsNearYou}</summary>
-        <LocationFilter filters={{}} action="/news" />
-      </details>
       <AdSlot placement="home-top" />
       {config.sections
         .filter((s) => s.enabled)
@@ -103,12 +105,9 @@ export default async function Home() {
                                   .map((p) => (
                                     <NewsCard key={p.id} post={p} compact />
                                   ))}
-                                <AdSlot
-                                  placement="home-sidebar"
-                                  format="rectangle"
-                                />
                               </aside>
                             </div>
+                            <AdSlot placement="home-after-hero" format="wide" />
                           </>
                         ) : (
                           <EmptyState />
@@ -291,7 +290,8 @@ export default async function Home() {
             </Fragment>
           );
         })}
-      <CategoryScrollShowcase posts={posts} categories={categoriesList} />
+      <CategoryScrollShowcase posts={showcasePosts} categories={categoriesList} />
+      <BusinessAdShelf ads={shops} />
       <HomeExtras config={config} />
       <HeritageStrip />
       <AdSlot placement="home-bottom" />

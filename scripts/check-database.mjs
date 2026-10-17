@@ -18,7 +18,7 @@ alter table storage.objects enable row level security;
 grant usage on schema public,auth to anon,authenticated,service_role;
 grant execute on all functions in schema auth to anon,authenticated,service_role;
 `);
-if(process.argv.includes("--bundle")){current="release bundle";await db.exec(await readFile(new URL("../supabase/release/01-schema.sql",import.meta.url),"utf8"));await db.exec(await readFile(new URL("../supabase/release/02-categories.sql",import.meta.url),"utf8"));assert.equal(Number((await db.query("select count(*) n from public.categories where not is_seed")).rows[0].n),12);console.log("Applied release schema and 12 categories");}else{
+if(process.argv.includes("--bundle")){current="release bundle";await db.exec(await readFile(new URL("../supabase/release/01-schema.sql",import.meta.url),"utf8"));await db.exec(await readFile(new URL("../supabase/release/02-categories.sql",import.meta.url),"utf8"));const released=(await readFile(new URL("../supabase/release/02-categories.sql",import.meta.url),"utf8")).split(/\r?\n/).filter(l=>l.startsWith("insert into public.categories")).length;assert.equal(Number((await db.query("select count(*) n from public.categories where not is_seed")).rows[0].n),released);console.log("Applied release schema and "+released+" categories");}else{
 for(const file of await migrationFiles(new URL("../supabase/migrations/",import.meta.url))){
  current=file;await db.exec(await readFile(new URL("../supabase/migrations/"+file,import.meta.url),"utf8"));console.log("Applied",file);
 }

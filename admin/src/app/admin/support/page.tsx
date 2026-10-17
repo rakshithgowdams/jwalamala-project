@@ -1,0 +1,44 @@
+import { requirePermission } from "@/lib/v4/permissions";
+import { supportSchema, defaultSupport } from "@/lib/payments/schema";
+import { SupportSettings } from "@/components/admin/v4/SupportSettings";
+import { getUiStrings } from "@/lib/i18n/server";
+export default async function Page() {
+  const { db } = await requirePermission("settings.manage");
+  const { tr } = await getUiStrings();
+  const [config, payments] = await Promise.all([
+    db.from("site_settings").select("value").eq("key", "support").maybeSingle(),
+    db
+      .from("payments")
+      .select("id,amount,status,paid_at")
+      .order("paid_at", { ascending: false })
+      .limit(100),
+  ]);
+  return (
+    <>
+      <h1>
+        {tr({
+          en: "Support and membership",
+          kn: "ಬೆಂಬಲ ಮತ್ತು ಸದಸ್ಯತ್ವ",
+          hi: "समर्थन और सदस्यता",
+        })}
+      </h1>
+      <SupportSettings
+        initial={supportSchema
+          .catch(defaultSupport)
+          .parse(config.data?.value || defaultSupport)}
+      />
+      <h2>
+        {tr({
+          en: "Recent payments",
+          kn: "ಇತ್ತೀಚಿನ ಪಾವತಿಗಳು",
+          hi: "हाल के भुगतान",
+        })}
+      </h2>
+      {payments.data?.map((p) => (
+        <p key={p.id}>
+          {p.id} · ₹{(p.amount / 100).toFixed(2)} · {p.status}
+        </p>
+      ))}
+    </>
+  );
+}

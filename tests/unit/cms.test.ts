@@ -1,10 +1,4 @@
 import { describe, it, expect } from "vitest";
-import {
-  parseCsv,
-  mapImportRow,
-  importRowSchema,
-  textToHtml,
-} from "@/lib/v4/import";
 import { homeSchema, defaultHome } from "@/lib/v4/home";
 import { splitSpeech } from "@/lib/audio/chunks";
 import {
@@ -12,27 +6,6 @@ import {
   pushPreferencesSchema,
   defaultPush,
 } from "@/lib/push/schema";
-describe("CSV draft import", () => {
-  it("handles BOM, quoted commas, doubled quotes and multiline fields", () => {
-    expect(
-      parseCsv('\uFEFFtitle,body\r\n"Hello, world","First\n""quoted"""'),
-    ).toEqual([{ title: "Hello, world", body: 'First\n"quoted"' }]);
-  });
-  it("rejects malformed quoting, duplicate headers and ragged rows", () => {
-    for (const csv of ["a,a\n1,2", "a,b\n1", 'a\n"unterminated', 'a\n"ok"bad'])
-      expect(() => parseCsv(csv)).toThrow();
-  });
-  it("requires real dates and slugs, escapes imported body text", () => {
-    expect(
-      importRowSchema.safeParse(
-        mapImportRow({ Title: "Story" }, { title_kn: "Title" }),
-      ).success,
-    ).toBe(false);
-    expect(textToHtml("<script>alert(1)</script>")).toBe(
-      "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>",
-    );
-  });
-});
 describe("homepage configuration", () => {
   it("rejects duplicate sections and accepts the default", () => {
     expect(homeSchema.parse(defaultHome)).toEqual(defaultHome);

@@ -12,7 +12,16 @@ export const site = {
   hindiDescription:
     process.env.NEXT_PUBLIC_SITE_HINDI_DESCRIPTION ||
     "जैन समाज की आवाज़। समाचार, संस्कृति और समुदाय का विश्वास।",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+  // Absolute URLs reach readers through metadata, sitemaps, RSS and email, so a
+  // localhost fallback in production silently publishes unreachable links. The
+  // NODE_ENV check is inlined identically on both sides of the render, unlike a
+  // server-only Vercel variable, which would differ once a client component
+  // reads this. Set NEXT_PUBLIC_SITE_URL to override for a custom domain.
+  url:
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://jwalamala-project.vercel.app"
+      : "http://localhost:3000"),
   logo: process.env.NEXT_PUBLIC_SITE_LOGO || "/images/jwalamala-logo.jpg",
   locale: "kn_IN",
   timeZone: "Asia/Kolkata",

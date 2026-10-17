@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { pickText } from "@/lib/i18n/content";
 import { normalizeVideo } from "@/lib/utils/video";
+import { FacebookLogo, YouTubeLogo } from "./BrandIcons";
 import { loadYouTube, type YouTubePlayer } from "@/lib/v4/youtube-player";
 import {
   watchSchema,
@@ -164,6 +165,10 @@ export function LiteVideoEmbed({
             />
             <span className="play-circle">
               <Play size={30} fill="currentColor" />
+            </span>
+            <span className="video-provider-badge">
+              {provider === "facebook" ? <FacebookLogo size={16} /> : <YouTubeLogo size={14} />}
+              {provider === "facebook" ? "Facebook" : "YouTube"}
             </span>
           </button>
         )}

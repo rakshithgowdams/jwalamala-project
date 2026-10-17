@@ -10,22 +10,36 @@ import { ArrowUpRight, Search, UserRound, Radio } from "lucide-react";
 import { site } from "@/config/site";
 
 import { formatDate, isoToday } from "@/lib/utils/dates";
-import { FlameGarland } from "./FlameGarland";
+import { BrandRibbon } from "./FlameGarland";
 import { CategoryNav, ThemeToggle } from "./Navigation";
 import { ScrollHeader } from "./ScrollHeader";
 import { AccountLink } from "./AccountLink";
 import { getCategories } from "@/lib/queries/content";
 import { getTheme } from "@/lib/theme/server";
+import { getV4Rows } from "@/lib/v4/queries";
+import { districtName, listDistricts } from "@/lib/utils/districts";
 export async function Header() {
   const { kn, locale } = await getUiStrings();
   const brand = brandParts(locale);
+  // The ribbon runs from the mark's first "l" (ಲ / ल in the Indic spellings) to the end.
+  const ribbonAt = Math.max(0, brand.mark.search(/[lಲल]/i));
   const { preference } = await getTheme();
-  const categories = await getCategories();
+  const [categories, places] = await Promise.all([
+    getCategories(),
+    getV4Rows("places").catch(() => []),
+  ]);
+  const districts = listDistricts(places, locale).map((district) => ({
+    href: "/districts/" + district.slug,
+    label: districtName(locale, district),
+  }));
   return (
     <ScrollHeader>
       <div className="utility-bar">
         <div className="container utility-inner">
-          <span>{kn.community}</span>
+          <span className="utility-tagline">
+            {kn.community}
+            <span className="utility-about">{kn.footerText}</span>
+          </span>
           <div>
             <Link href="/about">{kn.about}</Link>
             <Link href="/contact">{kn.contact}</Link>
@@ -47,15 +61,16 @@ export async function Header() {
       <div className="container masthead">
         <Link href="/" className="brand" aria-label={brand.full}>
           <Image src={site.logo} alt="" width={92} height={92} priority />
-          <div>
+          <div className="brand-text">
             <div className="wordmark">
-              {brand.mark}
-              <span>{brand.suffix}</span>
+              {brand.mark.slice(0, ribbonAt)}
+              <span className="wordmark-tail">
+                {brand.mark.slice(ribbonAt)}
+                <span className="wordmark-suffix">{brand.suffix}</span>
+                <BrandRibbon />
+              </span>
             </div>
-            <div className="brand-tagline">
-              {kn.tagline}
-              <FlameGarland />
-            </div>
+            <div className="brand-tagline">{kn.tagline}</div>
           </div>
         </Link>
         <div className="masthead-right">
@@ -84,7 +99,7 @@ export async function Header() {
           </div>
         </div>
       </div>
-      <CategoryNav categories={categories} />
+      <CategoryNav categories={categories} districts={districts} />
       <Suspense
         fallback={
           <div

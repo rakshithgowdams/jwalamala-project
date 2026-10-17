@@ -86,7 +86,7 @@ export function PlacePicker({
       </button>
       <button
         type="button"
-        className="chip"
+        className="button button-outline"
         onClick={() => {
           try {
             const value = localStorage.getItem("jwalamala-place");

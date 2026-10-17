@@ -10,6 +10,7 @@ import {
   routeAllowsAds,
   type AdPick,
 } from "./schema";
+import { slotShape } from "./posters";
 import { site } from "@/config/site";
 export function adToken(payload: {
   id: string;
@@ -52,6 +53,7 @@ export async function pickAd(
   path: string,
   device: "mobile" | "desktop",
   session: string,
+  format: "banner" | "rectangle" | "wide" = "banner",
 ): Promise<AdPick> {
   if (!routeAllowsAds(path)) return { mode: "off" };
   const config = adSettingsSchema
@@ -114,7 +116,7 @@ export async function pickAd(
       .maybeSingle();
     if (!c || c.hide_ads) return { mode: "off" };
     categories = [c.id];
-  } else if (parts[0] === "place" && parts[1]) {
+  } else if ((parts[0] === "place" || parts[0] === "districts") && parts[1]) {
     const { data: p } = await db
       .from("places")
       .select("id")
@@ -152,6 +154,7 @@ export async function pickAd(
       category_ids: categories,
       place_id: place,
       device_type: device,
+      slot_shape: slotShape(slotKey, format),
     });
     const ad = Array.isArray(data) ? data[0] : data;
     if (!error && ad)
@@ -164,6 +167,8 @@ export async function pickAd(
           alt_kn: ad.alt_kn,
           alt_en: ad.alt_en,
           alt_hi: ad.alt_hi,
+          shape: ad.shape || "any",
+          linked: !!ad.target_url,
           token: adToken({
             id: ad.id,
             slot: slotKey,
