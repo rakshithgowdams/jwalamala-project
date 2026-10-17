@@ -296,7 +296,10 @@ function adminOnly(
   };
 }
 
-/** Moves an article into the recycle bin. It leaves the site but can be restored. */
+/**
+ * The recycle bin is the Archived status: the article leaves the site at once and
+ * stays in the database until an administrator deletes it from the bin.
+ */
 export async function trashPost(postId: unknown): Promise<{ ok?: true; error?: string }> {
   const [{ db, profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const id = z.uuid().safeParse(postId);
@@ -305,12 +308,20 @@ export async function trashPost(postId: unknown): Promise<{ ok?: true; error?: s
   if (denied) return denied;
   const { data, error } = await db
     .from("posts")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ status: "archived", is_featured: false, is_breaking: false })
     .eq("id", id.data)
-    .is("deleted_at", null)
+    .neq("status", "archived")
     .select("id");
   if (error || !data?.length) {
     if (error) console.error("[posts] recycle failed:", error.code, error.message);
+    if (error?.message.includes("locked"))
+      return {
+        error: tr({
+          en: "Another editor has this article open. Try again in a few minutes.",
+          kn: "ಈ ಲೇಖನವನ್ನು ಇನ್ನೊಬ್ಬ ಸಂಪಾದಕರು ತೆರೆದಿದ್ದಾರೆ. ಕೆಲವು ನಿಮಿಷಗಳ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+          hi: "यह लेख कोई और संपादक खोले हुए है। कुछ मिनट बाद फिर कोशिश करें।",
+        }),
+      };
     return { error: kn.unavailable };
   }
   revalidatePath("/admin/posts");
@@ -318,7 +329,7 @@ export async function trashPost(postId: unknown): Promise<{ ok?: true; error?: s
   return { ok: true };
 }
 
-/** Puts a recycled article back on the article list, with its previous status. */
+/** Puts a recycled article back on the article list as a draft, ready to republish. */
 export async function restorePost(postId: unknown): Promise<{ ok?: true; error?: string }> {
   const [{ db, profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const id = z.uuid().safeParse(postId);
@@ -327,9 +338,9 @@ export async function restorePost(postId: unknown): Promise<{ ok?: true; error?:
   if (denied) return denied;
   const { data, error } = await db
     .from("posts")
-    .update({ deleted_at: null })
+    .update({ status: "draft" })
     .eq("id", id.data)
-    .not("deleted_at", "is", null)
+    .eq("status", "archived")
     .select("id");
   if (error || !data?.length) {
     if (error) console.error("[posts] restore failed:", error.code, error.message);
@@ -347,8 +358,8 @@ export async function deletePost(postId: unknown): Promise<{ ok?: true; error?: 
   if (!id.success) return { error: kn.validation };
   const denied = adminOnly(profile, tr, kn);
   if (denied) return denied;
-  const { data: held } = await db.from("posts").select("id,deleted_at").eq("id", id.data).maybeSingle();
-  if (!held?.deleted_at)
+  const { data: held } = await db.from("posts").select("id,status").eq("id", id.data).maybeSingle();
+  if (held?.status !== "archived")
     return {
       error: tr({
         en: "Move the article to the recycle bin before deleting it permanently.",

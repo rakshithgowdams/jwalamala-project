@@ -85,44 +85,22 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
   else if (sort === "title") query = query.order("title_kn", { ascending: true });
   else if (sort === "published") query = query.order("published_at", { ascending: false, nullsFirst: false });
   else query = query.order("updated_at", { ascending: false });
-  query = query.is("deleted_at", null);
+  // Archived articles are the recycle bin, listed on their own page.
+  query = query.neq("status", "archived");
   if (filters.q)
     query = query.ilike(
       "title_kn",
       "%" + filters.q.slice(0, 200).replace(/[%_]/g, "") + "%",
     );
-  if (
-    ["draft", "published", "scheduled", "archived"].includes(
-      filters.status || "",
-    )
-  )
+  if (["draft", "published", "scheduled"].includes(filters.status || ""))
     query = query.eq("status", filters.status!);
   if (["article", "video", "short"].includes(filters.type || ""))
     query = query.eq("type", filters.type!);
-  let {
+  const {
     data: posts,
     error,
     count,
   } = await query.range((page - 1) * 30, page * 30 - 1);
-  if (error && /deleted_at/i.test(error.message)) {
-    let fallback = db
-      .from("posts")
-      .select("id,title_kn,slug,status,type,updated_at,published_at,thumbnail_url,video_url", { count: "exact" });
-    if (sort === "oldest") fallback = fallback.order("updated_at", { ascending: true });
-    else if (sort === "title") fallback = fallback.order("title_kn", { ascending: true });
-    else if (sort === "published") fallback = fallback.order("published_at", { ascending: false, nullsFirst: false });
-    else fallback = fallback.order("updated_at", { ascending: false });
-    if (filters.q)
-      fallback = fallback.ilike("title_kn", "%" + filters.q.slice(0, 200).replace(/[%_]/g, "") + "%");
-    if (["draft", "published", "scheduled", "archived"].includes(filters.status || ""))
-      fallback = fallback.eq("status", filters.status!);
-    if (["article", "video", "short"].includes(filters.type || ""))
-      fallback = fallback.eq("type", filters.type!);
-    const again = await fallback.range((page - 1) * 30, page * 30 - 1);
-    posts = again.data;
-    error = again.error;
-    count = again.count;
-  }
   if (error) throw error;
   const updatedOn = new Intl.DateTimeFormat("en-IN", {
     day: "numeric",

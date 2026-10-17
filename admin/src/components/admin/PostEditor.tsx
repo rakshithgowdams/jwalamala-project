@@ -864,12 +864,12 @@ export function PostEditor({
                     {tr({ en: "View on site", kn: "ಸೈಟ್‌ನಲ್ಲಿ ನೋಡಿ", hi: "साइट पर देखें" })}
                   </a>
                 )}
-                {post.deleted_at ? <RestorePostButton postId={post.id} title={post.title_kn} /> : null}
+                {post.status === "archived" ? <RestorePostButton postId={post.id} title={post.title_kn} /> : null}
                 {canDelete && (
                   <DeletePostButton
                     postId={post.id}
                     title={post.title_kn}
-                    mode={post.deleted_at ? "forever" : "bin"}
+                    mode={post.status === "archived" ? "forever" : "bin"}
                     afterDelete="bin"
                   />
                 )}

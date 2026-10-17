@@ -1100,6 +1100,23 @@
   gap: 10px;
   margin-top: 18px;
 }
+.delete-dialog-actions .button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.delete-dialog-actions .button-danger {
+  border: 1px solid #c62828;
+  background: #c62828;
+  color: #fff;
+}
+.delete-dialog-actions .button-danger:hover:not(:disabled) {
+  border-color: #a51d1d;
+  background: #a51d1d;
+}
 .admin-main .recycle-note {
   margin: -8px 0 18px;
   color: var(--muted);

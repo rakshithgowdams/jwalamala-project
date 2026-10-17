@@ -52,22 +52,17 @@ const loadPosts = unstable_cache(
   async (): Promise<Post[]> => {
     const db = publicDb();
     if (!db) return [];
-    const run = (columns: string, hideDeleted: boolean) => {
-      let query = db
+    const run = (columns: string) =>
+      db
         .from("posts")
         .select(columns)
         .eq("status", "published")
         .lte("published_at", publishedCutoff())
         .order("published_at", { ascending: false })
         .limit(80);
-      if (hideDeleted) query = query.is("deleted_at", null);
-      return query;
-    };
-    // The recycle-bin column and the shorter column list are newer than some
-    // databases. A failed read must not take the whole page down.
-    let result = await run(listColumns, true);
-    if (result.error) result = await run(listColumns, false);
-    if (result.error) result = await run(postColumns, false);
+    // A column a pending migration has not added must not take the page down.
+    let result = await run(listColumns);
+    if (result.error) result = await run(postColumns);
     if (result.error || !result.data) return [];
     return mapPostList(result.data as Record<string, unknown>[]);
   },
@@ -122,18 +117,13 @@ const loadPost = unstable_cache(
   async (slug: string) => {
     const db = publicDb();
     if (!db) return null;
-    const run = (hideDeleted: boolean) => {
-      let query = db
-        .from("posts")
-        .select(postColumns)
-        .eq("slug", slug)
-        .eq("status", "published")
-        .lte("published_at", publishedCutoff());
-      if (hideDeleted) query = query.is("deleted_at", null);
-      return query.maybeSingle();
-    };
-    let result = await run(true);
-    if (result.error) result = await run(false);
+    const result = await db
+      .from("posts")
+      .select(postColumns)
+      .eq("slug", slug)
+      .eq("status", "published")
+      .lte("published_at", publishedCutoff())
+      .maybeSingle();
     if (result.error || !result.data) return null;
     const data = result.data;
     return {

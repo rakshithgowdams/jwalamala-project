@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 
-const statuses = ["draft", "scheduled", "published", "archived"] as const;
+const statuses = ["draft", "scheduled", "published"] as const;
 const types = ["article", "video", "short"] as const;
 const sorts = ["updated", "oldest", "published", "title"] as const;
 
@@ -59,7 +59,6 @@ export function PostFilters({
     draft: tr({ en: "Draft", kn: "ಕರಡು", hi: "ड्राफ़्ट" }),
     scheduled: tr({ en: "Scheduled", kn: "ನಿಗದಿತ", hi: "निर्धारित" }),
     published: tr({ en: "Published", kn: "ಪ್ರಕಟಿತ", hi: "प्रकाशित" }),
-    archived: tr({ en: "Archived", kn: "ಸಂಗ್ರಹಿತ", hi: "संग्रहीत" }),
   };
   const typeLabel = {
     article: tr({ en: "Article", kn: "ಲೇಖನ", hi: "लेख" }),

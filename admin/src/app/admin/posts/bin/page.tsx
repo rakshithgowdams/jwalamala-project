@@ -19,12 +19,11 @@ export default async function RecycleBin() {
   const canDelete = profile.role === "admin";
   const { data: posts, error } = await db
     .from("posts")
-    .select("id,title_kn,status,type,deleted_at,thumbnail_url,video_url")
-    .not("deleted_at", "is", null)
-    .order("deleted_at", { ascending: false })
+    .select("id,title_kn,status,type,updated_at,thumbnail_url,video_url")
+    .eq("status", "archived")
+    .order("updated_at", { ascending: false })
     .limit(100);
-  const missingBin = !!error && /deleted_at/i.test(error.message);
-  if (error && !missingBin) throw error;
+  if (error) throw error;
   const removedOn = new Intl.DateTimeFormat("en-IN", {
     day: "numeric",
     month: "short",
@@ -42,9 +41,9 @@ export default async function RecycleBin() {
       </div>
       <p className="recycle-note">
         {tr({
-          en: "Articles here are off the site. Restore puts one back. Delete asks before it is removed forever.",
-          kn: "ಇಲ್ಲಿರುವ ಲೇಖನಗಳು ಸೈಟ್‌ನಲ್ಲಿ ಕಾಣಿಸುವುದಿಲ್ಲ. ಮರಳಿಸಿ ಎಂದರೆ ಮತ್ತೆ ಪಟ್ಟಿಗೆ ಬರುತ್ತದೆ. ಅಳಿಸಿ ಎಂದರೆ ಶಾಶ್ವತವಾಗಿ ತೆಗೆಯುವ ಮೊದಲು ಕೇಳುತ್ತದೆ.",
-          hi: "यहाँ के लेख साइट पर नहीं दिखते। वापस लाएँ उन्हें सूची में लौटाता है। हटाएँ हमेशा के लिए मिटाने से पहले पूछता है।",
+          en: "Articles here are off the site. Restore puts one back on the article list as a draft. Delete asks before it is removed forever.",
+          kn: "ಇಲ್ಲಿರುವ ಲೇಖನಗಳು ಸೈಟ್‌ನಲ್ಲಿ ಕಾಣಿಸುವುದಿಲ್ಲ. ಮರಳಿಸಿ ಎಂದರೆ ಕರಡು ಆಗಿ ಲೇಖನ ಪಟ್ಟಿಗೆ ಬರುತ್ತದೆ. ಅಳಿಸಿ ಎಂದರೆ ಶಾಶ್ವತವಾಗಿ ತೆಗೆಯುವ ಮೊದಲು ಕೇಳುತ್ತದೆ.",
+          hi: "यहाँ के लेख साइट पर नहीं दिखते। वापस लाएँ उन्हें ड्राफ़्ट के रूप में लेख सूची में लौटाता है। हटाएँ हमेशा के लिए मिटाने से पहले पूछता है।",
         })}
       </p>
       <div className="post-card-list">
@@ -52,9 +51,9 @@ export default async function RecycleBin() {
           <article key={post.id} className="post-card is-archived">
             <div className="post-card-thumb">
               <PostThumb src={cardThumbnail(post.thumbnail_url, post.video_url)} eager={index < 6} />
-              <time className="post-card-updated" dateTime={post.deleted_at || undefined}>
+              <time className="post-card-updated" dateTime={post.updated_at}>
                 {tr({ en: "Removed", kn: "ತೆಗೆದದ್ದು", hi: "हटाया गया" })}{" "}
-                {post.deleted_at ? removedOn.format(new Date(post.deleted_at)) : ""}
+                {removedOn.format(new Date(post.updated_at))}
               </time>
             </div>
             <div className="post-card-body">
