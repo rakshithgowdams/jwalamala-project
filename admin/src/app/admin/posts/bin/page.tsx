@@ -23,7 +23,8 @@ export default async function RecycleBin() {
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false })
     .limit(100);
-  if (error) throw error;
+  const missingBin = !!error && /deleted_at/i.test(error.message);
+  if (error && !missingBin) throw error;
   const removedOn = new Intl.DateTimeFormat("en-IN", {
     day: "numeric",
     month: "short",

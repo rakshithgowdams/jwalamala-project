@@ -23,13 +23,13 @@ const loadV4Table = unstable_cache(
           .select("*")
           .order("id")
           .range(offset, offset + 499);
-        if (error) throw new Error("Unable to load places");
+        if (error) return rows;
         rows.push(...((data || []) as DataTables[typeof table][]));
         if (!data || data.length < 500) return rows;
       }
     }
     const { data, error } = await db.from(table).select("*").limit(500);
-    if (error) throw new Error("Unable to load " + table);
+    if (error) return [];
     return (data || []) as DataTables[typeof table][];
   },
   ["v4-table"],

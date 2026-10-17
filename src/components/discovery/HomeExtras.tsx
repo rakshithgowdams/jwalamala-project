@@ -25,6 +25,7 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
     .slice(0, 3);
   const anniversaries = posts.filter(
     (p) =>
+      !!p.event_date &&
       p.event_date.slice(5) === today.slice(5) &&
       p.event_date.slice(0, 4) < today.slice(0, 4),
   );

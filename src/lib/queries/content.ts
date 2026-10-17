@@ -34,30 +34,42 @@ function publicDb() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+function mapPostList(rows: Record<string, unknown>[]): Post[] {
+  return rows.map((p) => ({
+    ...p,
+    tags: (
+      (p.post_tags as {
+        tags: { slug: string; name_kn: string; name_hi?: string } | null;
+      }[]) || []
+    ).flatMap((link) => (link.tags ? [link.tags] : [])),
+    category_slugs: (
+      (p.post_categories as { categories: { slug: string } | null }[]) || []
+    ).flatMap((c) => (c.categories ? [c.categories.slug] : [])),
+  })) as Post[];
+}
+
 const loadPosts = unstable_cache(
   async (): Promise<Post[]> => {
     const db = publicDb();
     if (!db) return [];
-    const { data, error } = await db
-      .from("posts")
-      .select(listColumns)
-      .eq("status", "published")
-      .is("deleted_at", null)
-      .lte("published_at", publishedCutoff())
-      .order("published_at", { ascending: false })
-      .limit(80);
-    if (error) throw error;
-    return (data || []).map((p) => ({
-      ...p,
-      tags: (
-        (p.post_tags as {
-          tags: { slug: string; name_kn: string; name_hi?: string } | null;
-        }[]) || []
-      ).flatMap((link) => (link.tags ? [link.tags] : [])),
-      category_slugs: (
-        p.post_categories as { categories: { slug: string } | null }[]
-      ).flatMap((c) => (c.categories ? [c.categories.slug] : [])),
-    })) as Post[];
+    const run = (columns: string, hideDeleted: boolean) => {
+      let query = db
+        .from("posts")
+        .select(columns)
+        .eq("status", "published")
+        .lte("published_at", publishedCutoff())
+        .order("published_at", { ascending: false })
+        .limit(80);
+      if (hideDeleted) query = query.is("deleted_at", null);
+      return query;
+    };
+    // The recycle-bin column and the shorter column list are newer than some
+    // databases. A failed read must not take the whole page down.
+    let result = await run(listColumns, true);
+    if (result.error) result = await run(listColumns, false);
+    if (result.error) result = await run(postColumns, false);
+    if (result.error || !result.data) return [];
+    return mapPostList(result.data as Record<string, unknown>[]);
   },
   ["public-posts"],
   { revalidate: 60, tags: ["public-content"] },
@@ -110,16 +122,20 @@ const loadPost = unstable_cache(
   async (slug: string) => {
     const db = publicDb();
     if (!db) return null;
-    const { data, error } = await db
-      .from("posts")
-      .select(postColumns)
-      .eq("slug", slug)
-      .eq("status", "published")
-      .is("deleted_at", null)
-      .lte("published_at", publishedCutoff())
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return null;
+    const run = (hideDeleted: boolean) => {
+      let query = db
+        .from("posts")
+        .select(postColumns)
+        .eq("slug", slug)
+        .eq("status", "published")
+        .lte("published_at", publishedCutoff());
+      if (hideDeleted) query = query.is("deleted_at", null);
+      return query.maybeSingle();
+    };
+    let result = await run(true);
+    if (result.error) result = await run(false);
+    if (result.error || !result.data) return null;
+    const data = result.data;
     return {
       ...data,
       tags: (
