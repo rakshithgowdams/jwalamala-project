@@ -128,6 +128,7 @@ export function AdminNav() {
               <Link
                 href={"/admin" + (path ? "/" + path : "")}
                 key={path}
+                prefetch={false}
                 aria-current={isCurrent(path) ? "page" : undefined}
                 onClick={() => setOpen(false)}
               >

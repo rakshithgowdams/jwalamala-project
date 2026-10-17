@@ -59,7 +59,7 @@ export default async function RecycleBin() {
             </div>
             <div className="post-card-body">
               <h2>
-                <Link href={"/admin/posts/" + post.id}>{post.title_kn}</Link>
+                <Link href={"/admin/posts/" + post.id} prefetch={false}>{post.title_kn}</Link>
               </h2>
               {canDelete ? (
                 <div className="post-actions">

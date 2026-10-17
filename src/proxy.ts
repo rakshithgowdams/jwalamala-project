@@ -4,6 +4,27 @@ import { localPath } from "@/lib/v4/redirects";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { loginPath } from "@/lib/auth/paths";
+
+/** Redirect rules change rarely; keep one copy per server instance for five minutes. */
+let redirectRules: { at: number; rules: Map<string, string> } | null = null;
+async function loadRedirects(url: string, key: string) {
+  if (redirectRules && Date.now() - redirectRules.at < 300_000) return redirectRules.rules;
+  const rules = new Map<string, string>();
+  try {
+    const response = await supabaseFetch(
+      `${url}/rest/v1/redirects?select=old_path,new_path&limit=5000`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (response.ok)
+      for (const row of (await response.json()) as { old_path: string; new_path: string }[])
+        rules.set(row.old_path, row.new_path);
+  } catch {
+    if (redirectRules) return redirectRules.rules;
+  }
+  redirectRules = { at: Date.now(), rules };
+  return rules;
+}
+
 export async function proxy(request: NextRequest) {
   const strict = process.env.ADS_STRICT_CSP === "true";
   const nonce = strict
@@ -49,27 +70,32 @@ export async function proxy(request: NextRequest) {
     return finish(response);
   }
   try {
-    const db = createServerClient(url, key, {
-      global: { fetch: supabaseFetch },
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll(values) {
-          values.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response = nextResponse();
-          values.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+    // Readers without a sign-in cookie have no session to refresh.
+    const signedIn = request.cookies.getAll().some((c) => /^sb-.+-auth-token/.test(c.name));
+    if (signedIn || restricted) {
+      const db = createServerClient(url, key, {
+        global: { fetch: supabaseFetch },
+        cookies: {
+          getAll: () => request.cookies.getAll(),
+          setAll(values) {
+            values.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
+            );
+            response = nextResponse();
+            values.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options),
+            );
+          },
         },
-      },
-    });
-    const {
-      data: { user },
-    } = await db.auth.getUser();
-    if (restricted && !user) {
-      return toLogin();
+      });
+      const {
+        data: { user },
+      } = await db.auth.getUser();
+      if (restricted && !user) {
+        return toLogin();
+      }
     }
+    const rules = await loadRedirects(url, key);
     if (path === "/") {
       const q = request.nextUrl.searchParams;
       let target: string | null = null;
@@ -86,28 +112,15 @@ export async function proxy(request: NextRequest) {
       } else if (q.has("p") || q.has("cat") || q.has("page_id")) {
         const param = q.has("p") ? "p" : q.has("cat") ? "cat" : "page_id";
         const old = "/?" + param + "=" + q.get(param);
-        const { data } = await db
-          .from("redirects")
-          .select("new_path")
-          .eq("old_path", old)
-          .maybeSingle();
-        target = data?.new_path || null;
+        target = rules.get(old) || null;
       }
       if (target?.startsWith("/") && !target.startsWith("//"))
         return finish(NextResponse.redirect(new URL(target, request.url), 301));
     }
     if (!restricted && !/^\/(api|auth|review)(\/|$)/.test(path)) {
-      const { data: rule } = await db
-        .from("redirects")
-        .select("new_path")
-        .eq("old_path", path)
-        .maybeSingle();
-      if (
-        rule &&
-        rule.new_path !== path &&
-        localPath.safeParse(rule.new_path).success
-      )
-        return finish(NextResponse.redirect(new URL(rule.new_path, request.url), 301));
+      const next = rules.get(path);
+      if (next && next !== path && localPath.safeParse(next).success)
+        return finish(NextResponse.redirect(new URL(next, request.url), 301));
     }
   } catch {
     if (restricted) {

@@ -46,11 +46,8 @@ export async function proxy(request: NextRequest) {
       data: { user },
     } = await db.auth.getUser();
     if (!restricted) return finish(response);
+    // The admin layout checks admin.access; here only the session is refreshed.
     if (!user) return toLogin();
-    const { data } = await db.rpc("has_permission", {
-      requested: "admin.access",
-    });
-    if (data !== true) return toLogin("access");
   } catch {
     if (restricted) return toLogin();
   }

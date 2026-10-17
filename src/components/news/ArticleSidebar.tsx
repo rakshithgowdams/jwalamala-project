@@ -10,6 +10,7 @@ import { activeTrending, safePublicLink } from "@/lib/v4/utils";
 import { districtName, listDistricts } from "@/lib/utils/districts";
 import type { Post } from "@/lib/types";
 import { NewsCard } from "./NewsCard";
+import { toCardPost } from "@/lib/utils/card-post";
 
 function Widget({
   icon,
@@ -92,7 +93,7 @@ export async function ArticleSidebar({
       >
         <div className="sidebar-list">
           {latest.map((x) => (
-            <NewsCard key={x.id} post={x} compact />
+            <NewsCard key={x.id} post={toCardPost(x)} compact />
           ))}
         </div>
       </Widget>,
@@ -102,7 +103,7 @@ export async function ArticleSidebar({
       <Widget key="related" icon={<TrendingUp size={18} aria-hidden="true" />} title={say("ಇದನ್ನೂ ಓದಿ", "Read also", "यह भी पढ़ें")}>
         <div className="sidebar-list">
           {related.map((x) => (
-            <NewsCard key={x.id} post={x} compact />
+            <NewsCard key={x.id} post={toCardPost(x)} compact />
           ))}
         </div>
       </Widget>,

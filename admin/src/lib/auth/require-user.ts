@@ -20,6 +20,7 @@ export const requireStaff = cache(async () => {
     db.from("profiles").select("id,role,full_name").eq("id", user.id).single(),
     db.rpc("has_permission", { requested: "admin.access" }),
   ]);
-  if (!profile || allowed !== true) notFound();
+  if (!profile) notFound();
+  if (allowed !== true) redirect(loginPath("/admin") + "&error=access");
   return { db, user, profile };
 });

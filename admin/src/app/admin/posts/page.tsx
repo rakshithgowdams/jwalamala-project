@@ -156,10 +156,10 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
             </div>
             <div className="post-card-body">
             <h2>
-              <Link href={"/admin/posts/" + p.id}>{p.title_kn}</Link>
+              <Link href={"/admin/posts/" + p.id} prefetch={false}>{p.title_kn}</Link>
             </h2>
             <div className="post-actions">
-              <Link href={"/admin/posts/" + p.id} className="button button-outline is-compact">
+              <Link href={"/admin/posts/" + p.id} prefetch={false} className="button button-outline is-compact">
                 <Pencil size={15} aria-hidden="true" />
                 {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
               </Link>

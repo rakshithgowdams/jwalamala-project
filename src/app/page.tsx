@@ -23,10 +23,11 @@ import { EventsTicker } from "@/components/events/EventsTicker";
 import { BusinessAdShelf } from "@/components/ads/BusinessAds";
 import { getBusinessAds } from "@/lib/ads/business-server";
 import { pickBusinessAds } from "@/lib/ads/business";
+import { toCardPost } from "@/lib/utils/card-post";
 export default async function Home() {
   const { kn, locale } = await getUiStrings();
 
-  const [posts, events, categoriesList, trending, homeSetting, shopRows] = await Promise.all([
+  const [allPosts, events, categoriesList, trending, homeSetting, shopRows] = await Promise.all([
     getPosts().catch(() => []),
     getEvents().catch(() => []),
     getCategories().catch(() => []),
@@ -38,6 +39,17 @@ export default async function Home() {
   ]);
   const config = homeSchema.catch(defaultHome).parse(homeSetting || defaultHome);
   const shops = pickBusinessAds(shopRows, { count: 8 });
+  const posts = allPosts.map(toCardPost);
+  const showcaseIds = new Set<string>();
+  let showcaseRows = 0;
+  for (const category of categoriesList) {
+    if (showcaseRows === 8) break;
+    const items = posts.filter((p) => p.category_slugs.includes(category.slug)).slice(0, 10);
+    if (items.length < 2) continue;
+    showcaseRows++;
+    for (const item of items) showcaseIds.add(item.id);
+  }
+  const showcasePosts = posts.filter((p) => showcaseIds.has(p.id));
   const lead =
     posts.find((p) => p.id === config.lead_id) ||
     posts.find((p) => p.is_featured) ||
@@ -278,7 +290,7 @@ export default async function Home() {
             </Fragment>
           );
         })}
-      <CategoryScrollShowcase posts={posts} categories={categoriesList} />
+      <CategoryScrollShowcase posts={showcasePosts} categories={categoriesList} />
       <BusinessAdShelf ads={shops} />
       <HomeExtras config={config} />
       <HeritageStrip />
