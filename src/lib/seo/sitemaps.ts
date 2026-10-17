@@ -44,6 +44,7 @@ function query(kind: SitemapKind, count = false) {
   if (table === "posts") {
     q = q
       .eq("status", "published")
+      .is("deleted_at", null)
       .eq("is_seed", false)
       .lte("published_at", new Date().toISOString());
     if (kind === "news")

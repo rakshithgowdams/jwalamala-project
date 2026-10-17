@@ -281,17 +281,79 @@ const postLinks = [
   ["social_posts", "post_id"],
 ] as const;
 
-/** Permanently deletes an article. Only administrators may, as the database also enforces. */
+function adminOnly(
+  profile: { role?: string },
+  tr: (text: { en: string; kn: string; hi: string }) => string,
+  kn: { validation: string },
+) {
+  if (profile.role === "admin") return null;
+  return {
+    error: tr({
+      en: "Only administrators can delete articles.",
+      kn: "ಲೇಖನ ಅಳಿಸಲು ನಿರ್ವಾಹಕರಿಗೆ ಮಾತ್ರ ಅನುಮತಿ.",
+      hi: "केवल व्यवस्थापक लेख हटा सकते हैं।",
+    }) as string,
+  };
+}
+
+/** Moves an article into the recycle bin. It leaves the site but can be restored. */
+export async function trashPost(postId: unknown): Promise<{ ok?: true; error?: string }> {
+  const [{ db, profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+  const id = z.uuid().safeParse(postId);
+  if (!id.success) return { error: kn.validation };
+  const denied = adminOnly(profile, tr, kn);
+  if (denied) return denied;
+  const { data, error } = await db
+    .from("posts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id.data)
+    .is("deleted_at", null)
+    .select("id");
+  if (error || !data?.length) {
+    if (error) console.error("[posts] recycle failed:", error.code, error.message);
+    return { error: kn.unavailable };
+  }
+  revalidatePath("/admin/posts");
+  revalidatePath("/admin/posts/bin");
+  return { ok: true };
+}
+
+/** Puts a recycled article back on the article list, with its previous status. */
+export async function restorePost(postId: unknown): Promise<{ ok?: true; error?: string }> {
+  const [{ db, profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+  const id = z.uuid().safeParse(postId);
+  if (!id.success) return { error: kn.validation };
+  const denied = adminOnly(profile, tr, kn);
+  if (denied) return denied;
+  const { data, error } = await db
+    .from("posts")
+    .update({ deleted_at: null })
+    .eq("id", id.data)
+    .not("deleted_at", "is", null)
+    .select("id");
+  if (error || !data?.length) {
+    if (error) console.error("[posts] restore failed:", error.code, error.message);
+    return { error: kn.unavailable };
+  }
+  revalidatePath("/admin/posts");
+  revalidatePath("/admin/posts/bin");
+  return { ok: true };
+}
+
+/** Permanently deletes an article that is already in the recycle bin. */
 export async function deletePost(postId: unknown): Promise<{ ok?: true; error?: string }> {
   const [{ db, profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const id = z.uuid().safeParse(postId);
   if (!id.success) return { error: kn.validation };
-  if (profile.role !== "admin")
+  const denied = adminOnly(profile, tr, kn);
+  if (denied) return denied;
+  const { data: held } = await db.from("posts").select("id,deleted_at").eq("id", id.data).maybeSingle();
+  if (!held?.deleted_at)
     return {
       error: tr({
-        en: "Only administrators can delete articles. Set the status to Draft to take it off the site instead.",
-        kn: "ಲೇಖನ ಅಳಿಸಲು ನಿರ್ವಾಹಕರಿಗೆ ಮಾತ್ರ ಅನುಮತಿ. ಸೈಟ್‌ನಿಂದ ತೆಗೆಯಲು ಸ್ಥಿತಿಯನ್ನು ಕರಡು ಮಾಡಿ.",
-        hi: "केवल व्यवस्थापक लेख हटा सकते हैं। साइट से हटाने के लिए स्थिति ड्राफ़्ट करें।",
+        en: "Move the article to the recycle bin before deleting it permanently.",
+        kn: "ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುವ ಮೊದಲು ಲೇಖನವನ್ನು ಮರುಬಳಕೆ ಡಬ್ಬಿಗೆ ಸೇರಿಸಿ.",
+        hi: "स्थायी रूप से हटाने से पहले लेख को रीसायकल बिन में भेजें।",
       }),
     };
   // These references have no ON DELETE rule and RLS hides most of them from the
@@ -314,6 +376,7 @@ export async function deletePost(postId: unknown): Promise<{ ok?: true; error?: 
     return { error: kn.unavailable };
   }
   revalidatePath("/admin/posts");
+  revalidatePath("/admin/posts/bin");
   revalidatePath("/admin");
   return { ok: true };
 }

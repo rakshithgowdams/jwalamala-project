@@ -641,7 +641,7 @@
 /* ── List filters ── */
 :where(.admin-main) .filter-bar {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(150px, 1fr)) auto;
+  grid-template-columns: minmax(160px, 1.5fr) repeat(3, minmax(120px, 1fr)) auto;
   align-items: end;
   gap: 14px;
   margin: 0 0 20px;
@@ -650,6 +650,20 @@
   border-radius: var(--ui-radius-lg);
   background: var(--bg);
   box-shadow: var(--ui-shadow);
+}
+.admin-main .filter-bar.is-loading {
+  opacity: 0.7;
+}
+.admin-main .post-card-skeleton {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  pointer-events: none;
+}
+.admin-main .post-card-skeleton .skeleton-media {
+  height: 100%;
+  min-height: 120px;
+  border-radius: var(--ui-radius);
 }
 .admin-main .filter-bar > :is(.button, button) {
   align-self: end;
@@ -677,6 +691,9 @@
   align-items: center;
   gap: 12px;
   margin: -6px 0 24px;
+}
+:where(.admin-main) .section-title .page-actions {
+  margin: 0;
 }
 
 /* ── Image link with preview ── */
@@ -833,11 +850,192 @@
   background: #c62828;
   color: #fff;
 }
+.admin-main .post-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.admin-main .post-card {
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-lg);
+  background: transparent;
+  box-shadow: inset 0 3px 0 transparent;
+  animation: post-card-in 0.5s ease both;
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
+}
+.admin-main .post-card.is-draft {
+  background: rgb(239 108 0 / 0.1);
+  border-color: rgb(239 108 0 / 0.38);
+  box-shadow: inset 0 3px 0 #ef6c00;
+}
+.admin-main .post-card.is-published {
+  background: rgb(46 125 50 / 0.1);
+  border-color: rgb(46 125 50 / 0.38);
+  box-shadow: inset 0 3px 0 #2e7d32;
+}
+.admin-main .post-card.is-scheduled {
+  background: rgb(21 101 192 / 0.1);
+  border-color: rgb(21 101 192 / 0.38);
+  box-shadow: inset 0 3px 0 #1565c0;
+}
+.admin-main .post-card.is-archived {
+  background: rgb(97 97 97 / 0.1);
+  border-color: rgb(97 97 97 / 0.34);
+  box-shadow: inset 0 3px 0 #757575;
+}
+.admin-main .post-card:hover {
+  transform: translateY(-5px);
+}
+.admin-main .post-card.is-draft:hover {
+  box-shadow: inset 0 3px 0 #ef6c00, 0 14px 28px rgb(239 108 0 / 0.18);
+}
+.admin-main .post-card.is-published:hover {
+  box-shadow: inset 0 3px 0 #2e7d32, 0 14px 28px rgb(46 125 50 / 0.18);
+}
+.admin-main .post-card.is-scheduled:hover {
+  box-shadow: inset 0 3px 0 #1565c0, 0 14px 28px rgb(21 101 192 / 0.18);
+}
+.admin-main .post-card.is-archived:hover {
+  box-shadow: inset 0 3px 0 #757575, 0 14px 28px rgb(0 0 0 / 0.12);
+}
+.admin-main .post-card:has(.delete-post.is-confirming) {
+  aspect-ratio: auto;
+  overflow: visible;
+}
+.admin-main .post-card-thumb {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text) 8%, var(--surface));
+}
+.admin-main .post-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.45s ease;
+}
+.admin-main .post-card:hover .post-card-thumb img {
+  transform: scale(1.06);
+}
+.admin-main .post-card-badges {
+  position: absolute;
+  top: 10px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 16px);
+}
+.admin-main .post-card .status-pill {
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  backdrop-filter: blur(8px);
+}
+.admin-main .post-card.is-draft .status-pill {
+  background: rgb(239 108 0 / 0.78);
+}
+.admin-main .post-card.is-published .status-pill {
+  background: rgb(46 125 50 / 0.78);
+}
+.admin-main .post-card.is-scheduled .status-pill {
+  background: rgb(21 101 192 / 0.78);
+}
+.admin-main .post-card.is-archived .status-pill {
+  background: rgb(66 66 66 / 0.72);
+}
+.admin-main .post-card-type {
+  padding: 3px 10px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.28);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.admin-main .post-card-updated {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 1;
+  max-width: calc(100% - 16px);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.38);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(8px);
+}
+.admin-main .post-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 10px 12px;
+  background: transparent;
+}
+.admin-main .post-card h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.admin-main .post-card h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+.admin-main .post-card h2 a:hover {
+  color: var(--accent);
+}
+.admin-main .post-card-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 28px 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--ui-radius-lg);
+  color: var(--muted);
+  text-align: center;
+}
+@keyframes post-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-main .post-card,
+  .admin-main .post-card-thumb img {
+    animation: none;
+    transition: none;
+  }
+  .admin-main .post-card:hover,
+  .admin-main .post-card:hover .post-card-thumb img {
+    transform: none;
+  }
+}
 .admin-main .post-actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .admin-main .post-actions .delete-post.is-confirming {
   flex-wrap: nowrap;
@@ -870,6 +1068,43 @@
   font-weight: 600;
   color: #b71c1c;
 }
+.delete-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(15 18 32 / 0.48);
+}
+.delete-dialog {
+  width: min(440px, 100%);
+  padding: 22px;
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 24px 60px rgb(15 18 32 / 0.28);
+}
+.delete-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+.delete-dialog p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.admin-main .recycle-note {
+  margin: -8px 0 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
 .admin-main .editor-manage {
   display: flex;
   flex-wrap: wrap;
@@ -900,6 +1135,10 @@
 .status-pill.is-draft {
   background: rgb(239 108 0 / 0.12);
   color: #a64b00;
+}
+.status-pill.is-archived {
+  background: rgb(97 97 97 / 0.12);
+  color: #424242;
 }
 
 /* ── Save errors: the field to fix, and an alert that stays on screen ── */

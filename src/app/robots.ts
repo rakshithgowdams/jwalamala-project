@@ -7,7 +7,6 @@ const contentScrapers = [
   "CCBot",
   "ClaudeBot",
   "anthropic-ai",
-  "Google-Extended",
   "Applebot-Extended",
   "PerplexityBot",
   "Bytespider",

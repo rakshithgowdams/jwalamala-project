@@ -22,6 +22,7 @@ export type Post = {
   body_html: string;
   type: "article" | "video" | "short";
   status: "draft" | "published" | "scheduled" | "archived";
+  deleted_at?: string | null;
   event_date: string;
   published_at: string;
   event_place: string;

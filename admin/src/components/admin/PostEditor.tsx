@@ -21,6 +21,7 @@ import type { PlaceOption } from "@/lib/places/search";
 import { PlacePicker } from "./PlacePicker";
 import { FacebookLogo, YouTubeLogo } from "./BrandIcons";
 import { DeletePostButton } from "./DeletePostButton";
+import { RestorePostButton } from "./RestorePostButton";
 import { videoFromInput } from "@/lib/utils/video";
 
 /** datetime-local inputs are entered in India time. */
@@ -863,7 +864,15 @@ export function PostEditor({
                     {tr({ en: "View on site", kn: "ಸೈಟ್‌ನಲ್ಲಿ ನೋಡಿ", hi: "साइट पर देखें" })}
                   </a>
                 )}
-                {canDelete && <DeletePostButton postId={post.id} title={post.title_kn} afterDelete="list" />}
+                {post.deleted_at ? <RestorePostButton postId={post.id} title={post.title_kn} /> : null}
+                {canDelete && (
+                  <DeletePostButton
+                    postId={post.id}
+                    title={post.title_kn}
+                    mode={post.deleted_at ? "forever" : "bin"}
+                    afterDelete="bin"
+                  />
+                )}
               </div>
             )}
           </div>

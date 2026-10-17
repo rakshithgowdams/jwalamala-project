@@ -37,6 +37,7 @@ export const getPosts = cache(async (): Promise<Post[]> => {
     .from("posts")
     .select(postColumns)
     .eq("status", "published")
+    .is("deleted_at", null)
     .lte("published_at", new Date().toISOString())
     .order("published_at", { ascending: false })
     .limit(200);
@@ -84,6 +85,7 @@ export async function getPost(slug: string) {
     .select(postColumns)
     .eq("slug", slug)
     .eq("status", "published")
+    .is("deleted_at", null)
     .lte("published_at", new Date().toISOString())
     .maybeSingle();
   if (error) throw error;
