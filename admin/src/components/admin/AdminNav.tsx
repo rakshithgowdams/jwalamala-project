@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { Menu, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import type { Tri } from "@/lib/i18n/strings";
@@ -100,16 +100,31 @@ const groups: { title: Tri; links: [string, Tri][] }[] = [
 
 export function AdminNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { tr } = useUiStrings();
   const [open, setOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  useEffect(() => {
+    if (!pending) setPendingHref(null);
+  }, [pending, pathname]);
   const isCurrent = (path: string) =>
     path
       ? pathname === "/admin/" + path || pathname.startsWith("/admin/" + path + "/")
       : pathname === "/admin";
+  function go(href: string) {
+    setOpen(false);
+    if (href === pathname || pending) return;
+    setPendingHref(href);
+    startTransition(() => {
+      router.push(href);
+    });
+  }
   return (
     <nav
-      className={"admin-nav" + (open ? " is-open" : "")}
+      className={"admin-nav" + (open ? " is-open" : "") + (pending ? " is-loading" : "")}
       aria-label={tr({ en: "Admin sections", kn: "ನಿರ್ವಹಣಾ ವಿಭಾಗಗಳು", hi: "एडमिन अनुभाग" })}
+      aria-busy={pending || undefined}
     >
       <button
         type="button"
@@ -124,17 +139,28 @@ export function AdminNav() {
         {groups.map((group) => (
           <div className="admin-nav-group" key={group.title.en}>
             <p>{tr(group.title)}</p>
-            {group.links.map(([path, title]) => (
-              <Link
-                href={"/admin" + (path ? "/" + path : "")}
-                key={path}
-                prefetch={false}
-                aria-current={isCurrent(path) ? "page" : undefined}
-                onClick={() => setOpen(false)}
-              >
-                {tr(title)}
-              </Link>
-            ))}
+            {group.links.map(([path, title]) => {
+              const href = "/admin" + (path ? "/" + path : "");
+              return (
+                <Link
+                  href={href}
+                  key={path}
+                  prefetch={false}
+                  aria-current={isCurrent(path) ? "page" : undefined}
+                  className={pendingHref === href ? "is-pending" : undefined}
+                  onClick={(event) => {
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+                      setOpen(false);
+                      return;
+                    }
+                    event.preventDefault();
+                    go(href);
+                  }}
+                >
+                  {tr(title)}
+                </Link>
+              );
+            })}
           </div>
         ))}
       </div>

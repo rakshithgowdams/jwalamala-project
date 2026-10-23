@@ -654,6 +654,29 @@
 .admin-main .filter-bar.is-loading {
   opacity: 0.7;
 }
+.admin-main .post-card-list:has(+ .pagination.is-loading) {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.admin-main .pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 28px;
+}
+.admin-main .pagination.is-loading {
+  pointer-events: none;
+  opacity: 0.65;
+}
+.admin-main .pagination .chip {
+  min-width: 36px;
+}
+.admin-nav.is-loading a.is-pending {
+  color: var(--accent);
+  opacity: 0.7;
+}
 .admin-main .post-card-skeleton {
   display: grid;
   gap: 10px;

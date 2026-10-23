@@ -64,7 +64,10 @@ export default async function Posts({
         </div>
       </div>
       <PostFilters q={filters.q} status={filters.status} type={filters.type} sort={filters.sort} />
-      <Suspense fallback={<PostGridFallback />}>
+      <Suspense
+        key={[filters.page, filters.q, filters.status, filters.type, filters.sort].join("|")}
+        fallback={<PostGridFallback />}
+      >
         <PostResults filters={filters} />
       </Suspense>
     </>
@@ -78,9 +81,13 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
   const sort = ["updated", "oldest", "published", "title"].includes(filters.sort || "")
     ? filters.sort
     : "updated";
+  const pageSize = 30;
   let query = db
     .from("posts")
-    .select("id,title_kn,slug,status,type,updated_at,published_at,thumbnail_url,video_url", { count: "exact" });
+    .select(
+      "id,title_kn,slug,status,type,updated_at,published_at,thumbnail_url,video_url",
+      { count: "planned" },
+    );
   if (sort === "oldest") query = query.order("updated_at", { ascending: true });
   else if (sort === "title") query = query.order("title_kn", { ascending: true });
   else if (sort === "published") query = query.order("published_at", { ascending: false, nullsFirst: false });
@@ -96,12 +103,18 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
     query = query.eq("status", filters.status!);
   if (["article", "video", "short"].includes(filters.type || ""))
     query = query.eq("type", filters.type!);
+  const from = (page - 1) * pageSize;
   const {
     data: posts,
     error,
     count,
-  } = await query.range((page - 1) * 30, page * 30 - 1);
+  } = await query.range(from, from + pageSize - 1);
   if (error) throw error;
+  const pages = Math.max(
+    page,
+    Math.ceil((count || 0) / pageSize),
+    (posts?.length || 0) === pageSize ? page + 1 : page,
+  );
   const updatedOn = new Intl.DateTimeFormat("en-IN", {
     day: "numeric",
     month: "short",
@@ -169,7 +182,7 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
       </div>
       <Pagination
         page={page}
-        pages={Math.ceil((count || 0) / 30)}
+        pages={pages}
         query={{ q: filters.q, status: filters.status, type: filters.type, sort: filters.sort }}
       />
     </>

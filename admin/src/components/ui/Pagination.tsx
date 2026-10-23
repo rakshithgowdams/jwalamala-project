@@ -1,6 +1,9 @@
-import Link from "next/link";
-import { getUiStrings } from "@/lib/i18n/server";
-export async function Pagination({
+"use client";
+import { useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+
+export function Pagination({
   page,
   pages,
   query = {},
@@ -9,8 +12,11 @@ export async function Pagination({
   pages: number;
   query?: Record<string, string | undefined>;
 }) {
+  const { kn } = useUiStrings();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [pending, startTransition] = useTransition();
   if (pages <= 1) return null;
-  const { kn } = await getUiStrings();
   const numbers = [
     ...new Set([
       1,
@@ -20,31 +26,42 @@ export async function Pagination({
       pages,
     ]),
   ].sort((a, b) => a - b);
+
+  function go(nextPage: number) {
+    if (nextPage === page || pending) return;
+    const params = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(query).filter(
+          (entry): entry is [string, string] => Boolean(entry[1]),
+        ),
+      ),
+    );
+    if (nextPage > 1) params.set("page", String(nextPage));
+    else params.delete("page");
+    const href = params.size ? `${pathname}?${params}` : pathname;
+    startTransition(() => router.replace(href, { scroll: false }));
+  }
+
   return (
-    <nav className="pagination" aria-label={kn.pages}>
+    <nav
+      className={"pagination" + (pending ? " is-loading" : "")}
+      aria-label={kn.pages}
+      aria-busy={pending || undefined}
+    >
       {numbers.map((n, i) => (
         <span key={n}>
           {i > 0 && n > numbers[i - 1] + 1 && (
             <span aria-hidden="true"> … </span>
           )}
-          <Link
+          <button
+            type="button"
             className={"chip " + (n === page ? "active" : "")}
             aria-current={n === page ? "page" : undefined}
-            href={
-              "?" +
-              new URLSearchParams({
-                ...Object.fromEntries(
-                  Object.entries(query).filter(
-                    (entry): entry is [string, string] =>
-                      entry[1] !== undefined,
-                  ),
-                ),
-                page: String(n),
-              })
-            }
+            disabled={pending}
+            onClick={() => go(n)}
           >
             {n}
-          </Link>
+          </button>
         </span>
       ))}
     </nav>

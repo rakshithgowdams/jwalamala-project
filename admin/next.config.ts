@@ -19,13 +19,7 @@ const config: NextConfig = {
   },
   turbopack: {},
   webpack: (config) => {
-    config.cache = false;
     config.parallelism = 1;
-    config.snapshot = {
-      ...(config.snapshot ?? {}),
-      managedPaths: [],
-      immutablePaths: [],
-    };
     return config;
   },
   images: {
