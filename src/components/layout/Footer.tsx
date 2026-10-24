@@ -5,6 +5,7 @@ import { site } from "@/config/site";
 import { getUiStrings } from "@/lib/i18n/server";
 import { brandName } from "@/lib/i18n/content";
 import { FlameGarland } from "./FlameGarland";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 export async function Footer() {
   const { kn, v4: t, locale } = await getUiStrings();
   const brand = brandName(locale);
@@ -21,6 +22,7 @@ export async function Footer() {
               </div>
             </div>
             <p>{kn.footerText}</p>
+            <InstallAppButton className="button button-outline install-app-button footer-install" />
           </div>
           <div>
             <h3>{kn.explore}</h3>

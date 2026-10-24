@@ -1662,6 +1662,70 @@ textarea {
   top: 14px;
   right: 12px;
 }
+.install-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 36px;
+}
+.install-sheet-head p {
+  margin: 4px 0 14px;
+}
+.install-sheet-icon {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.install-step-number {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.install-sheet-actions {
+  display: flex;
+  gap: 10px;
+}
+.install-sheet-actions .button {
+  flex: 1;
+  justify-content: center;
+}
+.install-app-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.install-app-short {
+  display: none;
+}
+@media (max-width: 1100px) and (min-width: 641px) {
+  .masthead-actions .install-app-label {
+    display: none;
+  }
+  .masthead-actions .install-app-short {
+    display: inline;
+  }
+}
+.install-app-button.is-wide {
+  width: 100%;
+  justify-content: center;
+}
+.menu-install {
+  padding: 4px 18px 12px;
+}
+.footer-install {
+  margin-top: 14px;
+}
 .install-ios-steps {
   display: grid;
   gap: 10px;
@@ -1671,7 +1735,7 @@ textarea {
 }
 .install-ios-steps li {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -1682,8 +1746,103 @@ textarea {
 }
 .install-ios-steps li svg {
   flex: none;
-  margin-top: 2px;
   color: var(--accent);
+}
+@media (min-width: 761px) {
+  .install-banner.is-sheet {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 420px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 16px;
+    padding-bottom: 18px;
+  }
+}
+.offline-download {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.offline-download .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.offline-download .is-downloaded {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.offline-download-error {
+  font-size: 12px;
+  color: var(--accent);
+}
+.offline-download .spin {
+  animation: offline-spin 0.9s linear infinite;
+}
+@keyframes offline-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.downloads-usage {
+  margin-bottom: 12px;
+}
+.downloads-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.download-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.download-link {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 12px;
+  align-items: flex-start;
+  color: inherit;
+}
+.download-link img {
+  flex: none;
+  width: 96px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--surface);
+}
+.download-link > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.download-link strong {
+  font-size: 15px;
+  line-height: 1.4;
+}
+.download-summary {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 @keyframes install-sheet-up {
   from {
@@ -1940,6 +2099,9 @@ textarea {
   }
   .masthead-actions .button svg {
     width: 14px;
+  }
+  .masthead-actions .install-app-button {
+    display: none;
   }
   .category-nav {
     gap: 23px;

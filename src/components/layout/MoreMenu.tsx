@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import type { MenuSection } from "./Navigation";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 
 export function MoreMenu({
   primaryLinks = [],
@@ -102,6 +103,12 @@ export function MoreMenu({
               <X aria-hidden="true" />
             </button>
           </div>
+          <div className="menu-install">
+            <InstallAppButton
+              className="button button-ember install-app-button is-wide"
+              onOpen={() => setOpen(false)}
+            />
+          </div>
           {sections.length > 0 && (
             <div className="menu-sections">
               {sections.map((section) =>
@@ -158,6 +165,7 @@ export function MoreMenu({
               ["/stories", t.stories],
               ["/reservoirs", t.reservoirs],
               ["/rates", t.rates],
+              ["/downloads", kn.downloadsTitle],
               ["/account/history", t.history],
               ["/editorial", t.editorial],
               ["/corrections", t.corrections],

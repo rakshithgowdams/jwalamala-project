@@ -25,6 +25,7 @@ import { EventDateBadge, SectionTitle } from "@/components/ui/Primitives";
 import { NewsCard } from "./NewsCard";
 import { postHref } from "@/lib/utils/post-href";
 import { BookmarkButton, ShareButtons } from "./PostActions";
+import { OfflineDownloadButton } from "@/components/pwa/OfflineDownloadButton";
 import { LiteVideoEmbed } from "./LiteVideoEmbed";
 import { ArticleSidebar } from "./ArticleSidebar";
 /**
@@ -363,6 +364,12 @@ export async function ArticlePage({
           <div className="article-actions">
             <ShareButtons title={p.title_kn} summary={p.summary_kn} />
             <BookmarkButton postId={p.id} href={postHref(p)} />
+            <OfflineDownloadButton
+              href={postHref(p)}
+              title={p.title_kn}
+              summary={p.summary_kn}
+              image={p.thumbnail_url}
+            />
           </div>
           <Reactions postId={p.id} demo={p.is_seed} />
           {!english && !hindi && (
