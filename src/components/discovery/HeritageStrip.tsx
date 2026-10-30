@@ -4,6 +4,7 @@ import { pickText } from "@/lib/i18n/content";
 import { topicPosts } from "@/lib/v4/utils";
 import { getPosts } from "@/lib/queries/content";
 import { NewsCard } from "@/components/news/NewsCard";
+import { toCardPost } from "@/lib/utils/card-post";
 import { SectionTitle } from "@/components/ui/Primitives";
 import type { Topic } from "@/lib/v4/types";
 
@@ -29,7 +30,7 @@ export async function HeritageStrip() {
       <div className="heritage-track">
         {items.map((post) => (
           <div className="heritage-card" key={post.id}>
-            <NewsCard post={post} />
+            <NewsCard post={toCardPost(post)} />
           </div>
         ))}
       </div>

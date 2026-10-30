@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { pickText } from "@/lib/i18n/content";
 import { normalizeVideo } from "@/lib/utils/video";
+import { FacebookLogo, InstagramLogo, YouTubeLogo } from "./BrandIcons";
 import { loadYouTube, type YouTubePlayer } from "@/lib/v4/youtube-player";
 import {
   watchSchema,
@@ -44,7 +45,40 @@ export function LiteVideoEmbed({
   const video = url ? normalizeVideo(url) : null;
   const id = video?.id;
   const provider = video?.provider;
+  const reel = video?.kind === "reel";
   const saved = history.find((r) => r.id === postId)?.seconds || 0;
+  useEffect(() => {
+    if (!playing || provider !== "instagram") return;
+    const w = window as Window & {
+      instgrm?: { Embeds: { process: () => void } };
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      timer = setTimeout(() => w.instgrm?.Embeds.process(), 50);
+    };
+    if (w.instgrm) {
+      run();
+      return () => clearTimeout(timer);
+    }
+    const existing = document.querySelector<HTMLScriptElement>(
+      "script[data-instagram-embed]",
+    );
+    if (existing) {
+      existing.addEventListener("load", run, { once: true });
+      return () => {
+        existing.removeEventListener("load", run);
+        clearTimeout(timer);
+      };
+    }
+    const script = document.createElement("script");
+    script.src = "https://www.instagram.com/embed.js";
+    script.async = true;
+    script.dataset.instagramEmbed = "true";
+    script.onload = run;
+    script.onerror = () => setError(true);
+    document.body.appendChild(script);
+    return () => clearTimeout(timer);
+  }, [playing, provider]);
   useEffect(() => {
     if (!playing || provider !== "youtube" || !id || !frame.current) return;
     let active = true,
@@ -126,9 +160,20 @@ export function LiteVideoEmbed({
   }
   return (
     <>
-      <div className="video-player">
+      <div
+        className={
+          "video-player" +
+          (reel ? " is-reel" : provider === "instagram" ? " is-square" : "")
+        }
+      >
         {error ? (
           <div className="video-unavailable">
+            <Image
+              src={thumbnail}
+              alt=""
+              fill
+              sizes="(max-width:900px) 100vw,800px"
+            />
             <p>{kn.noVideo}</p>
             <a
               className="chip"
@@ -136,12 +181,26 @@ export function LiteVideoEmbed({
               target="_blank"
               rel="noopener noreferrer"
             >
-              {kn.openVideo}
+              {provider === "instagram"
+                ? kn.openVideo + " · Instagram"
+                : provider === "facebook"
+                  ? kn.openVideo + " · Facebook"
+                  : kn.openVideo}
             </a>
           </div>
         ) : playing ? (
           provider === "youtube" ? (
             <div className="youtube-api-frame" ref={frame} />
+          ) : provider === "instagram" ? (
+            <blockquote
+              className="instagram-media"
+              data-instgrm-permalink={video.url}
+              data-instgrm-version="14"
+            >
+              <a href={video.url} target="_blank" rel="noopener noreferrer">
+                {kn.openVideo} · Instagram
+              </a>
+            </blockquote>
           ) : (
             <iframe
               title={title}
@@ -152,6 +211,7 @@ export function LiteVideoEmbed({
               }
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
+              onError={() => setError(true)}
             />
           )
         ) : (
@@ -164,6 +224,20 @@ export function LiteVideoEmbed({
             />
             <span className="play-circle">
               <Play size={30} fill="currentColor" />
+            </span>
+            <span className="video-provider-badge">
+              {provider === "facebook" ? (
+                <FacebookLogo size={16} />
+              ) : provider === "instagram" ? (
+                <InstagramLogo size={16} />
+              ) : (
+                <YouTubeLogo size={14} />
+              )}
+              {provider === "facebook"
+                ? "Facebook"
+                : provider === "instagram"
+                  ? "Instagram"
+                  : "YouTube"}
             </span>
           </button>
         )}

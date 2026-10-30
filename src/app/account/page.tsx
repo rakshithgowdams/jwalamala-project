@@ -55,9 +55,6 @@ export default async function Account({
     .select("day_id,jain_calendar_days(*)")
     .eq("user_id", user.id);
   const saved = posts.filter((p) => bookmarks?.some((b) => b.post_id === p.id));
-  const { data: staffAccess } = await db.rpc("has_permission", {
-    requested: "admin.access",
-  });
   return (
     <div className="container page-shell">
       <div className="section-title">
@@ -69,15 +66,6 @@ export default async function Account({
         email={user.email || ""}
         phone={user.phone || ""}
       />
-      {staffAccess === true && (
-        <Link
-          className="button button-outline"
-          style={{ marginBottom: 24 }}
-          href="/admin"
-        >
-          {kn.admin}
-        </Link>
-      )}
       <nav className="account-tabs" aria-label={kn.account}>
         {[
           ["saved", kn.savedPosts],

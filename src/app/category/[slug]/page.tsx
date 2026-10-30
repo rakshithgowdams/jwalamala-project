@@ -1,14 +1,28 @@
-import { LocationFilter } from "@/components/search/LocationFilter";
 import type { Filters } from "@/lib/utils/search";
-import { getListing } from "@/lib/queries/listing";
 import { getUiStrings } from "@/lib/i18n/server";
 import { pickText } from "@/lib/i18n/content";
-import { AdSlot } from "@/components/ads/AdSlot";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPosts, getCategories } from "@/lib/queries/content";
-import { NewsCard } from "@/components/news/NewsCard";
-import { EmptyState } from "@/components/ui/Primitives";
+import { getCategories, getPublishedPlaceIds } from "@/lib/queries/content";
+import { getV4Rows } from "@/lib/v4/queries";
+import { CategoryListing } from "@/components/news/CategoryListing";
+import {
+  districtName,
+  districtsWithContent,
+} from "@/lib/utils/districts";
+import { listActiveMathas, mathaName } from "@/lib/utils/mathas";
+import { SocialMediaListing } from "@/components/news/SocialMediaListing";
+import {
+  JAIN_MATHA_SLUG,
+  SOCIAL_MEDIA_SLUG,
+  SOCIAL_POSTERS_SLUG,
+  SOCIAL_VIDEOS_SLUG,
+  STATE_JAIN_NEWS_SLUG,
+  mathaHref,
+  resolvePublicCategory,
+  stateJainNewsDistrictHref,
+} from "@/lib/taxonomy";
+
 export async function generateMetadata({
   params,
 }: {
@@ -16,110 +30,74 @@ export async function generateMetadata({
 }) {
   const { kn, locale } = await getUiStrings();
   const { slug } = await params;
-  const c = (await getCategories()).find((c) => c.slug === slug);
+  const category = resolvePublicCategory(slug, await getCategories());
   return {
-    title: c ? pickText(locale, c.name_kn, c.name_en, c.name_hi) : kn.notFound,
+    title: category
+      ? pickText(locale, category.name_kn, category.name_en, category.name_hi)
+      : kn.notFound,
     alternates: { canonical: "/category/" + slug },
   };
 }
+
 export default async function CategoryPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Filters & { page?: string }>;
+  searchParams: Promise<Filters & { page?: string; tab?: string }>;
 }) {
-  const { kn, locale } = await getUiStrings();
-
+  const { locale } = await getUiStrings();
   const { slug } = await params;
-  const f = await searchParams;
-  const [posts, categories] = await Promise.all([getPosts(), getCategories()]);
-  const category = categories.find((c) => c.slug === slug);
+  const filters = await searchParams;
+  const [categories, places, mathas, placeIds] = await Promise.all([
+    getCategories(),
+    getV4Rows("places").catch(() => []),
+    getV4Rows("mathas").catch(() => []),
+    getPublishedPlaceIds().catch(() => []),
+  ]);
+  const category = resolvePublicCategory(slug, categories);
   if (!category) notFound();
-  const listing = await getListing({ ...f, category: slug }, f.page, 9);
-  const page = listing.page,
-    visible = listing.rows;
+  const extraNav =
+    slug === STATE_JAIN_NEWS_SLUG ? (
+      <nav className="category-chips" aria-label={category.name_kn}>
+        {districtsWithContent(places, placeIds, locale).map((district) => (
+          <Link
+            className="chip"
+            href={stateJainNewsDistrictHref(district.slug)}
+            key={district.id}
+          >
+            {districtName(locale, district)}
+          </Link>
+        ))}
+      </nav>
+    ) : slug === JAIN_MATHA_SLUG ? (
+      <nav className="category-chips" aria-label={category.name_kn}>
+        {listActiveMathas(mathas, locale).map((matha) => (
+          <Link className="chip" href={mathaHref(matha.slug)} key={matha.id}>
+            {mathaName(locale, matha)}
+          </Link>
+        ))}
+      </nav>
+    ) : null;
+  if (
+    slug === SOCIAL_MEDIA_SLUG ||
+    slug === SOCIAL_POSTERS_SLUG ||
+    slug === SOCIAL_VIDEOS_SLUG
+  ) {
+    return (
+      <SocialMediaListing
+        category={category}
+        filters={filters}
+        extraNav={extraNav}
+      />
+    );
+  }
   return (
-    <div className="container page-shell">
-      <div className="breadcrumb">
-        <Link href="/">{kn.home}</Link>
-        <span>/</span>
-        {pickText(locale, category.name_kn, category.name_en, category.name_hi)}
-      </div>
-      <div className="page-heading">
-        <h1>
-          {pickText(
-            locale,
-            category.name_kn,
-            category.name_en,
-            category.name_hi,
-          )}
-        </h1>
-      </div>
-      <AdSlot placement={`category-${slug}-top`} />
-      <div className="ad-supported-layout">
-        <div className="ad-supported-content">
-          <LocationFilter filters={f} action={"/category/" + slug} />
-          <form className="filters filter-row">
-            {["state", "district", "city"].map((key) => (
-              <input
-                key={key}
-                type="hidden"
-                name={key}
-                value={f[key as keyof typeof f] || ""}
-              />
-            ))}
-            <label className="field">
-              {kn.year}
-              <select name="year" defaultValue={f.year || ""}>
-                <option value="">{kn.all}</option>
-                {[...new Set(posts.map((p) => p.event_date.slice(0, 4)))].map(
-                  (y) => (
-                    <option key={y}>{y}</option>
-                  ),
-                )}
-              </select>
-            </label>
-            <label className="field">
-              {kn.sort}
-              <select name="sort" defaultValue={f.sort || "newest"}>
-                <option value="newest">{kn.newest}</option>
-                <option value="oldest">{kn.oldest}</option>
-              </select>
-            </label>
-            <button className="button button-ember">{kn.filter}</button>
-          </form>
-          {visible.length ? (
-            <div className="news-grid">
-              {visible.map((p) => (
-                <NewsCard key={p.id} post={p} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState />
-          )}
-          <nav className="pagination">
-            {Array.from(
-              { length: Math.min(listing.pages, 7) },
-              (_, index) =>
-                index + Math.max(0, Math.min(page - 4, listing.pages - 7)),
-            ).map((i) => (
-              <Link
-                aria-current={page === i + 1 ? "page" : undefined}
-                className={"chip " + (page === i + 1 ? "active" : "")}
-                key={i}
-                href={"?" + new URLSearchParams({ ...f, page: String(i + 1) })}
-              >
-                {i + 1}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <aside className="ad-sidebar" aria-label={kn.advertisement}>
-          <AdSlot placement={`category-${slug}-sidebar`} format="rectangle" />
-        </aside>
-      </div>
-      <AdSlot placement={`category-${slug}-bottom`} />
-    </div>
+    <CategoryListing
+      category={category}
+      filters={filters}
+      action={"/category/" + slug}
+      extraNav={extraNav}
+    />
   );
 }

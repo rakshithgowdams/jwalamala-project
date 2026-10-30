@@ -62,6 +62,23 @@ describe("input security", () => {
       normalizeVideo("https://youtube.com.evil.test/watch?v=abcdefghijk"),
     ).toBeNull();
   });
+  it("keeps the Facebook video id that lives in the query string", () => {
+    expect(
+      normalizeVideo("https://www.facebook.com/watch/?v=1234567890&ref=sharing")?.url,
+    ).toBe("https://www.facebook.com/watch/?v=1234567890");
+    expect(normalizeVideo("https://www.facebook.com/watch/")).toBeNull();
+    expect(
+      normalizeVideo("https://facebook.com.evil.test/watch/?v=1234567890"),
+    ).toBeNull();
+  });
+  it("normalizes Instagram reel and post links", () => {
+    expect(normalizeVideo("https://www.instagram.com/reel/AbCdEfGhIj/")?.url).toBe(
+      "https://www.instagram.com/reel/AbCdEfGhIj/",
+    );
+    expect(normalizeVideo("https://www.instagram.com/p/AbCdEfGhIj/")?.kind).toBe(
+      "post",
+    );
+  });
   it("rejects incomplete and oversized submissions", () => {
     expect(submissionSchema.safeParse({}).success).toBe(false);
     expect(

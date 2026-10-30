@@ -12,11 +12,6 @@ import { pollutantIndex, naqi, hourlyAverage } from "@/lib/weather/aqi";
 import { dailyTimes, istTime, jainRulesSchema } from "@/lib/jain/times";
 import { communitySubmissionSchema } from "@/lib/v4/submissions";
 import { scoreQuiz, voteSchema } from "@/lib/v4/engagement";
-import {
-  roleControlSchema,
-  providerControlSchema,
-} from "@/lib/v4/control-schema";
-import { publicationIssues } from "@/lib/v4/workflow";
 describe("discovery boundaries", () => {
   it("filters scheduled and unsafe trending links", () => {
     const base = v4Demo.trending_items[0],
@@ -148,35 +143,5 @@ describe("participation and newsroom validation", () => {
         [1],
       ),
     ).toBe(1);
-  });
-  it("limits role and provider settings", () => {
-    expect(
-      roleControlSchema.safeParse({
-        role: "reader",
-        permission: "service_role",
-        allowed: true,
-      }).success,
-    ).toBe(false);
-    expect(
-      providerControlSchema.safeParse({
-        id: "ai",
-        enabled: true,
-        monthly_limit: -1,
-      }).success,
-    ).toBe(false);
-  });
-  it("checks publication metadata and embargo", () => {
-    expect(
-      publicationIssues(
-        {
-          title_kn: "title",
-          summary_kn: "",
-          event_date: "",
-          image_credit: "",
-          embargo_until: "2027-01-01T00:00:00Z",
-        },
-        Date.parse("2026-09-16"),
-      ),
-    ).toEqual(["summary", "event_date", "credit", "embargo"]);
   });
 });

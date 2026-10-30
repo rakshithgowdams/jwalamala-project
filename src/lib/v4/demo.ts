@@ -200,6 +200,7 @@ const postTags = demoPosts.flatMap((p) => [
   },
   { post_id: p.id, tag_id: tags[0].id },
 ]);
+const retiredTrending = new Set(["/tag/ahimsa", "/basadis", "/place/hassan"]);
 export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
   tags,
   places,
@@ -349,7 +350,9 @@ export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
     ends_at: null,
     sort_order: i,
     is_active: true,
-  })),
+  }))
+    // Ids come from list position, so retired links are filtered, not deleted.
+    .filter((item) => !retiredTrending.has(item.url)),
   series: [
     {
       id: id("series", 1),
@@ -685,4 +688,36 @@ export const v4Demo: { [K in keyof DataTables]: DataTables[K][] } = {
   ],
   market_rates: [],
   corrections_log: [],
+  mathas: [
+    {
+      id: id("matha", 1),
+      slug: "shravanabelagola-matha",
+      name_kn: "ಶ್ರೀ ಕ್ಷೇತ್ರ ಶ್ರವಣಬೆಳಗೊಳ ದಿಗಂಬರ ಜೈನ ಮಠ",
+      name_en: "Shri Kshetra Shravanabelagola Digambar Jain Math",
+      name_hi: "श्री क्षेत्र श्रवणबेलगोला दिगंबर जैन मठ",
+      district_id: null,
+      sort_order: 10,
+      is_active: true,
+    },
+    {
+      id: id("matha", 2),
+      slug: "hombuja-matha",
+      name_kn: "ಹೊಂಬುಜ ದಿಗಂಬರ ಜೈನ ಮಹಾ ಸಂಸ್ಥಾನ ಮಠ",
+      name_en: "Hombuja Digambar Jain Maha Sansthan Math",
+      name_hi: "होम्बुज दिगंबर जैन महा संस्थान मठ",
+      district_id: null,
+      sort_order: 20,
+      is_active: true,
+    },
+    {
+      id: id("matha", 3),
+      slug: "swadi-matha",
+      name_kn: "ಸ್ವಾದಿ ದಿಗಂಬರ ಜೈನ ಮಠ",
+      name_en: "Swadi Digambar Jain Math",
+      name_hi: "स्वादि दिगंबर जैन मठ",
+      district_id: null,
+      sort_order: 30,
+      is_active: true,
+    },
+  ],
 };
