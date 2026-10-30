@@ -31,18 +31,35 @@ import {
 } from "@/lib/theme/shared";
 
 import type { Category } from "@/lib/types";
+import type { Locale } from "@/lib/i18n/strings";
 export type NavItemLink = { href: string; label: string };
 export type MenuSection = NavItemLink & {
   key: string;
   children: NavItemLink[];
 };
 
+function menuLabel(
+  href: string,
+  fallback: string,
+  categories: Category[],
+  locale: Locale,
+) {
+  if (!href.startsWith("/category/")) return fallback;
+  const slug = href.slice("/category/".length);
+  const category = categories.find((row) => row.slug === slug);
+  return category
+    ? pickText(locale, category.name_kn, category.name_en, category.name_hi)
+    : fallback;
+}
+
 export function CategoryNav({
   categories,
   districts,
+  mathas,
 }: {
   categories: Category[];
   districts: NavItemLink[];
+  mathas: NavItemLink[];
 }) {
   const { kn, locale } = useUiStrings();
   const path = usePathname();
@@ -68,14 +85,26 @@ export function CategoryNav({
   const sections: MenuSection[] = mainNavigation.map((section) => ({
     key: section.key,
     href: section.href,
-    label: navLabel(locale, section),
+    label: menuLabel(
+      section.href,
+      navLabel(locale, section),
+      categories,
+      locale,
+    ),
     children:
       section.children === "districts"
         ? districts
-        : (section.children || []).map((child) => ({
-            href: child.href,
-            label: navLabel(locale, child),
-          })),
+        : section.children === "mathas"
+          ? mathas
+          : (section.children || []).map((child) => ({
+              href: child.href,
+              label: menuLabel(
+                child.href,
+                navLabel(locale, child),
+                categories,
+                locale,
+              ),
+            })),
   }));
   const current = (href: string) =>
     href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
@@ -83,7 +112,9 @@ export function CategoryNav({
   const remaining = categories
     .filter(
       (c) =>
-        c.slug !== "news" && !mainNavigationHrefs.has(`/category/${c.slug}`),
+        c.show_in_menu !== false &&
+        c.slug !== "news" &&
+        !mainNavigationHrefs.has(`/category/${c.slug}`),
     )
     .map((c): [string, string] => [
       `/category/${c.slug}`,

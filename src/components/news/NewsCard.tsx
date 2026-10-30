@@ -7,6 +7,7 @@ import { ProgressiveImage as Image } from "@/components/ui/ProgressiveImage";
 import { MapPin, ArrowUpRight, Play } from "lucide-react";
 
 import type { Post } from "@/lib/types";
+import { duration } from "@/lib/utils/dates";
 import { EventDateBadge } from "@/components/ui/Primitives";
 import { BookmarkButton } from "./PostActions";
 import { postHref } from "@/lib/utils/post-href";
@@ -49,6 +50,9 @@ export function NewsCard({
             <Play size={19} fill="currentColor" />
           </span>
         )}
+        {post.duration_seconds ? (
+          <span className="card-duration">{duration(post.duration_seconds)}</span>
+        ) : null}
         <EventDateBadge date={post.event_date} />
       </Link>
       <div className="card-body">

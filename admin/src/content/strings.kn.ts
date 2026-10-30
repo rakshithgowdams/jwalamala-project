@@ -490,6 +490,7 @@ export const v4 = {
   tags: "ಟ್ಯಾಗ್‌ಗಳು",
   popularTags: "ಜನಪ್ರಿಯ ಟ್ಯಾಗ್‌ಗಳು",
   places: "ಊರುಗಳು",
+  mathas: "ಜೈನ ಮಠಗಳು",
   authors: "ಲೇಖಕರು",
   series: "ವಿಡಿಯೋ ಸರಣಿಗಳು",
   episodes: "ಸಂಚಿಕೆಗಳು",

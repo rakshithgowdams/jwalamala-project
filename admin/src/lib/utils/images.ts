@@ -15,9 +15,16 @@ export function isRemoteImage(value: string) {
   );
 }
 
-/** Bundled site images or ImageKit links; files are never stored in Supabase. */
+const supabasePublicImage =
+  /^(?:https:\/\/[a-z0-9]+\.supabase\.co|http:\/\/127\.0\.0\.1:54321)\/storage\/v1\/object\/public\/[A-Za-z0-9._/-]+$/i;
+
+/** Bundled site images, ImageKit links, or files in our public storage buckets. */
 export function isHostedImage(value: string) {
-  return value.startsWith("/images/") || isRemoteImage(value);
+  return (
+    value.startsWith("/images/") ||
+    isRemoteImage(value) ||
+    supabasePublicImage.test(value)
+  );
 }
 
 const thumbnailSizes = /^(?:default|mqdefault|hqdefault|sddefault|maxresdefault|[0-3])$/;

@@ -87,6 +87,33 @@ export function ResourceManager({
                   <option key={role}>{role}</option>
                 ))}
               </select>
+            ) : name === "parent_id" ? (
+              <select
+                name="parent_id"
+                defaultValue={String(selected.parent_id || "")}
+              >
+                <option value="">—</option>
+                {rows
+                  .filter(
+                    (row) => row.id && String(row.id) !== String(selected.id || ""),
+                  )
+                  .map((row) => (
+                    <option key={String(row.id)} value={String(row.id)}>
+                      {String(row.name_kn || row.slug || row.id)}
+                    </option>
+                  ))}
+              </select>
+            ) : name === "category_kind" ? (
+              <select
+                name="category_kind"
+                defaultValue={String(selected.category_kind || "listing")}
+              >
+                <option value="news">news — ಸುದ್ದಿ (ಜಿಲ್ಲೆ, ಊರು, ದಿನಾಂಕ)</option>
+                <option value="kshetra">kshetra — ಕ್ಷೇತ್ರ (ಜಿಲ್ಲೆ, ಊರು)</option>
+                <option value="programme">programme — ವಾಹಿನಿ ಕಾರ್ಯಕ್ರಮ</option>
+                <option value="upcoming">upcoming — ಮುಂಬರುವ</option>
+                <option value="listing">listing — ಸಾಮಾನ್ಯ ಪಟ್ಟಿ</option>
+              </select>
             ) : type === "textarea" ? (
               <textarea
                 name={name}

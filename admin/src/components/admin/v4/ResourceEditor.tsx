@@ -251,7 +251,7 @@ export function ResourceEditor({
                   ? choices.categories
                   : field.name === "target_places"
                     ? choices.places
-                    : field.name === "place_id"
+                    : field.name === "place_id" || field.name === "district_id"
                       ? choices.places
                       : field.name === "liveblog_post_id"
                         ? choices.liveblogs
@@ -284,7 +284,7 @@ export function ResourceEditor({
                 <StructuredEditor name={field.name} initial={value} />
               </fieldset>
             );
-          if (field.name === "place_id")
+          if (field.name === "place_id" || field.name === "district_id")
             return (
               <PlacePicker
                 key={field.name}

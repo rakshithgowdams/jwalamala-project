@@ -4,6 +4,9 @@ export type Category = {
   name_kn: string;
   name_en: string;
   name_hi?: string;
+  category_kind?: string;
+  show_in_menu?: boolean;
+  parent_id?: string | null;
 };
 export type Post = {
   id: string;
@@ -28,7 +31,11 @@ export type Post = {
   thumbnail_url: string;
   video_url: string | null;
   video_id: string | null;
-  video_provider: "youtube" | "facebook" | "none";
+  video_provider: "youtube" | "facebook" | "instagram" | "none";
+  social_platform?: "facebook" | "instagram" | null;
+  social_post_url?: string | null;
+  social_post_id?: string | null;
+  image_layout?: "single" | "split2" | "collage3" | "video";
   category_slugs: string[];
   is_featured: boolean;
   is_breaking: boolean;

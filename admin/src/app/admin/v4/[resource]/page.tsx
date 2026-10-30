@@ -23,7 +23,9 @@ export default async function Page({
         .order("sort_order")
         .order("name_kn")
         .limit(1000)
-    : query.order("created_at", { ascending: false }).limit(200));
+    : name === "mathas"
+      ? query.order("sort_order").order("name_kn").limit(200)
+      : query.order("created_at", { ascending: false }).limit(200));
   if (error) throw new Error("v4 migration required");
   const choices: Record<string, Choice[]> = {};
   for (const table of [

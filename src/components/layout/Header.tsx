@@ -15,23 +15,36 @@ import { CategoryNav, ThemeToggle } from "./Navigation";
 import { ScrollHeader } from "./ScrollHeader";
 import { AccountLink } from "./AccountLink";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
-import { getCategories } from "@/lib/queries/content";
+import { getCategories, getPublishedPlaceIds } from "@/lib/queries/content";
 import { getTheme } from "@/lib/theme/server";
 import { getV4Rows } from "@/lib/v4/queries";
-import { districtName, listDistricts } from "@/lib/utils/districts";
+import {
+  districtName,
+  districtsWithContent,
+} from "@/lib/utils/districts";
+import { listActiveMathas, mathaName } from "@/lib/utils/mathas";
+import { mathaHref } from "@/lib/taxonomy";
 export async function Header() {
   const { kn, locale } = await getUiStrings();
   const brand = brandParts(locale);
   // The ribbon runs from the mark's first "l" (ಲ / ल in the Indic spellings) to the end.
   const ribbonAt = Math.max(0, brand.mark.search(/[lಲल]/i));
   const { preference } = await getTheme();
-  const [categories, places] = await Promise.all([
+  const [categories, places, mathas, placeIds] = await Promise.all([
     getCategories(),
     getV4Rows("places").catch(() => []),
+    getV4Rows("mathas").catch(() => []),
+    getPublishedPlaceIds().catch(() => []),
   ]);
-  const districts = listDistricts(places, locale).map((district) => ({
-    href: "/districts/" + district.slug,
-    label: districtName(locale, district),
+  const districts = districtsWithContent(places, placeIds, locale).map(
+    (district) => ({
+      href: "/districts/" + district.slug,
+      label: districtName(locale, district),
+    }),
+  );
+  const mathaLinks = listActiveMathas(mathas, locale).map((matha) => ({
+    href: mathaHref(matha.slug),
+    label: mathaName(locale, matha),
   }));
   return (
     <ScrollHeader>
@@ -101,7 +114,11 @@ export async function Header() {
           </div>
         </div>
       </div>
-      <CategoryNav categories={categories} districts={districts} />
+      <CategoryNav
+        categories={categories}
+        districts={districts}
+        mathas={mathaLinks}
+      />
       <Suspense
         fallback={
           <div

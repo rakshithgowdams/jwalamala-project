@@ -1,5 +1,6 @@
 import { v4Resources } from "@/lib/v4/admin-schema";
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { requireStaff } from "@/lib/auth/require-user";
 import { resources, type Resource } from "@/lib/admin/resources";
 import { ResourceManager } from "@/components/admin/ResourceManager";
@@ -38,6 +39,11 @@ export default async function ResourcePage({
     <>
       <div className="page-heading">
         <h1>{l(resources[resource as Resource].title)}</h1>
+        {resource === "categories" && (
+          <p>
+            <Link href="/admin/v4/mathas">ಜೈನ ಮಠಗಳು</Link>
+          </p>
+        )}
       </div>
       <ResourceManager resource={resource as Resource} rows={data || []} />
     </>

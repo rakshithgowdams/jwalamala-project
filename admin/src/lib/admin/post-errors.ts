@@ -45,9 +45,9 @@ const field: Record<string, Tri> = {
     hi: "ज़िला / शहर पेज: सूची से स्थान फिर से चुनें।",
   },
   video_url: {
-    en: "Video: this is not a YouTube or Facebook video link. Paste the video's own link, or the <iframe> code from Share → Embed.",
-    kn: "ವಿಡಿಯೋ: ಇದು YouTube ಅಥವಾ Facebook ವಿಡಿಯೋ ಲಿಂಕ್ ಅಲ್ಲ. ವಿಡಿಯೋದ ಲಿಂಕ್ ಅಥವಾ Share → Embed ನಲ್ಲಿನ <iframe> ಕೋಡ್ ಅಂಟಿಸಿ.",
-    hi: "वीडियो: यह YouTube या Facebook वीडियो लिंक नहीं है। वीडियो का लिंक, या Share → Embed से <iframe> कोड चिपकाएँ।",
+    en: "Video: this is not a YouTube, Facebook or Instagram video link. Paste the video's own link, or the <iframe> code from Share → Embed.",
+    kn: "ವಿಡಿಯೋ: ಇದು YouTube, Facebook ಅಥವಾ Instagram ವಿಡಿಯೋ ಲಿಂಕ್ ಅಲ್ಲ. ವಿಡಿಯೋದ ಲಿಂಕ್ ಅಥವಾ Share → Embed ನಲ್ಲಿನ <iframe> ಕೋಡ್ ಅಂಟಿಸಿ.",
+    hi: "वीडियो: यह YouTube, Facebook या Instagram वीडियो लिंक नहीं है। वीडियो का लिंक, या Share → Embed से <iframe> कोड चिपकाएँ।",
   },
   seo_title: {
     en: "SEO title: keep it to 110 characters or fewer.",
@@ -75,9 +75,9 @@ const field: Record<string, Tri> = {
     hi: "लेख: पाठ बहुत लंबा है। इसे दो लेखों में बाँटें।",
   },
   media_images: {
-    en: "Gallery images: use ImageKit links, at most 3, each with a credit.",
-    kn: "ಗ್ಯಾಲರಿ ಚಿತ್ರಗಳು: ImageKit ಲಿಂಕ್‌ಗಳನ್ನು ಬಳಸಿ, ಗರಿಷ್ಠ 3, ಪ್ರತಿಯೊಂದಕ್ಕೂ ಕೃಪೆ ಸಹಿತ.",
-    hi: "गैलरी इमेज: ImageKit लिंक इस्तेमाल करें, अधिकतम 3, हर एक के क्रेडिट के साथ।",
+    en: "Gallery images: use ImageKit or stored image links, at most 3.",
+    kn: "ಗ್ಯಾಲರಿ ಚಿತ್ರಗಳು: ImageKit ಅಥವಾ ಉಳಿಸಿದ ಚಿತ್ರದ ಲಿಂಕ್‌ಗಳನ್ನು ಬಳಸಿ, ಗರಿಷ್ಠ 3.",
+    hi: "गैलरी इमेज: ImageKit या सहेजे चित्र लिंक इस्तेमाल करें, अधिकतम 3.",
   },
   tag_ids: {
     en: "Tags: choose 20 or fewer.",
@@ -134,9 +134,9 @@ export const postErrors = {
   shortNeedsVideo: {
     field: "video_url",
     message: {
-      en: "Video: a short video needs a YouTube or Facebook link.",
-      kn: "ವಿಡಿಯೋ: ಶಾರ್ಟ್ ವಿಡಿಯೋಗೆ YouTube ಅಥವಾ Facebook ಲಿಂಕ್ ಬೇಕು.",
-      hi: "वीडियो: शॉर्ट वीडियो के लिए YouTube या Facebook लिंक चाहिए।",
+      en: "Video: a short video needs a YouTube, Facebook or Instagram link.",
+      kn: "ವಿಡಿಯೋ: ಶಾರ್ಟ್ ವಿಡಿಯೋಗೆ YouTube, Facebook ಅಥವಾ Instagram ಲಿಂಕ್ ಬೇಕು.",
+      hi: "वीडियो: शॉर्ट वीडियो के लिए YouTube, Facebook या Instagram लिंक चाहिए।",
     },
   },
   badVideo: { field: "video_url", message: field.video_url },

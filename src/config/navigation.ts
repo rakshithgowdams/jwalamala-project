@@ -2,10 +2,10 @@ import type { Locale } from "@/lib/i18n/strings";
 
 export type NavLabel = { kn: string; en: string; hi: string };
 export type NavLink = NavLabel & { href: string };
-/** "districts" is filled from the live district list rather than written out here. */
+/** "districts" and "mathas" are filled from the live lists rather than written out here. */
 export type NavSection = NavLink & {
   key: string;
-  children?: NavLink[] | "districts";
+  children?: NavLink[] | "districts" | "mathas";
 };
 
 export const navLabel = (locale: Locale, label: NavLabel) => label[locale];
@@ -90,6 +90,7 @@ export const mainNavigation: NavSection[] = [
   {
     key: "matha",
     ...category("jain-matha", "ಜೈನ ಮಠಗಳು", "Jain mathas", "जैन मठ"),
+    children: "mathas",
   },
   {
     key: "mahamastakabhisheka",
@@ -120,6 +121,18 @@ export const mainNavigation: NavSection[] = [
         "ಜ್ವಾಲಾಮಾಲ ಹೆಮ್ಮೆಯ ಶ್ರಾವಕರು",
         "Proud shravakas",
         "गौरवशाली श्रावक",
+      ),
+      category(
+        "sahitigalondige-samvada",
+        "ಸಾಹಿತಿಗಳೊಂದಿಗೆ ಸಂವಾದ",
+        "Conversations with writers",
+        "साहित्यकारों से संवाद",
+      ),
+      category(
+        "kiru-parichaya",
+        "ಕಿರು ಪರಿಚಯ / ವ್ಯಕ್ತಿ ಪರಿಚಯ",
+        "Short profiles",
+        "संक्षिप्त परिचय",
       ),
       category(
         "jnana-deepike",
@@ -163,6 +176,19 @@ export const mainNavigation: NavSection[] = [
         "Chintana–Manthana",
         "चिंतन–मंथन",
       ),
+    ],
+  },
+  {
+    key: "social",
+    ...category(
+      "social-media",
+      "ಸಾಮಾಜಿಕ ಜಾಲತಾಣ",
+      "Social media",
+      "सोशल मीडिया",
+    ),
+    children: [
+      category("social-posters", "ಪೋಸ್ಟರ್‌ಗಳು", "Posters", "पोस्टर"),
+      category("social-videos", "ವಿಡಿಯೋಗಳು", "Videos", "वीडियो"),
     ],
   },
   {

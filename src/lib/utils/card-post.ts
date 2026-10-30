@@ -33,7 +33,7 @@ export function toCardPost(post: Post): Post {
     video_url: null,
     video_id: null,
     video_provider: post.video_provider,
-    duration_seconds: null,
+    duration_seconds: post.duration_seconds,
     view_count: 0,
     tags: post.tags?.slice(0, 2),
   };

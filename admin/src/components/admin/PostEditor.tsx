@@ -19,7 +19,7 @@ import { slugify } from "@/lib/utils/slug";
 import { site } from "@/config/site";
 import type { PlaceOption } from "@/lib/places/search";
 import { PlacePicker } from "./PlacePicker";
-import { FacebookLogo, YouTubeLogo } from "./BrandIcons";
+import { FacebookLogo, InstagramLogo, YouTubeLogo } from "./BrandIcons";
 import { DeletePostButton } from "./DeletePostButton";
 import { RestorePostButton } from "./RestorePostButton";
 import { videoFromInput } from "@/lib/utils/video";
@@ -27,6 +27,30 @@ import { videoFromInput } from "@/lib/utils/video";
 /** datetime-local inputs are entered in India time. */
 const istInput = (value?: string | null) =>
   value ? new Date(Date.parse(value) + 19800000).toISOString().slice(0, 16) : "";
+
+function nestedCategories(categories: Category[]) {
+  const children = new Map<string | null, Category[]>();
+  for (const category of categories) {
+    const key = category.parent_id || null;
+    children.set(key, [...(children.get(key) || []), category]);
+  }
+  const walk = (
+    parent: string | null,
+    depth: number,
+  ): { category: Category; depth: number }[] =>
+    (children.get(parent) || []).flatMap((category) => [
+      { category, depth },
+      ...walk(category.id, depth + 1),
+    ]);
+  const rooted = walk(null, 0);
+  const seen = new Set(rooted.map((row) => row.category.id));
+  return [
+    ...rooted,
+    ...categories
+      .filter((category) => !seen.has(category.id))
+      .map((category) => ({ category, depth: 0 })),
+  ];
+}
 
 function Section({
   title,
@@ -136,6 +160,37 @@ export function PostEditor({
   const imagePreview = imageLink.trim() ? parseImageLink(imageLink)?.src || "" : "";
   const [videoInput, setVideoInput] = useState(post?.video_url || "");
   const video = videoInput.trim() ? videoFromInput(videoInput) : null;
+  const nested = nestedCategories(categories);
+  const [primaryCategory, setPrimaryCategory] = useState(
+    post?.primary_category || categories[0]?.id || "",
+  );
+  const [extraCategories, setExtraCategories] = useState(() => {
+    const primary = post?.primary_category;
+    return new Set(
+      categories
+        .filter((category) => post?.category_slugs.includes(category.slug) && category.id !== primary)
+        .map((category) => category.id),
+    );
+  });
+  const [postType, setPostType] = useState(post?.type || "article");
+  const [gallery, setGallery] = useState(post?.media_images || []);
+  const [socialPlatform, setSocialPlatform] = useState(post?.social_platform || "");
+  const [socialUrl, setSocialUrl] = useState(post?.social_post_url || "");
+  const selectedIds = new Set([primaryCategory, ...extraCategories]);
+  const selectedSlugs = new Set(
+    categories.filter((category) => selectedIds.has(category.id)).map((category) => category.slug),
+  );
+  const isPoster = selectedSlugs.has("social-posters");
+  const isSocialVideo = selectedSlugs.has("social-videos");
+  const imageLayout = isPoster
+    ? gallery.length >= 3
+      ? "collage3"
+      : gallery.length === 2
+        ? "split2"
+        : "single"
+    : video
+      ? "video"
+      : post?.image_layout || "single";
 
   function clearInvalid() {
     formRef.current
@@ -365,7 +420,9 @@ export function PostEditor({
       }}
     >
       {/* Kept as they were: no longer edited here, but saved so nothing is lost. */}
-      <input type="hidden" name="media_images" value={JSON.stringify(post?.media_images || [])} />
+      <input type="hidden" name="media_images" value={JSON.stringify(gallery)} />
+      <input type="hidden" name="image_layout" value={imageLayout} />
+      <input type="hidden" name="social_post_id" value={post?.social_post_id || ""} />
       <input type="hidden" name="key_points" value={keyPointsText} />
       <input type="hidden" name="transcript" value={post?.transcript || ""} />
       <input type="hidden" name="summary_points" value="" />
@@ -436,9 +493,23 @@ export function PostEditor({
           </div>
           <label className="field">
             {kn.primary}
-            <select name="primary_category" required defaultValue={post?.primary_category}>
-              {categories.map((c) => (
+            <select
+              name="primary_category"
+              required
+              value={primaryCategory}
+              onChange={(event) => {
+                const next = event.target.value;
+                setPrimaryCategory(next);
+                setExtraCategories((current) => {
+                  const copy = new Set(current);
+                  copy.delete(next);
+                  return copy;
+                });
+              }}
+            >
+              {nested.map(({ category: c, depth }) => (
                 <option key={c.id} value={c.id}>
+                  {depth ? "— ".repeat(depth) : ""}
                   {c.name_kn}
                 </option>
               ))}
@@ -548,6 +619,38 @@ export function PostEditor({
               {tr({ en: "Image credit (optional)", kn: "ಚಿತ್ರ ಕೃಪೆ (ಐಚ್ಛಿಕ)", hi: "चित्र श्रेय (वैकल्पिक)" })}
               <input name="image_credit" maxLength={200} defaultValue={post?.image_credit || ""} />
             </label>
+            {isPoster && (
+              <div className="editor-stack">
+                <p>
+                  {tr({
+                    en: "Posters: up to 3 images. Title and image are enough — body text is optional.",
+                    kn: "ಪೋಸ್ಟರ್‌ಗಳು: 3 ಚಿತ್ರಗಳವರೆಗೆ. ಶೀರ್ಷಿಕೆ ಮತ್ತು ಚಿತ್ರ ಸಾಕು — ಲೇಖನದ ಪಠ್ಯ ಐಚ್ಛಿಕ.",
+                    hi: "पोस्टर: अधिकतम 3 चित्र. शीर्षक और चित्र पर्याप्त हैं — लेख का पाठ वैकल्पिक है।",
+                  })}
+                </p>
+                {[0, 1, 2].map((index) => (
+                  <label className="field" key={index}>
+                    {tr({ en: "Poster image", kn: "ಪೋಸ್ಟರ್ ಚಿತ್ರ", hi: "पोस्टर चित्र" })} {index + 1}
+                    <input
+                      value={gallery[index]?.url || ""}
+                      placeholder="https://…"
+                      onChange={(event) => {
+                        const url = event.target.value.trim();
+                        setGallery((current) => {
+                          const next = [...current];
+                          if (!url) {
+                            next.splice(index, 1);
+                            return next;
+                          }
+                          next[index] = { url, credit: next[index]?.credit || "" };
+                          return next.filter((image) => image?.url);
+                        });
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </Section>
 
@@ -718,15 +821,60 @@ export function PostEditor({
             hi: "वैकल्पिक। लेख के नीचे, पाठ के बाद दिखता है।",
           })}
         >
+          <label className="field">
+            {tr({ en: "Video provider", kn: "ವಿಡಿಯೋ ಒದಗಿಸುವವರು", hi: "वीडियो प्रदाता" })}
+            <select
+              value={video?.provider || "none"}
+              disabled
+              aria-readonly="true"
+            >
+              <option value="none">{tr({ en: "None (from the link)", kn: "ಇಲ್ಲ (ಲಿಂಕ್‌ನಿಂದ)", hi: "कोई नहीं (लिंक से)" })}</option>
+              <option value="youtube">YouTube</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+            </select>
+          </label>
+          <label className="field">
+            {tr({ en: "Social platform", kn: "ಸಾಮಾಜಿಕ ಜಾಲತಾಣ", hi: "सोशल प्लेटफ़ॉर्म" })}
+            <select
+              name="social_platform"
+              value={socialPlatform}
+              onChange={(event) => setSocialPlatform(event.target.value)}
+            >
+              <option value="">{tr({ en: "Not from social media", kn: "ಸಾಮಾಜಿಕ ಜಾಲತಾಣದ್ದಲ್ಲ", hi: "सोशल मीडिया से नहीं" })}</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+            </select>
+          </label>
           <label className="field wide">
-            {tr({ en: "YouTube / Facebook link or embed code", kn: "YouTube / Facebook ಲಿಂಕ್ ಅಥವಾ ಎಂಬೆಡ್ ಕೋಡ್", hi: "YouTube / Facebook लिंक या एम्बेड कोड" })}
+            {tr({ en: "Original post URL", kn: "ಮೂಲ ಪೋಸ್ಟ್ URL", hi: "मूल पोस्ट URL" })}
+            <input
+              name="social_post_url"
+              value={socialUrl}
+              maxLength={2000}
+              placeholder="https://www.facebook.com/…  or  https://www.instagram.com/p/…"
+              onChange={(event) => setSocialUrl(event.target.value)}
+            />
+          </label>
+          <label className="field wide">
+            {tr({ en: "YouTube / Facebook / Instagram link or embed code", kn: "YouTube / Facebook / Instagram ಲಿಂಕ್ ಅಥವಾ ಎಂಬೆಡ್ ಕೋಡ್", hi: "YouTube / Facebook / Instagram लिंक या एम्बेड कोड" })}
             <textarea
               name="video_url"
               rows={2}
               value={videoInput}
-              onChange={(e) => setVideoInput(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setVideoInput(next);
+                const parsed = next.trim() ? videoFromInput(next) : null;
+                if (parsed?.provider === "instagram" || parsed?.provider === "facebook") {
+                  setSocialPlatform(parsed.provider);
+                  setSocialUrl((current) => current || parsed.url);
+                  if (isSocialVideo)
+                    setPostType(parsed.kind === "reel" ? "short" : "video");
+                }
+              }}
               aria-invalid={videoInput.trim() && !video ? true : undefined}
-              placeholder={'https://www.youtube.com/watch?v=…   or   <iframe src="https://www.facebook.com/plugins/video.php?href=…"></iframe>'}
+              placeholder={'https://www.instagram.com/reel/…   or   https://www.facebook.com/watch/?v=…'}
             />
             {!videoInput.trim() ? (
               <small className="video-source-hint">
@@ -736,6 +884,9 @@ export function PostEditor({
                 <span className="video-source">
                   <FacebookLogo size={15} /> Facebook
                 </span>
+                <span className="video-source">
+                  <InstagramLogo size={15} /> Instagram
+                </span>
                 {tr({
                   en: "Paste the video link, or the <iframe> code from the video's Share → Embed option.",
                   kn: "ವಿಡಿಯೋ ಲಿಂಕ್ ಅಥವಾ ವಿಡಿಯೋದ Share → Embed ಆಯ್ಕೆಯ <iframe> ಕೋಡ್ ಅಂಟಿಸಿ.",
@@ -744,11 +895,19 @@ export function PostEditor({
               </small>
             ) : video ? (
               <small className={"video-detected is-" + video.provider}>
-                {video.provider === "facebook" ? <FacebookLogo size={16} /> : <YouTubeLogo size={14} />}
+                {video.provider === "facebook" ? (
+                  <FacebookLogo size={16} />
+                ) : video.provider === "instagram" ? (
+                  <InstagramLogo size={16} />
+                ) : (
+                  <YouTubeLogo size={14} />
+                )}
                 <strong>
                   {video.provider === "facebook"
                     ? tr({ en: "Facebook video found", kn: "Facebook ವಿಡಿಯೋ ಸಿಕ್ಕಿದೆ", hi: "Facebook वीडियो मिला" })
-                    : tr({ en: "YouTube video found", kn: "YouTube ವಿಡಿಯೋ ಸಿಕ್ಕಿದೆ", hi: "YouTube वीडियो मिला" })}
+                    : video.provider === "instagram"
+                      ? tr({ en: "Instagram video found", kn: "Instagram ವಿಡಿಯೋ ಸಿಕ್ಕಿದೆ", hi: "Instagram वीडियो मिला" })
+                      : tr({ en: "YouTube video found", kn: "YouTube ವಿಡಿಯೋ ಸಿಕ್ಕಿದೆ", hi: "YouTube वीडियो मिला" })}
                 </strong>
                 <a href={video.url} target="_blank" rel="noopener noreferrer">
                   {tr({ en: "Open to check", kn: "ತೆರೆದು ಪರಿಶೀಲಿಸಿ", hi: "खोलकर जाँचें" })}
@@ -757,9 +916,9 @@ export function PostEditor({
             ) : (
               <small className="video-detected is-error" role="alert">
                 {tr({
-                  en: "This is not a YouTube or Facebook video link. Paste the video's own link, or the <iframe> code from Share → Embed.",
-                  kn: "ಇದು YouTube ಅಥವಾ Facebook ವಿಡಿಯೋ ಲಿಂಕ್ ಅಲ್ಲ. ವಿಡಿಯೋದ ಲಿಂಕ್ ಅಥವಾ Share → Embed ನಲ್ಲಿನ <iframe> ಕೋಡ್ ಅಂಟಿಸಿ.",
-                  hi: "यह YouTube या Facebook वीडियो लिंक नहीं है। वीडियो का लिंक, या Share → Embed से <iframe> कोड चिपकाएँ।",
+                  en: "This is not a YouTube, Facebook or Instagram video link. Paste the video's own link, or the <iframe> code from Share → Embed.",
+                  kn: "ಇದು YouTube, Facebook ಅಥವಾ Instagram ವಿಡಿಯೋ ಲಿಂಕ್ ಅಲ್ಲ. ವಿಡಿಯೋದ ಲಿಂಕ್ ಅಥವಾ Share → Embed ನಲ್ಲಿನ <iframe> ಕೋಡ್ ಅಂಟಿಸಿ.",
+                  hi: "यह YouTube, Facebook या Instagram वीडियो लिंक नहीं है। वीडियो का लिंक, या Share → Embed से <iframe> कोड चिपकाएँ।",
                 })}
               </small>
             )}
@@ -912,12 +1071,26 @@ export function PostEditor({
             </div>
             <label className="field">
               {t.contentType}
-              <select name="type" defaultValue={post?.type || "article"}>
+              <select
+                name="type"
+                value={postType}
+                onChange={(event) => setPostType(event.target.value as Post["type"])}
+              >
                 <option value="article">{tr({ en: "Article (video below the text)", kn: "ಲೇಖನ (ಪಠ್ಯದ ಕೆಳಗೆ ವಿಡಿಯೋ)", hi: "लेख (पाठ के नीचे वीडियो)" })}</option>
                 <option value="video">{tr({ en: "Video story", kn: "ವಿಡಿಯೋ ಸುದ್ದಿ", hi: "वीडियो स्टोरी" })}</option>
-                <option value="short">{tr({ en: "Short video", kn: "ಕಿರು ವಿಡಿಯೋ", hi: "छोटा वीडियो" })}</option>
+                <option value="short">{tr({ en: "Reel / short", kn: "ರೀಲ್ / ಕಿರು ವಿಡಿಯೋ", hi: "रील / छोटा वीडियो" })}</option>
               </select>
             </label>
+            {isSocialVideo && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={postType === "short"}
+                  onChange={(event) => setPostType(event.target.checked ? "short" : "video")}
+                />
+                {tr({ en: "Reel / Short", kn: "ರೀಲ್ / ಶಾರ್ಟ್", hi: "रील / शॉर्ट" })}
+              </label>
+            )}
           </div>
         </section>
 
@@ -929,9 +1102,28 @@ export function PostEditor({
             <fieldset className="editor-checklist-box">
               <legend>{tr({ en: "Also show in", kn: "ಇವುಗಳಲ್ಲೂ ತೋರಿಸಿ", hi: "इनमें भी दिखाएँ" })}</legend>
               <div className="editor-scroll-list">
-                {categories.map((c) => (
-                  <label key={c.id}>
-                    <input type="checkbox" name="category_ids" value={c.id} defaultChecked={post?.category_slugs.includes(c.slug)} />
+                {nested.map(({ category: c, depth }) => (
+                  <label key={c.id} className={depth ? "editor-category-child" : undefined}>
+                    <input
+                      type="checkbox"
+                      name="category_ids"
+                      value={c.id}
+                      checked={extraCategories.has(c.id) || c.id === primaryCategory}
+                      disabled={c.id === primaryCategory}
+                      onChange={(event) => {
+                        const on = event.target.checked;
+                        setExtraCategories((current) => {
+                          const copy = new Set(current);
+                          if (on) copy.add(c.id);
+                          else copy.delete(c.id);
+                          return copy;
+                        });
+                        if (on && c.slug === "social-videos" && postType === "article")
+                          setPostType("video");
+                        if (on && c.slug === "social-posters" && postType !== "article" && !selectedSlugs.has("social-videos"))
+                          setPostType("article");
+                      }}
+                    />
                     {c.name_kn}
                   </label>
                 ))}

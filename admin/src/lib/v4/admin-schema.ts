@@ -190,6 +190,15 @@ export const v4Schemas = {
     description_en: translation(2000),
     description_hi: translation(2000),
   }),
+  mathas: z.object({
+    slug,
+    name_kn: title,
+    name_en: translation(150),
+    name_hi: translation(150),
+    district_id: nullableId,
+    sort_order: number.int(),
+    is_active: bool,
+  }),
   authors: z.object({
     slug,
     name_kn: title,
@@ -641,6 +650,19 @@ export const v4Resources: Record<
       f("description_kn", kn.summary, "textarea"),
       f("description_en", "English description", "textarea"),
       f("description_hi", "Hindi description", "textarea"),
+    ],
+  },
+  mathas: {
+    title: t.mathas,
+    permission: "content.edit",
+    fields: [
+      f("slug", kn.slug),
+      f("name_kn", kn.title),
+      f("name_en", "English"),
+      f("name_hi", "Hindi"),
+      f("district_id", t.district),
+      f("sort_order", t.order, "number"),
+      f("is_active", t.enabled, "checkbox"),
     ],
   },
   authors: {

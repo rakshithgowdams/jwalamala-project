@@ -11,6 +11,21 @@ export function YouTubeLogo({ size = 18 }: { size?: number }) {
   );
 }
 
+export function InstagramLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <radialGradient id="instagram-mark" cx="30%" cy="107%" r="150%">
+        <stop offset="0%" stopColor="#fdf497" />
+        <stop offset="50%" stopColor="#fd5949" />
+        <stop offset="100%" stopColor="#285AEB" />
+      </radialGradient>
+      <rect width="24" height="24" rx="6" fill="url(#instagram-mark)" />
+      <circle cx="12" cy="12" r="5.2" fill="none" stroke="#fff" strokeWidth="1.8" />
+      <circle cx="17.4" cy="6.6" r="1.2" fill="#fff" />
+    </svg>
+  );
+}
+
 export function FacebookLogo({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">

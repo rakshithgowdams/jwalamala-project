@@ -21,6 +21,7 @@ const groups: { title: Tri; links: [string, Tri][] }[] = [
       ["posts", { en: "Articles", kn: "ಲೇಖನಗಳು", hi: "लेख" }],
       ["desk", { en: "News desk", kn: "ಸುದ್ದಿ ವಿಭಾಗ", hi: "न्यूज़ डेस्क" }],
       ["categories", { en: "Categories", kn: "ವರ್ಗಗಳು", hi: "श्रेणियाँ" }],
+      ["mathas", { en: "Jain mathas", kn: "ಜೈನ ಮಠಗಳು", hi: "जैन मठ" }],
       ["home", { en: "Home page layout", kn: "ಮುಖಪುಟ ವಿನ್ಯಾಸ", hi: "होम पेज लेआउट" }],
       ["trending", { en: "Trending topics", kn: "ಈಗ ಚರ್ಚೆಯಲ್ಲಿ", hi: "ट्रेंडिंग विषय" }],
       ["topics", { en: "Topic collections", kn: "ವಿಷಯ ಸಂಗ್ರಹ", hi: "विषय संग्रह" }],

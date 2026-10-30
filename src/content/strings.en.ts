@@ -470,6 +470,7 @@ export const v4en = {
   tags: "Tags",
   popularTags: "Popular tags",
   places: "Places",
+  mathas: "Jain mathas",
   authors: "Authors",
   series: "Series",
   episodes: "Episodes",

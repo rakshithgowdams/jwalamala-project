@@ -325,9 +325,20 @@ export type Correction = {
   note_hi?: string;
   created_at: string;
 };
+export type Matha = {
+  id: string;
+  slug: string;
+  name_kn: string;
+  name_en: string;
+  name_hi?: string;
+  district_id?: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
 export type DataTables = {
   tags: Tag;
   places: Place;
+  mathas: Matha;
   authors: Author;
   topics: Topic;
   trending_items: TrendingItem;

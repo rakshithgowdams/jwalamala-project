@@ -472,6 +472,7 @@ export const v4hi = {
   tags: "टैग",
   popularTags: "लोकप्रिय टैग",
   places: "स्थान",
+  mathas: "जैन मठ",
   authors: "लेखक",
   series: "वीडियो श्रृंखला",
   episodes: "एपिसोड",

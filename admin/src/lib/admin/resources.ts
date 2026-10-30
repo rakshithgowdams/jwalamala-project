@@ -10,6 +10,9 @@ export const resources = {
       ["name_hi", "Hindi name", "text"],
       ["slug", kn.slug, "text"],
       ["sort_order", kn.sort, "number"],
+      ["parent_id", "ಮೇಲ್ವರ್ಗ / Parent", "text"],
+      ["category_kind", "ವರ್ಗದ ಬಗೆ", "text"],
+      ["show_in_menu", "ಮೆನುವಿನಲ್ಲಿ ತೋರಿಸಿ", "checkbox"],
     ],
   },
   events: {
@@ -67,6 +70,16 @@ export const resourceSchemas = {
     name_hi: z.string().max(200).default(""),
     slug: z.string().regex(/^[a-z0-9-]+$/),
     sort_order: z.coerce.number().int(),
+    parent_id: z
+      .union([z.uuid(), z.literal("")])
+      .transform((value) => value || null)
+      .optional(),
+    category_kind: z
+      .enum(["news", "kshetra", "programme", "listing", "upcoming"])
+      .default("listing"),
+    show_in_menu: z
+      .union([z.boolean(), z.literal("on"), z.literal("")])
+      .transform((value) => value === true || value === "on"),
   }),
   events: z
     .object({

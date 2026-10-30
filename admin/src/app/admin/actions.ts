@@ -47,8 +47,8 @@ const postSchema = z.object({
       z
         .array(
           z.object({
-            url: z.string().trim().max(2000).refine(isHostedImage),
-            credit: z.string().trim().min(1).max(200),
+            url: z.string().trim().max(2000).refine((value) => isHostedImage(value) || isCoverImage(value)),
+            credit: z.string().trim().max(200).default(""),
           }),
         )
         .max(3),
@@ -104,6 +104,10 @@ const postSchema = z.object({
   status: z.enum(["draft", "published", "scheduled"]),
   scheduled_for: z.string().optional(),
   video_url: z.string().max(5000).default(""),
+  image_layout: z.enum(["single", "split2", "collage3", "video"]).default("single"),
+  social_platform: z.enum(["facebook", "instagram", ""]).default(""),
+  social_post_url: z.string().trim().max(2000).default(""),
+  social_post_id: z.string().trim().max(200).default(""),
   primary_category: z.uuid(),
   category_ids: z.array(z.uuid()).max(30).default([]),
 });
@@ -164,13 +168,42 @@ export async function savePost(input: unknown): Promise<{ id?: string; error?: s
   if (p.video_url.trim() && !video) return fail(postErrors.badVideo);
   if (p.type === "short" && !video) return fail(postErrors.shortNeedsVideo);
   const text = excerpt(p.body_html);
-  if (publishing && !text && !video) return fail(postErrors.bodyRequired);
+  const categoryIds = [...new Set([p.primary_category, ...p.category_ids])];
+  const { data: assigned } = await db
+    .from("categories")
+    .select("slug")
+    .in("id", categoryIds);
+  const slugs = new Set((assigned || []).map((row: { slug: string }) => row.slug));
+  const isPoster = slugs.has("social-posters");
+  const isSocialVideo = slugs.has("social-videos");
+  const posterReady =
+    isPoster &&
+    (p.media_images.length > 0 || p.thumbnail_url !== "/images/jwalamala-logo.jpg");
+  if (publishing && isSocialVideo && !video) return fail(postErrors.badVideo);
+  if (publishing && !text && !video && !posterReady) return fail(postErrors.bodyRequired);
   // Editors write only the Kannada article; everything below is derived so a
   // story can be published with a title, a category and a body.
   const summary = p.summary_kn.trim() || text || p.title_kn.trim();
   const eventDate = p.event_date || isoToday();
-  const categoryIds = [...new Set([p.primary_category, ...p.category_ids])];
-  const type = video && (p.type === "video" || p.type === "short") ? p.type : "article";
+  const type = video && (p.type === "video" || p.type === "short" || isSocialVideo)
+    ? p.type === "short" || video.kind === "reel"
+      ? "short"
+      : "video"
+    : "article";
+  const image_layout = isPoster
+    ? p.media_images.length >= 3
+      ? "collage3"
+      : p.media_images.length === 2
+        ? "split2"
+        : "single"
+    : video
+      ? "video"
+      : p.image_layout;
+  const social_platform =
+    p.social_platform ||
+    (video?.provider === "instagram" || video?.provider === "facebook"
+      ? video.provider
+      : "");
   let body;
   try {
     body = JSON.parse(p.body_json);
@@ -231,6 +264,14 @@ export async function savePost(input: unknown): Promise<{ id?: string; error?: s
           : p.breaking_until
         : null,
       type,
+      image_layout,
+      social_platform,
+      social_post_url: p.social_post_url,
+      social_post_id: p.social_post_id,
+      media_images: p.media_images.map((image) => ({
+        url: image.url,
+        credit: image.credit || site.fullName,
+      })),
       title_translit: transliterateKannada(p.title_kn).toLowerCase(),
     },
   });

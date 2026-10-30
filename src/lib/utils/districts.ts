@@ -52,3 +52,23 @@ export const townsInDistrict = (places: Place[], district: Place) =>
       placeState(place) === placeState(district) &&
       place.district === district.district,
   );
+
+/** Districts that have at least one published article. Falls back to the full list if none map. */
+export function districtsWithContent(
+  places: Place[],
+  placeIds: string[],
+  locale: Locale,
+) {
+  const byId = new Map(places.map((place) => [place.id, place]));
+  const keys = new Set<string>();
+  for (const id of placeIds) {
+    const place = byId.get(id);
+    if (!place) continue;
+    keys.add(placeState(place) + "::" + place.district);
+  }
+  const all = listDistricts(places, locale);
+  const withNews = all.filter((district) =>
+    keys.has(placeState(district) + "::" + district.district),
+  );
+  return withNews.length ? withNews : all;
+}

@@ -17,7 +17,7 @@ const postColumns =
   "*,key_points(*),post_categories(categories(slug)),post_tags(tags(*))";
 /** List pages do not need the article body or transcript, which are the heavy columns. */
 const listColumns =
-  "id,slug,title_kn,title_en,title_hi,summary_kn,summary_en,summary_hi,title_translit,type,status,event_date,published_at,updated_at,event_place,thumbnail_url,video_url,video_id,video_provider,is_featured,is_breaking,is_live,duration_seconds,view_count,is_seed,place_id,image_credit,post_categories(categories(slug)),post_tags(tags(slug,name_kn,name_en,name_hi))";
+  "id,slug,title_kn,title_en,title_hi,summary_kn,summary_en,summary_hi,title_translit,type,status,event_date,published_at,updated_at,event_place,thumbnail_url,video_url,video_id,video_provider,media_images,image_layout,duration_seconds,view_count,is_seed,place_id,image_credit,social_platform,social_post_url,post_categories(categories(slug)),post_tags(tags(slug,name_kn,name_en,name_hi))";
 
 /** The publication cutoff is stable for a minute so repeated page loads share one database response. */
 function publishedCutoff() {
@@ -95,6 +95,38 @@ const loadCategories = unstable_cache(
 export const getCategories = cache(async (): Promise<Category[]> => {
   if (site.demo) return categories;
   return loadCategories();
+});
+
+const loadPublishedPlaceIds = unstable_cache(
+  async (): Promise<string[]> => {
+    const db = publicDb();
+    if (!db) return [];
+    const ids: string[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await db
+        .from("posts")
+        .select("place_id")
+        .eq("status", "published")
+        .lte("published_at", publishedCutoff())
+        .not("place_id", "is", null)
+        .range(offset, offset + 999);
+      if (error || !data?.length) break;
+      for (const row of data) {
+        const id = (row as { place_id?: string | null }).place_id;
+        if (id) ids.push(id);
+      }
+      if (data.length < 1000) break;
+    }
+    return ids;
+  },
+  ["published-place-ids"],
+  { revalidate: 300, tags: ["public-content"] },
+);
+
+export const getPublishedPlaceIds = cache(async (): Promise<string[]> => {
+  if (site.demo)
+    return demoPosts.map((post) => post.place_id).filter((id): id is string => !!id);
+  return loadPublishedPlaceIds();
 });
 const loadEvents = unstable_cache(
   async (): Promise<NewsEvent[]> => {

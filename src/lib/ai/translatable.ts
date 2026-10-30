@@ -122,6 +122,7 @@ export const translatable: Record<string, TranslatableField[]> = {
     short("name_kn", "name", 150),
     long("description_kn", "description", 2000),
   ],
+  mathas: [short("name_kn", "name", 300)],
   authors: [
     short("name_kn", "name", 300),
     short("role_kn", "role", 300),
