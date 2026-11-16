@@ -101,7 +101,9 @@ export async function sendChatMessage(input: unknown): Promise<Result & { messag
   const access = await gate();
   if ("denied" in access) return access.denied;
   const { server, user, profile, fail, isAdmin } = access;
-  const parsed = z.object({ roomId: uuid, body: z.string().max(4000) }).safeParse(input);
+  const parsed = z
+    .object({ roomId: uuid, body: z.string().max(4000), id: uuid.optional() })
+    .safeParse(input);
   if (!parsed.success)
     return fail("Enter a message.", "ಸಂದೇಶ ನಮೂದಿಸಿ.", "संदेश दर्ज करें।");
   const checked = validateChatBody(parsed.data.body);
@@ -118,15 +120,17 @@ export async function sendChatMessage(input: unknown): Promise<Result & { messag
       return fail("You are not in this group.", "ನೀವು ಈ ಗುಂಪಿನಲ್ಲಿ ಇಲ್ಲ.", "आप इस समूह में नहीं हैं।");
   }
 
+  const row = {
+    ...(parsed.data.id ? { id: parsed.data.id } : {}),
+    room_id: parsed.data.roomId,
+    sender_id: user.id,
+    sender_label: profile.full_name || null,
+    body: checked.body,
+    kind: checked.kind,
+  };
   const { data, error } = await server
     .from("chat_messages")
-    .insert({
-      room_id: parsed.data.roomId,
-      sender_id: user.id,
-      sender_label: profile.full_name || null,
-      body: checked.body,
-      kind: checked.kind,
-    })
+    .insert(row)
     .select("id,room_id,sender_id,sender_label,body,kind,created_at")
     .single();
   if (error || !data)

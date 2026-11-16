@@ -3,8 +3,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { io, type Socket } from "socket.io-client";
 import { Link2, MessageSquarePlus, Send, Users } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
-import { linkify } from "@/lib/chat/message";
-import { playChatNotifySound, unlockChatSound } from "@/lib/chat/notify";
+import { linkify, validateChatBody } from "@/lib/chat/message";
+import {
+  chatNotificationPermission,
+  ensureChatNotificationPermission,
+  playChatNotifySound,
+  showChatDesktopNotification,
+  unlockChatSound,
+} from "@/lib/chat/notify";
 import { getBrowserClient } from "@/lib/supabase/client";
 import {
   createChatRoom,
@@ -85,6 +91,7 @@ export function StaffChat({
   const [socketLive, setSocketLive] = useState(false);
   const [dbLive, setDbLive] = useState(false);
   const live = socketLive || dbLive;
+  const [notifyPerm, setNotifyPerm] = useState<NotificationPermission | "unsupported">("default");
   const [typers, setTypers] = useState<Record<string, { name: string; at: number }>>({});
   const [unread, setUnread] = useState<Record<string, number>>({});
   const threadRef = useRef<HTMLDivElement>(null);
@@ -95,6 +102,8 @@ export function StaffChat({
   const seenIdsRef = useRef(new Set<string>());
   const roomsRef = useRef(rooms);
   roomsRef.current = rooms;
+  const socketLiveRef = useRef(socketLive);
+  socketLiveRef.current = socketLive;
 
   const active = useMemo(() => rooms.find((r) => r.id === activeId) || null, [rooms, activeId]);
   const typingLabel = useMemo(() => {
@@ -155,8 +164,12 @@ export function StaffChat({
   useEffect(() => {
     const thread = threadRef.current;
     if (!thread) return;
-    thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
+    thread.scrollTo({ top: thread.scrollHeight, behavior: "auto" });
   }, [messages.length, activeId, typingLabel]);
+
+  useEffect(() => {
+    setNotifyPerm(chatNotificationPermission());
+  }, []);
 
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
@@ -189,8 +202,20 @@ export function StaffChat({
       }));
     }
 
-    if (!fromSelf || !opts?.silentSelf) {
-      if (!fromSelf) playChatNotifySound();
+    if (!fromSelf) {
+      playChatNotifySound();
+      const roomName = roomsRef.current.find((r) => r.id === payload.roomId)?.name || "Chat";
+      const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+      if (hidden || !viewing) {
+        showChatDesktopNotification({
+          title: `${payload.senderName} · ${roomName}`,
+          body: payload.body,
+          tag: `chat-${payload.roomId}`,
+          onClick: () => setActiveId(payload.roomId),
+        });
+      }
+    } else if (!opts?.silentSelf) {
+      /* no-op for self echoes */
     }
   }
 
@@ -247,32 +272,36 @@ export function StaffChat({
     // ingestMessage closes over userId; remount when identity changes.
   }, [userId]);
 
-  // Safety net: merge the open thread from the DB so the other user still sees new
-  // messages if Socket.IO / Realtime miss an event (common on Vercel).
+  // Fallback poll only when neither socket nor Realtime is live.
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId || live) return;
     let cancelled = false;
     const pull = async () => {
       const result = await loadChatMessages(activeId);
       if (cancelled || result.error) return;
       for (const msg of result.messages) ingestMessage(msg, { silentSelf: true });
     };
-    const timer = window.setInterval(pull, 3000);
+    const timer = window.setInterval(pull, 2000);
+    void pull();
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [activeId]);
+  }, [activeId, live]);
 
   useEffect(() => {
     if (!socketUrl || !userId) return;
     const socket = io(socketUrl, {
+      // WebSocket first for lowest latency; polling only as fallback.
       transports: ["websocket", "polling"],
+      upgrade: true,
       auth: { userId, name: userName },
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 800,
+      reconnectionDelay: 200,
+      reconnectionDelayMax: 2000,
+      timeout: 8000,
     });
     socketRef.current = socket;
 
@@ -315,18 +344,18 @@ export function StaffChat({
 
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !live) return;
+    if (!socket || !socketLive) return;
     for (const room of rooms) socket.emit("room:join", room.id);
-  }, [rooms, live]);
+  }, [rooms, socketLive]);
 
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !activeId || !live) return;
+    if (!socket || !activeId || !socketLive) return;
     socket.emit("room:join", activeId);
     return () => {
       socket.emit("typing:stop", activeId);
     };
-  }, [activeId, live]);
+  }, [activeId, socketLive]);
 
   // Drop stale typers if they stop without a stop event.
   useEffect(() => {
@@ -347,16 +376,16 @@ export function StaffChat({
 
   function emitTyping(roomId: string) {
     const socket = socketRef.current;
-    if (!socket || !live) return;
+    if (!socket || !socketLiveRef.current) return;
     const now = Date.now();
-    if (now - lastTypingEmitRef.current > 700) {
+    if (now - lastTypingEmitRef.current > 250) {
       lastTypingEmitRef.current = now;
       socket.emit("typing:start", roomId);
     }
     if (typingIdleRef.current) clearTimeout(typingIdleRef.current);
     typingIdleRef.current = setTimeout(() => {
       socket.emit("typing:stop", roomId);
-    }, 1400);
+    }, 900);
   }
 
   function stopTyping(roomId: string) {
@@ -386,7 +415,15 @@ export function StaffChat({
   }
 
   return (
-    <div className="staff-chat" onPointerDown={unlockChatSound}>
+    <div
+      className="staff-chat"
+      onPointerDown={() => {
+        unlockChatSound();
+        void ensureChatNotificationPermission().then((ok) => {
+          setNotifyPerm(ok ? "granted" : chatNotificationPermission());
+        });
+      }}
+    >
       <aside className="staff-chat-sidebar">
         <div className="staff-chat-side-head">
           <h2>{tr({ en: "Groups", kn: "ಗುಂಪುಗಳು", hi: "समूह" })}</h2>
@@ -396,6 +433,23 @@ export function StaffChat({
               : tr({ en: "Offline", kn: "ಆಫ್‌ಲೈನ್", hi: "ऑफ़लाइन" })}
           </span>
         </div>
+        {notifyPerm === "default" ? (
+          <button
+            type="button"
+            className="button button-ghost staff-chat-notify-btn"
+            onClick={() => {
+              void ensureChatNotificationPermission().then((ok) => {
+                setNotifyPerm(ok ? "granted" : chatNotificationPermission());
+              });
+            }}
+          >
+            {tr({
+              en: "Enable message notifications",
+              kn: "ಸಂದೇಶ ಅಧಿಸೂಚನೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
+              hi: "संदेश सूचनाएँ चालू करें",
+            })}
+          </button>
+        ) : null}
         <ul className="staff-chat-room-list">
           {rooms.map((room) => {
             const count = unread[room.id] || 0;
@@ -651,14 +705,49 @@ Content-Type: application/json
               className="staff-chat-composer"
               onSubmit={(e) => {
                 e.preventDefault();
-                const body = draft;
-                if (!body.trim()) return;
+                const raw = draft;
+                if (!raw.trim()) return;
+                const checked = validateChatBody(raw);
+                if (!checked.ok) {
+                  setStatus({ error: checked.error });
+                  return;
+                }
                 setDraft("");
                 stopTyping(active.id);
-                run(
-                  () => sendChatMessage({ roomId: active.id, body }),
-                  tr({ en: "Sent.", kn: "ಕಳುಹಿಸಲಾಯಿತು.", hi: "भेजा गया।" }),
-                );
+                unlockChatSound();
+                void ensureChatNotificationPermission().then((ok) => {
+                  setNotifyPerm(ok ? "granted" : chatNotificationPermission());
+                });
+
+                // Socket-first: peers see the message before DB round-trip finishes.
+                const message: ChatMessage = {
+                  id: crypto.randomUUID(),
+                  roomId: active.id,
+                  senderId: userId,
+                  senderName: userName,
+                  body: checked.body,
+                  kind: checked.kind,
+                  createdAt: new Date().toISOString(),
+                };
+                ingestMessage(message, { silentSelf: true });
+                socketRef.current?.emit("message:share", message);
+
+                start(async () => {
+                  const result = await sendChatMessage({
+                    roomId: active.id,
+                    body: checked.body,
+                    id: message.id,
+                  });
+                  if (result.error) {
+                    setStatus({ error: result.error });
+                    setMessages((current) => current.filter((m) => m.id !== message.id));
+                    seenIdsRef.current.delete(message.id);
+                  } else {
+                    setStatus({
+                      ok: tr({ en: "Sent.", kn: "ಕಳುಹಿಸಲಾಯಿತು.", hi: "भेजा गया।" }),
+                    });
+                  }
+                });
               }}
             >
               <label className="sr-only" htmlFor="staff-chat-input">
@@ -680,9 +769,9 @@ Content-Type: application/json
                   kn: "ಸಂದೇಶ ಬರೆಯಿರಿ ಅಥವಾ https ಲಿಂಕ್ ಅಂಟಿಸಿ…",
                   hi: "संदेश लिखें या https लिंक पेस्ट करें…",
                 })}
-                disabled={pending}
+                autoComplete="off"
               />
-              <button type="submit" className="button button-ember" disabled={pending || !draft.trim()}>
+              <button type="submit" className="button button-ember" disabled={!draft.trim()}>
                 <Send size={16} aria-hidden="true" />
                 {tr({ en: "Send", kn: "ಕಳುಹಿಸಿ", hi: "भेजें" })}
               </button>

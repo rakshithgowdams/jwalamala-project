@@ -57,6 +57,10 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
   },
   transports: ["websocket", "polling"],
+  // Keep the live path snappy for desk chat fan-out.
+  pingInterval: 10000,
+  pingTimeout: 5000,
+  perMessageDeflate: false,
 });
 
 io.use((socket, next) => {

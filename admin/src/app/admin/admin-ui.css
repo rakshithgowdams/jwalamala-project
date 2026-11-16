@@ -2199,6 +2199,12 @@
 .admin-main .staff-chat-live.is-on {
   color: #1b7a3d;
 }
+.admin-main .staff-chat-notify-btn {
+  width: 100%;
+  justify-content: center;
+  font-size: 12px;
+  padding: 6px 10px;
+}
 .admin-main .staff-chat-room-list {
   list-style: none;
   margin: 0;
