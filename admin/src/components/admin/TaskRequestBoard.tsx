@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, Pencil, RefreshCw, Send, X } from "lucide-react";
+import { Check, ExternalLink, Eye, Pencil, RefreshCw, Send, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { PostThumb } from "@/components/admin/PostThumb";
 import { site } from "@/config/site";
@@ -31,7 +31,8 @@ type SectionKey = "request" | "process" | "completed";
 const SECTION_STATUSES: Record<SectionKey, string[]> = {
   request: ["requested", "rejected"],
   process: ["processing", "ready"],
-  completed: ["done"],
+  // Cancelled stays visible here with a Cancelled pill — it used to disappear from every tab.
+  completed: ["done", "cancelled"],
 };
 
 function cardThumbnail(thumbnail: string | null, video: string | null) {
@@ -71,8 +72,20 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
   });
   const [filterStaff, setFilterStaff] = useState("all");
   const [reviewId, setReviewId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [driveUrl, setDriveUrl] = useState("");
   const [adminNote, setAdminNote] = useState("");
+
+  useEffect(() => {
+    if (!detailId && !reviewId) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape" || pending) return;
+      setDetailId(null);
+      if (!pending) setReviewId(null);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [detailId, reviewId, pending]);
 
   const counts = useMemo(() => {
     const byStaff = (row: TaskRequestRow) =>
@@ -92,7 +105,11 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
     });
   }, [requests, section, filterStaff]);
 
-  function run(action: () => Promise<{ ok?: true; error?: string }>, okMsg: string) {
+  function run(
+    action: () => Promise<{ ok?: true; error?: string }>,
+    okMsg: string,
+    opts?: { goCompleted?: boolean },
+  ) {
     setMessage({});
     start(async () => {
       const result = await action();
@@ -100,8 +117,10 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
       else {
         setMessage({ ok: okMsg });
         setReviewId(null);
+        setDetailId(null);
         setDriveUrl("");
         setAdminNote("");
+        if (opts?.goCompleted) setSection("completed");
         router.refresh();
       }
     });
@@ -135,10 +154,23 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
               hi: "एडमिन ने स्वीकृत किया — Drive खोलें, लेख पूरा करें, प्रकाशन के लिए भेजें।",
             })
         : tr({
-            en: "Published articles whose verification request is finished.",
-            kn: "ಪ್ರಕಟಿತ ಲೇಖನಗಳು — ಪರಿಶೀಲನಾ ವಿನಂತಿ ಮುಗಿದಿದೆ.",
-            hi: "प्रकाशित लेख जिनका सत्यापन अनुरोध पूरा हो चुका है।",
+            en: "Finished verification work — Done and Cancelled requests stay listed here with their status on the card.",
+            kn: "ಮುಗಿದ ಪರಿಶೀಲನೆ — ಮುಗಿದಿದೆ ಮತ್ತು ರದ್ದು ವಿನಂತಿಗಳು ಇಲ್ಲಿ ಸ್ಥಿತಿ ಪಿಲ್‌ನೊಂದಿಗೆ ಕಾಣುತ್ತವೆ.",
+            hi: "समाप्त सत्यापन — पूर्ण और रद्द अनुरोध यहाँ कार्ड पर स्थिति के साथ दिखते हैं।",
           });
+
+  const detailRow = detailId ? requests.find((r) => r.id === detailId) : null;
+  const stamped = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "Asia/Kolkata",
+      }),
+    [],
+  );
 
   const sections: { key: SectionKey; label: Tri }[] = [
     { key: "request", label: { en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" } },
@@ -218,7 +250,14 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
             {visible.map((row, index) => (
               <article
                 key={row.id}
-                className={"post-card is-" + (row.postStatus || "draft")}
+                className={
+                  "post-card is-" +
+                  (row.status === "cancelled" || row.status === "rejected"
+                    ? "archived"
+                    : row.status === "done"
+                      ? "published"
+                      : row.postStatus || "draft")
+                }
                 style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
               >
                 <div className="post-card-thumb">
@@ -249,7 +288,14 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                   </p>
                   {row.adminNote ? (
                     <p className="task-request-admin-note">
-                      <strong>{tr({ en: "Admin", kn: "ಆಡ್ಮಿನ್", hi: "एडमिन" })}:</strong>{" "}
+                      <strong>
+                        {row.status === "rejected"
+                          ? tr({ en: "Rejection note", kn: "ತಿರಸ್ಕಾರ ಟಿಪ್ಪಣಿ", hi: "अस्वीकृति नोट" })
+                          : row.status === "cancelled"
+                            ? tr({ en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" })
+                            : tr({ en: "Admin", kn: "ಆಡ್ಮಿನ್", hi: "एडमिन" })}
+                        :
+                      </strong>{" "}
                       {row.adminNote}
                     </p>
                   ) : null}
@@ -263,6 +309,14 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                   ) : null}
 
                   <div className="post-actions">
+                    <button
+                      type="button"
+                      className="button button-outline is-compact"
+                      onClick={() => setDetailId(row.id)}
+                    >
+                      <Eye size={15} aria-hidden="true" />
+                      {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+                    </button>
                     <Link
                       href={`${basePath}/posts/${row.postId}`}
                       prefetch={false}
@@ -351,10 +405,11 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                           run(
                             () => cancelTaskRequest({ id: row.id }),
                             tr({
-                              en: "Request cancelled.",
-                              kn: "ವಿನಂತಿ ರದ್ದುಗೊಂಡಿದೆ.",
-                              hi: "अनुरोध रद्द।",
+                              en: "Request cancelled — see Completed tab.",
+                              kn: "ವಿನಂತಿ ರದ್ದು — ಪೂರ್ಣ ಟ್ಯಾಬ್ ನೋಡಿ.",
+                              hi: "अनुरोध रद्द — पूर्ण टैब देखें।",
                             }),
+                            { goCompleted: true },
                           )
                         }
                       >
@@ -369,6 +424,112 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
           </div>
         )}
       </section>
+
+      {detailRow ? (
+        <div
+          className="staff-chat-modal-root"
+          role="presentation"
+          onClick={() => setDetailId(null)}
+        >
+          <div
+            className="staff-chat-modal task-detail-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="request-detail-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="staff-chat-modal-head">
+              <div>
+                <h2 id="request-detail-title">
+                  {tr({ en: "Request details", kn: "ವಿನಂತಿ ವಿವರ", hi: "अनुरोध विवरण" })}
+                </h2>
+                <p className="staff-chat-modal-lead">{detailRow.title}</p>
+              </div>
+              <button
+                type="button"
+                className="button button-outline is-compact"
+                onClick={() => setDetailId(null)}
+              >
+                {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
+              </button>
+            </header>
+            <div className="confirm-dialog-preview">
+              <span className="confirm-dialog-thumb">
+                <PostThumb src={cardThumbnail(detailRow.thumbnail, detailRow.videoUrl)} eager />
+              </span>
+              <div>
+                <strong>{detailRow.title || detailRow.postId}</strong>
+                <small>
+                  <span className={"status-pill is-" + statusPillClass(detailRow.status)}>
+                    {requestStatusNames[detailRow.status]
+                      ? tr(requestStatusNames[detailRow.status])
+                      : detailRow.status}
+                  </span>
+                </small>
+              </div>
+            </div>
+            <dl className="task-detail-grid">
+              <div>
+                <dt>{tr({ en: "Staff", kn: "ಸಿಬ್ಬಂದಿ", hi: "स्टाफ़" })}</dt>
+                <dd>{detailRow.requesterName}</dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Article status", kn: "ಲೇಖನ ಸ್ಥಿತಿ", hi: "लेख स्थिति" })}</dt>
+                <dd>{detailRow.postStatus || "—"}</dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Staff note", kn: "ಸಿಬ್ಬಂದಿ ಟಿಪ್ಪಣಿ", hi: "स्टाफ़ नोट" })}</dt>
+                <dd>{detailRow.staffNote || "—"}</dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Admin note", kn: "ಆಡ್ಮಿನ್ ಟಿಪ್ಪಣಿ", hi: "एडमिन नोट" })}</dt>
+                <dd>{detailRow.adminNote || "—"}</dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Drive link", kn: "Drive ಲಿಂಕ್", hi: "Drive लिंक" })}</dt>
+                <dd>
+                  {detailRow.driveUrl ? (
+                    <a href={detailRow.driveUrl} target="_blank" rel="noopener noreferrer">
+                      {detailRow.driveUrl}
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Requested", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}</dt>
+                <dd>
+                  {detailRow.createdAt ? stamped.format(new Date(detailRow.createdAt)) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Reviewed", kn: "ಪರಿಶೀಲನೆ", hi: "समीक्षा" })}</dt>
+                <dd>
+                  {detailRow.reviewedAt ? stamped.format(new Date(detailRow.reviewedAt)) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>{tr({ en: "Ready", kn: "ಸಿದ್ಧ", hi: "तैयार" })}</dt>
+                <dd>{detailRow.readyAt ? stamped.format(new Date(detailRow.readyAt)) : "—"}</dd>
+              </div>
+            </dl>
+            <div className="staff-chat-modal-actions">
+              <Link
+                href={`${basePath}/posts/${detailRow.postId}`}
+                prefetch={false}
+                className="button button-outline"
+                onClick={() => setDetailId(null)}
+              >
+                {tr({ en: "Open article", kn: "ಲೇಖನ ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+              </Link>
+              <button type="button" className="button" onClick={() => setDetailId(null)}>
+                {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {reviewing ? (
         <div
@@ -431,9 +592,9 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                         driveUrl: "",
                       }),
                     tr({
-                      en: "Request rejected.",
-                      kn: "ವಿನಂತಿ ತಿರಸ್ಕರಿಸಲಾಯಿತು.",
-                      hi: "अनुरोध अस्वीकृत।",
+                      en: "Request rejected — stays in Request with Rejected on the card.",
+                      kn: "ವಿನಂತಿ ತಿರಸ್ಕೃತ — ವಿನಂತಿ ಟ್ಯಾಬ್‌ನಲ್ಲಿ ತಿರಸ್ಕೃತ ಪಿಲ್‌ನೊಂದಿಗೆ ಉಳಿಯುತ್ತದೆ.",
+                      hi: "अनुरोध अस्वीकृत — अनुरोध टैब में अस्वीकृत पिल के साथ रहेगा।",
                     }),
                   )
                 }

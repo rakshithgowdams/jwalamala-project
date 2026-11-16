@@ -3342,6 +3342,52 @@ body:has(.admin-main .staff-chat) {
   margin: 0;
   font-size: 13px;
 }
+.admin-main .task-batch-card .task-batch-thumb {
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--accent) 70%, var(--muted));
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 14%, var(--surface, #fff)),
+      color-mix(in srgb, var(--muted) 18%, var(--surface, #fff))
+    );
+}
+.admin-main .task-detail-dialog {
+  max-width: min(520px, calc(100vw - 2rem));
+  width: 100%;
+  text-align: left;
+}
+.admin-main .task-detail-grid {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+.admin-main .task-detail-grid > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--ui-radius) - 2px);
+  background: color-mix(in srgb, var(--surface, #fff) 92%, var(--muted));
+}
+.admin-main .task-detail-grid dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-main .task-detail-grid dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.admin-main .task-detail-grid dd a {
+  color: inherit;
+}
 .admin-main .task-request-drive a {
   display: inline-flex;
   align-items: center;

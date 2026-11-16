@@ -1,7 +1,7 @@
 import { requireStaff } from "@/lib/auth/require-user";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getUiStrings } from "@/lib/i18n/server";
-import { TaskBoard, type TaskRow } from "@/components/admin/TaskBoard";
+import { TaskBoard, type BatchSummary, type TaskRow } from "@/components/admin/TaskBoard";
 
 type PostJoin = {
   title_kn: string | null;
@@ -35,7 +35,7 @@ export default async function TasksPage() {
   const isAdmin = profile.role === "admin";
   const server = getAdminClient() || db;
 
-  const [{ count: totalArticles }, staffRes, tasksRes] = await Promise.all([
+  const [{ count: totalArticles }, staffRes, tasksRes, openBatchRes] = await Promise.all([
     // Staff never see the assign UI — skip the expensive full-library count.
     isAdmin
       ? server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived")
@@ -51,10 +51,21 @@ export default async function TasksPage() {
           "id,post_id,assignee_id,status,batch_label,notes,created_at,posts(title_kn,thumbnail_url,video_url,status,type,updated_at,slug),profiles!assignee_id(full_name)",
         )
         .order("created_at", { ascending: false })
-        .limit(isAdmin ? 200 : 100);
+        .limit(isAdmin ? 400 : 150);
       if (!isAdmin) q = q.eq("assignee_id", user.id);
       return q;
     })(),
+    // Lightweight open-batch rollup so 1–1000 / 1001–2000 blocks stay visible even when
+    // thousands of row cards cannot all be painted.
+    isAdmin
+      ? server
+          .from("article_tasks")
+          .select("batch_label,assignee_id,created_at,notes")
+          .eq("status", "open")
+          .neq("batch_label", "")
+          .order("created_at", { ascending: false })
+          .limit(8000)
+      : Promise.resolve({ data: [] as { batch_label: string; assignee_id: string; created_at: string; notes: string | null }[] }),
   ]);
 
   if (tasksRes.error) {
@@ -120,6 +131,7 @@ export default async function TasksPage() {
           totalArticles={totalArticles || 0}
           staff={(staffRes.data || []).map((s) => ({ id: s.id, name: s.full_name || s.id }))}
           tasks={tasks}
+          batches={[]}
         />
       </>
     );
@@ -164,6 +176,35 @@ export default async function TasksPage() {
     }
   }
 
+  const staffName = new Map(
+    (staffRes.data || []).map((s) => [s.id as string, (s.full_name as string) || (s.id as string)]),
+  );
+  const batchMap = new Map<string, BatchSummary>();
+  for (const row of openBatchRes.data || []) {
+    const batchLabel = (row.batch_label as string) || "";
+    const assigneeId = row.assignee_id as string;
+    if (!batchLabel || !assigneeId) continue;
+    const key = `${assigneeId}::${batchLabel}`;
+    const existing = batchMap.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (row.created_at && (!existing.createdAt || row.created_at > existing.createdAt)) {
+        existing.createdAt = row.created_at as string;
+      }
+    } else {
+      batchMap.set(key, {
+        key,
+        batchLabel,
+        assigneeId,
+        assigneeName: staffName.get(assigneeId) || "Staff",
+        count: 1,
+        notes: (row.notes as string) || "",
+        createdAt: (row.created_at as string) || "",
+      });
+    }
+  }
+  const batches = [...batchMap.values()].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
   return (
     <>
       <div className="section-title">
@@ -177,6 +218,7 @@ export default async function TasksPage() {
           name: s.full_name || s.id,
         }))}
         tasks={tasks}
+        batches={batches}
         activeRequests={activeRequests}
       />
     </>

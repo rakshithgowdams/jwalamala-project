@@ -248,6 +248,52 @@ export async function setTaskStatus(input: unknown): Promise<Result> {
   return { ok: true };
 }
 
+const cancelBatchSchema = z.object({
+  assigneeId: uuid,
+  batchLabel: z.string().trim().min(1).max(120),
+});
+
+/**
+ * Cancel every open assignment in a numbered bulk batch (e.g. "1-1000" for one staff).
+ * Returns how many rows were cancelled.
+ */
+export async function cancelOpenBatch(input: unknown): Promise<Result> {
+  const access = await requireAdminAssign();
+  if ("denied" in access) return access.denied;
+  const { server, fail } = access;
+  const parsed = cancelBatchSchema.safeParse(input);
+  if (!parsed.success)
+    return fail(
+      "Pick a staff member and a batch label to cancel.",
+      "ರದ್ದುಮಾಡಲು ಸಿಬ್ಬಂದಿ ಮತ್ತು ಬ್ಯಾಚ್ ಲೇಬಲ್ ಆಯ್ಕೆಮಾಡಿ.",
+      "रद्द करने के लिए स्टाफ़ और बैच लेबल चुनें।",
+    );
+
+  const { assigneeId, batchLabel } = parsed.data;
+  const now = new Date().toISOString();
+  const { data, error } = await server
+    .from("article_tasks")
+    .update({ status: "cancelled", updated_at: now })
+    .eq("assignee_id", assigneeId)
+    .eq("batch_label", batchLabel)
+    .eq("status", "open")
+    .select("id");
+  if (error)
+    return fail(error.message || "Could not cancel the batch.", "ಬ್ಯಾಚ್ ರದ್ದುಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "बैच रद्द नहीं हो सका।");
+
+  const assigned = (data || []).length;
+  if (!assigned)
+    return fail(
+      "No open assignments left in that batch.",
+      "ಆ ಬ್ಯಾಚ್‌ನಲ್ಲಿ ತೆರೆದ ನಿಯೋಜನೆಗಳಿಲ್ಲ.",
+      "उस बैच में कोई खुला असाइनमेंट नहीं।",
+    );
+
+  revalidatePath("/admin/tasks");
+  revalidatePath("/staff/tasks");
+  return { ok: true, assigned };
+}
+
 export type ArticleSearchHit = {
   id: string;
   title: string;

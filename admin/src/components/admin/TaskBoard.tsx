@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CircleAlert, ExternalLink, Pencil, RefreshCw, SendHorizontal } from "lucide-react";
+import { CircleAlert, ExternalLink, Eye, Layers, Pencil, RefreshCw, SendHorizontal } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { ArticleCardSearch } from "@/components/admin/ArticleCardSearch";
 import { PostThumb } from "@/components/admin/PostThumb";
@@ -13,6 +13,7 @@ import { youtubeThumbnail } from "@/lib/utils/images";
 import {
   assignBulkRange,
   assignSingleArticle,
+  cancelOpenBatch,
   setTaskStatus,
 } from "@/app/admin/tasks/actions";
 import { createTaskRequest } from "@/app/admin/task-requests/actions";
@@ -73,15 +74,45 @@ export type StaffOption = { id: string; name: string };
 
 export type ActiveRequestInfo = { id: string; status: string };
 
+export type BatchSummary = {
+  key: string;
+  batchLabel: string;
+  assigneeId: string;
+  assigneeName: string;
+  count: number;
+  notes: string;
+  createdAt: string;
+};
+
 type Props = {
   isAdmin: boolean;
   totalArticles: number;
   staff: StaffOption[];
   tasks: TaskRow[];
+  batches?: BatchSummary[];
   activeRequests?: Record<string, ActiveRequestInfo>;
 };
 
-export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests = {} }: Props) {
+function taskCardTone(task: TaskRow) {
+  if (task.status === "cancelled") return "archived";
+  if (task.status === "done") return "published";
+  return task.postStatus || "draft";
+}
+
+function taskStatusPillClass(status: string) {
+  if (status === "open") return "scheduled";
+  if (status === "done") return "published";
+  return "archived";
+}
+
+export function TaskBoard({
+  isAdmin,
+  totalArticles,
+  staff,
+  tasks,
+  batches = [],
+  activeRequests = {},
+}: Props) {
   const { tr } = useUiStrings();
   const router = useRouter();
   const basePath = useDeskPath();
@@ -96,27 +127,56 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterStatus, setFilterStatus] = useState<"open" | "done" | "cancelled" | "all">("open");
   const [cancelTask, setCancelTask] = useState<TaskRow | null>(null);
+  const [cancelBatch, setCancelBatch] = useState<BatchSummary | null>(null);
+  const [detailTask, setDetailTask] = useState<TaskRow | null>(null);
+  const [detailBatch, setDetailBatch] = useState<BatchSummary | null>(null);
   const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
   const [requestNote, setRequestNote] = useState("");
 
   useEffect(() => {
-    if (!cancelTask) return;
+    if (!cancelTask && !cancelBatch && !detailTask && !detailBatch) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !pending) setCancelTask(null);
+      if (event.key !== "Escape" || pending) return;
+      setCancelTask(null);
+      setCancelBatch(null);
+      setDetailTask(null);
+      setDetailBatch(null);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [cancelTask, pending]);
+  }, [cancelTask, cancelBatch, detailTask, detailBatch, pending]);
+
+  const visibleBatches = useMemo(() => {
+    if (!isAdmin || filterStatus === "done" || filterStatus === "cancelled") return [];
+    return batches.filter((batch) => {
+      if (filterAssignee !== "all" && batch.assigneeId !== filterAssignee) return false;
+      return true;
+    });
+  }, [batches, filterAssignee, filterStatus, isAdmin]);
 
   const visible = useMemo(() => {
     return tasks.filter((t) => {
       if (filterStatus !== "all" && t.status !== filterStatus) return false;
       if (isAdmin && filterAssignee !== "all" && t.assigneeId !== filterAssignee) return false;
+      // Bulk batches already have a summary card — hide open batch members from the list noise.
+      if (
+        isAdmin &&
+        filterStatus === "open" &&
+        t.status === "open" &&
+        t.batchLabel &&
+        visibleBatches.some((b) => b.assigneeId === t.assigneeId && b.batchLabel === t.batchLabel)
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [tasks, filterStatus, filterAssignee, isAdmin]);
+  }, [tasks, filterStatus, filterAssignee, isAdmin, visibleBatches]);
 
-  function run(action: () => Promise<{ ok?: true; error?: string; assigned?: number }>, done: string) {
+  function run(
+    action: () => Promise<{ ok?: true; error?: string; assigned?: number }>,
+    done: string,
+    opts?: { showCancelled?: boolean },
+  ) {
     setMessage({});
     start(async () => {
       const result = await action();
@@ -124,13 +184,20 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
       else {
         const extra =
           typeof result.assigned === "number"
-            ? tr({
-                en: ` Assigned ${result.assigned}.`,
-                kn: ` ${result.assigned} ನಿಯೋಜಿಸಲಾಯಿತು.`,
-                hi: ` ${result.assigned} असाइन हुए।`,
-              })
+            ? opts?.showCancelled
+              ? tr({
+                  en: ` ${result.assigned} cancelled.`,
+                  kn: ` ${result.assigned} ರದ್ದು.`,
+                  hi: ` ${result.assigned} रद्द।`,
+                })
+              : tr({
+                  en: ` Assigned ${result.assigned}.`,
+                  kn: ` ${result.assigned} ನಿಯೋಜಿಸಲಾಯಿತು.`,
+                  hi: ` ${result.assigned} असाइन हुए।`,
+                })
             : "";
         setMessage({ ok: done + extra });
+        if (opts?.showCancelled) setFilterStatus("cancelled");
         router.refresh();
       }
     });
@@ -339,21 +406,69 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
           </div>
         </div>
 
-        {!visible.length ? (
+        {!visibleBatches.length && !visible.length ? (
           <p>
             {tr({
-              en: "No assignments in this view yet.",
-              kn: "ಈ ನೋಟದಲ್ಲಿ ಇನ್ನೂ ನಿಯೋಜನೆಗಳಿಲ್ಲ.",
-              hi: "इस दृश्य में अभी कोई असाइनमेंट नहीं।",
+              en: "No assignments in this view yet. Use the status filter to see Cancelled or Done.",
+              kn: "ಈ ನೋಟದಲ್ಲಿ ಇನ್ನೂ ನಿಯೋಜನೆಗಳಿಲ್ಲ. ರದ್ದು ಅಥವಾ ಮುಗಿದಿದೆ ನೋಡಲು ಸ್ಥಿತಿ ಫಿಲ್ಟರ್ ಬಳಸಿ.",
+              hi: "इस दृश्य में अभी कोई असाइनमेंट नहीं। रद्द या पूर्ण देखने के लिए स्थिति फ़िल्टर उपयोग करें।",
             })}
           </p>
         ) : (
           <div className="post-card-list">
+            {visibleBatches.map((batch, index) => (
+              <article
+                key={batch.key}
+                className="post-card is-scheduled task-batch-card"
+                style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
+              >
+                <div className="post-card-thumb task-batch-thumb" aria-hidden="true">
+                  <Layers size={36} strokeWidth={1.75} />
+                  <div className="post-card-badges">
+                    <span className="status-pill is-scheduled">
+                      {tr({ en: "Open batch", kn: "ತೆರೆದ ಬ್ಯಾಚ್", hi: "खुला बैच" })}
+                    </span>
+                    <span className="post-card-type">#{batch.batchLabel}</span>
+                  </div>
+                </div>
+                <div className="post-card-body">
+                  <h2>
+                    {tr({
+                      en: `${batch.count.toLocaleString("en-IN")} articles · #${batch.batchLabel}`,
+                      kn: `${batch.count.toLocaleString("en-IN")} ಲೇಖನಗಳು · #${batch.batchLabel}`,
+                      hi: `${batch.count.toLocaleString("en-IN")} लेख · #${batch.batchLabel}`,
+                    })}
+                  </h2>
+                  <p className="task-card-meta">
+                    <strong>{batch.assigneeName}</strong>
+                    {batch.notes ? ` · ${batch.notes}` : null}
+                  </p>
+                  <div className="post-actions">
+                    <button
+                      type="button"
+                      className="button button-outline is-compact"
+                      onClick={() => setDetailBatch(batch)}
+                    >
+                      <Eye size={15} aria-hidden="true" />
+                      {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-outline is-compact"
+                      disabled={pending}
+                      onClick={() => setCancelBatch(batch)}
+                    >
+                      {tr({ en: "Cancel batch", kn: "ಬ್ಯಾಚ್ ರದ್ದು", hi: "बैच रद्द" })}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
             {visible.map((task, index) => (
               <article
                 key={task.id}
-                className={"post-card is-" + (task.postStatus || "draft")}
-                style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
+                className={"post-card is-" + taskCardTone(task)}
+                style={{ animationDelay: Math.min(index + visibleBatches.length, 11) * 45 + "ms" }}
               >
                 <div className="post-card-thumb">
                   <PostThumb
@@ -361,6 +476,9 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                     eager={index < 6}
                   />
                   <div className="post-card-badges">
+                    <span className={"status-pill is-" + taskStatusPillClass(task.status)}>
+                      {taskStatusNames[task.status] ? tr(taskStatusNames[task.status]) : task.status}
+                    </span>
                     {task.postStatus ? (
                       <span className={"status-pill is-" + task.postStatus}>
                         {statusNames[task.postStatus]
@@ -373,9 +491,6 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                         {typeNames[task.postType] ? tr(typeNames[task.postType]) : task.postType}
                       </span>
                     ) : null}
-                    <span className={"status-pill is-" + (task.status === "open" ? "scheduled" : task.status === "done" ? "published" : "archived")}>
-                      {taskStatusNames[task.status] ? tr(taskStatusNames[task.status]) : task.status}
-                    </span>
                     {activeRequests[task.id] ? (
                       <span className="status-pill is-draft">
                         {requestStatusNames[activeRequests[task.id].status]
@@ -409,6 +524,14 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                     {task.notes || null}
                   </p>
                   <div className="post-actions">
+                    <button
+                      type="button"
+                      className="button button-outline is-compact"
+                      onClick={() => setDetailTask(task)}
+                    >
+                      <Eye size={15} aria-hidden="true" />
+                      {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+                    </button>
                     <Link
                       href={`${basePath}/posts/${task.postId}`}
                       prefetch={false}
@@ -568,10 +691,11 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                       run(
                         () => setTaskStatus({ id, status: "cancelled" }),
                         tr({
-                          en: "Assignment cancelled.",
-                          kn: "ನಿಯೋಜನೆ ರದ್ದು.",
-                          hi: "असाइनमेंट रद्द।",
+                          en: "Assignment cancelled — shown under Cancelled.",
+                          kn: "ನಿಯೋಜನೆ ರದ್ದು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+                          hi: "असाइनमेंट रद्द — रद्द फ़िल्टर में दिखेगा।",
                         }),
+                        { showCancelled: true },
                       );
                     }}
                   >
@@ -580,6 +704,254 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                       kn: "ಹೌದು, ರದ್ದುಮಾಡಿ",
                       hi: "हाँ, रद्द करें",
                     })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {cancelBatch && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setCancelBatch(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cancel-batch-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="confirm-dialog-icon" aria-hidden="true">
+                  <CircleAlert size={28} strokeWidth={2.25} />
+                </div>
+                <h2 id="cancel-batch-title">
+                  {tr({
+                    en: "Cancel this whole batch?",
+                    kn: "ಈ ಸಂಪೂರ್ಣ ಬ್ಯಾಚ್ ರದ್ದುಮಾಡುವುದೇ?",
+                    hi: "पूरा बैच रद्द करें?",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: `This marks all ${cancelBatch.count.toLocaleString("en-IN")} open assignments in #${cancelBatch.batchLabel} for ${cancelBatch.assigneeName} as Cancelled. They will appear under the Cancelled filter.`,
+                    kn: `ಇದು ${cancelBatch.assigneeName} ಅವರ #${cancelBatch.batchLabel} ನಲ್ಲಿನ ${cancelBatch.count.toLocaleString("en-IN")} ತೆರೆದ ನಿಯೋಜನೆಗಳನ್ನು ರದ್ದು ಎಂದು ಗುರುತಿಸುತ್ತದೆ. ಅವು ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತವೆ.`,
+                    hi: `यह ${cancelBatch.assigneeName} के #${cancelBatch.batchLabel} में ${cancelBatch.count.toLocaleString("en-IN")} खुले असाइनमेंट रद्द चिह्नित करेगा। वे रद्द फ़िल्टर में दिखेंगे।`,
+                  })}
+                </p>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setCancelBatch(null)}
+                  >
+                    {tr({ en: "Keep batch", kn: "ಬ್ಯಾಚ್ ಇರಿಸಿ", hi: "बैच रखें" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-danger"
+                    disabled={pending}
+                    onClick={() => {
+                      const payload = {
+                        assigneeId: cancelBatch.assigneeId,
+                        batchLabel: cancelBatch.batchLabel,
+                      };
+                      setCancelBatch(null);
+                      run(
+                        () => cancelOpenBatch(payload),
+                        tr({
+                          en: "Batch cancelled — shown under Cancelled.",
+                          kn: "ಬ್ಯಾಚ್ ರದ್ದು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+                          hi: "बैच रद्द — रद्द फ़िल्टर में दिखेगा।",
+                        }),
+                        { showCancelled: true },
+                      );
+                    }}
+                  >
+                    {tr({
+                      en: "Yes, cancel batch",
+                      kn: "ಹೌದು, ಬ್ಯಾಚ್ ರದ್ದುಮಾಡಿ",
+                      hi: "हाँ, बैच रद्द करें",
+                    })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {detailTask && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => setDetailTask(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog task-detail-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="task-detail-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="task-detail-title">
+                  {tr({ en: "Task details", kn: "ಕಾರ್ಯ ವಿವರ", hi: "कार्य विवरण" })}
+                </h2>
+                <div className="confirm-dialog-preview">
+                  <span className="confirm-dialog-thumb">
+                    <PostThumb src={cardThumbnail(detailTask.thumbnail, detailTask.videoUrl)} eager />
+                  </span>
+                  <div>
+                    <strong>{detailTask.title || detailTask.postId}</strong>
+                    <small>
+                      <span className={"status-pill is-" + taskStatusPillClass(detailTask.status)}>
+                        {taskStatusNames[detailTask.status]
+                          ? tr(taskStatusNames[detailTask.status])
+                          : detailTask.status}
+                      </span>
+                    </small>
+                  </div>
+                </div>
+                <dl className="task-detail-grid">
+                  <div>
+                    <dt>{tr({ en: "Assignee", kn: "ನಿಯೋಜಿತ", hi: "असाइनी" })}</dt>
+                    <dd>{detailTask.assigneeName}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Batch", kn: "ಬ್ಯಾಚ್", hi: "बैच" })}</dt>
+                    <dd>{detailTask.batchLabel ? `#${detailTask.batchLabel}` : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Article status", kn: "ಲೇಖನ ಸ್ಥಿತಿ", hi: "लेख स्थिति" })}</dt>
+                    <dd>
+                      {detailTask.postStatus
+                        ? statusNames[detailTask.postStatus]
+                          ? tr(statusNames[detailTask.postStatus])
+                          : detailTask.postStatus
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Type", kn: "ಪ್ರಕಾರ", hi: "प्रकार" })}</dt>
+                    <dd>
+                      {detailTask.postType
+                        ? typeNames[detailTask.postType]
+                          ? tr(typeNames[detailTask.postType])
+                          : detailTask.postType
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Notes", kn: "ಟಿಪ್ಪಣಿ", hi: "नोट" })}</dt>
+                    <dd>{detailTask.notes || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Assigned", kn: "ನಿಯೋಜನೆ", hi: "असाइन" })}</dt>
+                    <dd>
+                      {detailTask.createdAt
+                        ? updatedOn.format(new Date(detailTask.createdAt))
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}</dt>
+                    <dd>
+                      {activeRequests[detailTask.id]
+                        ? requestStatusNames[activeRequests[detailTask.id].status]
+                          ? tr(requestStatusNames[activeRequests[detailTask.id].status])
+                          : activeRequests[detailTask.id].status
+                        : tr({ en: "None active", kn: "ಸಕ್ರಿಯವಿಲ್ಲ", hi: "कोई सक्रिय नहीं" })}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="delete-dialog-actions">
+                  <Link
+                    href={`${basePath}/posts/${detailTask.postId}`}
+                    prefetch={false}
+                    className="button button-outline"
+                    onClick={() => setDetailTask(null)}
+                  >
+                    {tr({ en: "Open article", kn: "ಲೇಖನ ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                  </Link>
+                  <button type="button" className="button" onClick={() => setDetailTask(null)}>
+                    {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {detailBatch && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => setDetailBatch(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog task-detail-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="batch-detail-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="batch-detail-title">
+                  {tr({ en: "Batch details", kn: "ಬ್ಯಾಚ್ ವಿವರ", hi: "बैच विवरण" })}
+                </h2>
+                <dl className="task-detail-grid">
+                  <div>
+                    <dt>{tr({ en: "Batch", kn: "ಬ್ಯಾಚ್", hi: "बैच" })}</dt>
+                    <dd>#{detailBatch.batchLabel}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Assignee", kn: "ನಿಯೋಜಿತ", hi: "असाइनी" })}</dt>
+                    <dd>{detailBatch.assigneeName}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Open articles", kn: "ತೆರೆದ ಲೇಖನಗಳು", hi: "खुले लेख" })}</dt>
+                    <dd>{detailBatch.count.toLocaleString("en-IN")}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Notes", kn: "ಟಿಪ್ಪಣಿ", hi: "नोट" })}</dt>
+                    <dd>{detailBatch.notes || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Last activity", kn: "ಕೊನೆಯ ಚಟುವಟಿಕೆ", hi: "अंतिम गतिविधि" })}</dt>
+                    <dd>
+                      {detailBatch.createdAt
+                        ? updatedOn.format(new Date(detailBatch.createdAt))
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Status", kn: "ಸ್ಥಿತಿ", hi: "स्थिति" })}</dt>
+                    <dd>
+                      <span className="status-pill is-scheduled">
+                        {tr({ en: "Open", kn: "ತೆರೆದ", hi: "खुला" })}
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => {
+                      const batch = detailBatch;
+                      setDetailBatch(null);
+                      setCancelBatch(batch);
+                    }}
+                  >
+                    {tr({ en: "Cancel batch", kn: "ಬ್ಯಾಚ್ ರದ್ದು", hi: "बैच रद्द" })}
+                  </button>
+                  <button type="button" className="button" onClick={() => setDetailBatch(null)}>
+                    {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
                   </button>
                 </div>
               </div>
