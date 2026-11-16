@@ -5296,16 +5296,25 @@ a.admin-auth-submit {
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+  vertical-align: middle;
 }
 .admin-topbar a svg,
 .admin-topbar button svg {
   display: block;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  align-self: center;
 }
 .admin-topbar-label {
   display: inline-flex;
   align-items: center;
+  align-self: center;
+  margin: 0;
+  padding: 0;
   line-height: 1;
+  height: 1em;
 }
 .admin-topbar a:hover,
 .admin-topbar button:hover:not(:disabled) {

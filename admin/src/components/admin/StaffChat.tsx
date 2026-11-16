@@ -263,9 +263,9 @@ export function StaffChat({
       const roomName = roomsRef.current.find((r) => r.id === payload.roomId)?.name || "Chat";
       const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
       const away = hidden || !viewing;
-      // Alert when the desk is on another room/tab; stay quiet if already reading this thread.
+      // Always chime for inbound messages so peers hear the alert reliably.
+      void playChatNotifySound();
       if (away) {
-        playChatNotifySound();
         showChatDesktopNotification({
           title: `${payload.senderName} · ${roomName}`,
           body: payload.body,
@@ -538,7 +538,7 @@ export function StaffChat({
     <div
       className="staff-chat"
       onPointerDown={() => {
-        unlockChatSound();
+        void unlockChatSound();
         void ensureChatNotificationPermission().then((ok) => {
           setNotifyPerm(ok ? "granted" : chatNotificationPermission());
         });
@@ -749,7 +749,7 @@ export function StaffChat({
                 }
                 setDraft("");
                 stopTyping(active.id);
-                unlockChatSound();
+                void unlockChatSound();
                 void ensureChatNotificationPermission().then((ok) => {
                   setNotifyPerm(ok ? "granted" : chatNotificationPermission());
                 });

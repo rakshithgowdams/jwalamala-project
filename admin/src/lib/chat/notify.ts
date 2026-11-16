@@ -7,6 +7,7 @@ let audioCtx: AudioContext | null = null;
 let lastPlay = 0;
 let lastNotify = 0;
 let cachedVolume: number | null = null;
+let unlockBound = false;
 
 function context() {
   if (typeof window === "undefined") return null;
@@ -52,52 +53,75 @@ export function setChatNotifyVolume(value: number) {
   return next;
 }
 
-export function unlockChatSound() {
+export async function unlockChatSound() {
   const ctx = context();
-  if (!ctx) return;
-  if (ctx.state === "suspended") void ctx.resume();
+  if (!ctx) return false;
+  try {
+    if (ctx.state === "suspended") await ctx.resume();
+    return ctx.state === "running";
+  } catch {
+    return false;
+  }
 }
 
-/** Louder two-tone desk chime; respects the saved 0–100 volume. */
-export function playChatNotifySound(opts?: { preview?: boolean }) {
+function bindUnlockListeners() {
+  if (typeof window === "undefined" || unlockBound) return;
+  unlockBound = true;
+  const wake = () => {
+    void unlockChatSound();
+  };
+  window.addEventListener("pointerdown", wake, { passive: true });
+  window.addEventListener("keydown", wake, { passive: true });
+  window.addEventListener("touchstart", wake, { passive: true });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") wake();
+  });
+  window.addEventListener("focus", wake);
+}
+
+bindUnlockListeners();
+
+/** Louder multi-tone desk chime; respects the saved 0–100 volume. */
+export async function playChatNotifySound(opts?: { preview?: boolean }) {
   const volume = getChatNotifyVolume();
   if (!opts?.preview && volume <= 0) return;
 
   const now = Date.now();
-  if (!opts?.preview && now - lastPlay < 160) return;
+  if (!opts?.preview && now - lastPlay < 140) return;
   lastPlay = now;
 
   const ctx = context();
   if (!ctx) return;
-  if (ctx.state === "suspended") void ctx.resume();
+  const ready = await unlockChatSound();
+  if (!ready && ctx.state !== "running") return;
 
-  const level = Math.max(0.05, (opts?.preview ? Math.max(volume, 35) : volume) / 100);
-  const peak = 0.18 + level * 0.62;
+  const level = Math.max(0.08, (opts?.preview ? Math.max(volume, 40) : volume) / 100);
+  const peak = 0.22 + level * 0.7;
 
-  const t0 = ctx.currentTime;
+  const t0 = ctx.currentTime + 0.01;
   const master = ctx.createGain();
-  master.gain.setValueAtTime(0.0001, t0);
-  master.gain.exponentialRampToValueAtTime(peak, t0 + 0.014);
-  master.gain.exponentialRampToValueAtTime(peak * 0.55, t0 + 0.12);
-  master.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+  master.gain.setValueAtTime(0, t0);
+  master.gain.linearRampToValueAtTime(peak, t0 + 0.02);
+  master.gain.linearRampToValueAtTime(peak * 0.65, t0 + 0.14);
+  master.gain.linearRampToValueAtTime(0, t0 + 0.48);
   master.connect(ctx.destination);
 
   for (const [offset, freq, amp] of [
-    [0, 784, 0.95],
-    [0.08, 1046.5, 1],
-    [0.16, 1318.5, 0.72],
+    [0, 880, 1],
+    [0.07, 1174.7, 0.95],
+    [0.14, 1396.9, 0.75],
   ] as const) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = "triangle";
     osc.frequency.setValueAtTime(freq, t0 + offset);
-    gain.gain.setValueAtTime(0.0001, t0 + offset);
-    gain.gain.exponentialRampToValueAtTime(amp, t0 + offset + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + offset + 0.22);
+    gain.gain.setValueAtTime(0, t0 + offset);
+    gain.gain.linearRampToValueAtTime(amp, t0 + offset + 0.015);
+    gain.gain.linearRampToValueAtTime(0, t0 + offset + 0.24);
     osc.connect(gain);
     gain.connect(master);
     osc.start(t0 + offset);
-    osc.stop(t0 + offset + 0.24);
+    osc.stop(t0 + offset + 0.28);
   }
 }
 
@@ -135,7 +159,7 @@ export function showChatDesktopNotification(input: {
       body: input.body.slice(0, 180),
       tag: input.tag || "jwalamala-staff-chat",
       renotify: true,
-      silent: false,
+      silent: true, // we play our own louder desk chime
     });
     note.onclick = () => {
       try {

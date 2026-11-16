@@ -47,7 +47,7 @@ export function StaffChatNotifier({ userId }: { userId: string }) {
           // Chat page owns in-room alerts; this covers every other admin screen.
           if (pathnameRef.current.startsWith("/admin/chat")) return;
 
-          playChatNotifySound();
+          void playChatNotifySound();
           const title = `${row.sender_label || "Staff"} · Chat`;
           showChatDesktopNotification({
             title,
@@ -58,6 +58,8 @@ export function StaffChatNotifier({ userId }: { userId: string }) {
         },
       )
       .subscribe();
+
+    void unlockChatSound();
 
     return () => {
       window.removeEventListener("pointerdown", onFirstGesture);

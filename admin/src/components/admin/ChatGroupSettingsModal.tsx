@@ -299,8 +299,7 @@ export function ChatGroupSettingsModal({
                       setNotifyVolume(next);
                     }}
                     onPointerUp={() => {
-                      unlockChatSound();
-                      playChatNotifySound({ preview: true });
+                      void unlockChatSound().then(() => playChatNotifySound({ preview: true }));
                     }}
                     onKeyUp={(e) => {
                       if (
@@ -309,8 +308,7 @@ export function ChatGroupSettingsModal({
                         e.key === "Home" ||
                         e.key === "End"
                       ) {
-                        unlockChatSound();
-                        playChatNotifySound({ preview: true });
+                        void unlockChatSound().then(() => playChatNotifySound({ preview: true }));
                       }
                     }}
                   />
@@ -318,8 +316,7 @@ export function ChatGroupSettingsModal({
                     type="button"
                     className="button button-ghost staff-chat-volume-test"
                     onClick={() => {
-                      unlockChatSound();
-                      playChatNotifySound({ preview: true });
+                      void unlockChatSound().then(() => playChatNotifySound({ preview: true }));
                     }}
                   >
                     {tr({ en: "Test sound", kn: "ಧ್ವನಿ ಪರೀಕ್ಷಿಸಿ", hi: "ध्वनि जाँच" })}
