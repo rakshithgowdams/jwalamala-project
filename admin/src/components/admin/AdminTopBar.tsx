@@ -12,7 +12,7 @@ const roles = {
   reporter: { en: "Reporter", kn: "ವರದಿಗಾರ", hi: "रिपोर्टर" },
 };
 
-export function AdminTopBar({ email, role }: { email: string; role: string }) {
+export function AdminTopBar({ name, email, role }: { name: string; email: string; role: string }) {
   const router = useRouter();
   const { tr } = useUiStrings();
   const [busy, setBusy] = useState(false);
@@ -33,20 +33,24 @@ export function AdminTopBar({ email, role }: { email: string; role: string }) {
         {site.englishName} {tr({ en: "Admin", kn: "ನಿರ್ವಹಣೆ", hi: "एडमिन" })}
       </span>
       <div className="admin-topbar-user">
-        <span title={email}>
-          {email}
+        <span className="admin-topbar-person" title={email}>
+          <strong>{name}</strong>
           <small>{roleName}</small>
         </span>
         <LanguageSwitch className="admin-language" />
         <a href={site.url} target="_blank" rel="noreferrer">
           <ExternalLink size={16} aria-hidden="true" />
-          {tr({ en: "View site", kn: "ತಾಣ ನೋಡಿ", hi: "साइट देखें" })}
+          <span className="admin-topbar-label">
+            {tr({ en: "View site", kn: "ತಾಣ ನೋಡಿ", hi: "साइट देखें" })}
+          </span>
         </a>
         <button type="button" onClick={signOut} disabled={busy}>
           <LogOut size={16} aria-hidden="true" />
-          {busy
-            ? tr({ en: "Signing out…", kn: "ಹೊರಹೋಗುತ್ತಿದೆ…", hi: "साइन आउट हो रहा है…" })
-            : tr({ en: "Sign out", kn: "ಲಾಗ್ ಔಟ್", hi: "साइन आउट" })}
+          <span className="admin-topbar-label">
+            {busy
+              ? tr({ en: "Signing out…", kn: "ಹೊರಹೋಗುತ್ತಿದೆ…", hi: "साइन आउट हो रहा है…" })
+              : tr({ en: "Sign out", kn: "ಲಾಗ್ ಔಟ್", hi: "साइन आउट" })}
+          </span>
         </button>
       </div>
     </header>

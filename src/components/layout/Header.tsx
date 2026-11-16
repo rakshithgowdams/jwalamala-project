@@ -14,7 +14,6 @@ import { BrandRibbon } from "./FlameGarland";
 import { CategoryNav, ThemeToggle } from "./Navigation";
 import { ScrollHeader } from "./ScrollHeader";
 import { AccountLink } from "./AccountLink";
-import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { getCategories, getPublishedPlaceIds } from "@/lib/queries/content";
 import { getTheme } from "@/lib/theme/server";
 import { getV4Rows } from "@/lib/v4/queries";
@@ -106,7 +105,6 @@ export async function Header() {
             >
               <AccountLink />
             </Suspense>
-            <InstallAppButton />
             <Link href="/videos?tab=live" className="button button-ember">
               <Radio size={17} />
               {kn.live}

@@ -151,13 +151,23 @@
   background: rgb(255 255 255 / 0.16);
 }
 .dash-range {
-  display: inline-flex;
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  align-items: center;
   padding: 4px;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.1);
 }
 .dash-range a {
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 14px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
   border-radius: 999px;
   color: #d8dbec;
   font-size: 13px;
@@ -1007,4 +1017,9 @@ summary.dash-card-head::-webkit-details-marker {
     animation: none !important;
     transition: none !important;
   }
+}
+
+.dash-activity-loading {
+  height: 220px;
+  border-radius: 10px;
 }

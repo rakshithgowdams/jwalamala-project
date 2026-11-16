@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Circle,
   Clock3,
+  Database,
   Eye,
   FilePlus2,
   FileText,
@@ -21,7 +22,10 @@ import {
   Users,
 } from "lucide-react";
 import { requireStaff } from "@/lib/auth/require-user";
-import { loadDashboard, parseRange, RANGES, sampleDashboard } from "@/lib/admin/dashboard";
+import { Suspense } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "@/lib/supabase/admin";
+import { cached, loadActivity, loadDashboard, parseRange, RANGES, sampleDashboard, type DashboardData } from "@/lib/admin/dashboard";
 import {
   AnimatedNumber,
   AreaChart,
@@ -84,8 +88,15 @@ const quickActions: { href: string; label: Tri; icon: typeof FilePlus2 }[] = [
   { href: "/admin/social", label: { en: "Share to social", kn: "ಸಾಮಾಜಿಕ ಮಾಧ್ಯಮಕ್ಕೆ ಹಂಚಿ", hi: "सोशल पर साझा करें" }, icon: Megaphone },
 ];
 
+type DashboardActivity = DashboardData["activity"];
+
 const name = (map: Record<string, Tri>, key: string, tr: (t: Tri) => string) =>
   map[key] ? tr(map[key]) : key.charAt(0).toUpperCase() + key.slice(1);
+
+/** The GitHub Action pings every 2 days; past 4 days a run has been missed. */
+const KEEP_ALIVE_STALE_MINUTES = 4 * 24 * 60;
+const minutesSince = (iso: string | null | undefined) =>
+  iso ? Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)) : null;
 
 export default async function Dashboard({
   searchParams,
@@ -97,7 +108,17 @@ export default async function Dashboard({
   const params = await searchParams;
   const range = parseRange(params.range);
   const sample = params.preview === "sample";
-  const data = sample ? sampleDashboard(range) : await loadDashboard(db, range);
+  const [data, keepAlive] = await Promise.all([
+    sample ? sampleDashboard(range) : cached(`dash:${user.id}:${range}`, () => loadDashboard(db, range)),
+    profile.role === "admin"
+      ? cached(`keep-alive:${user.id}`, async () =>
+          (await db.from("keep_alive").select("last_ping,ping_count").eq("id", 1).maybeSingle())
+            .data as { last_ping: string | null; ping_count: number } | null,
+        )
+      : undefined,
+  ]);
+  const pingAge = minutesSince(keepAlive?.last_ping);
+  const keepAliveHealthy = pingAge !== null && pingAge < KEEP_ALIVE_STALE_MINUTES;
   const greetingName = (profile.full_name as string | null)?.trim() || user.email || "";
   const pendingSetup = data.setup.filter((step) => !step.done);
   const query = (next: { range?: number; preview?: boolean }) => {
@@ -477,30 +498,12 @@ export default async function Dashboard({
             </div>
             <Link href="/admin/audit">{tr({ en: "History", kn: "ಇತಿಹಾಸ", hi: "इतिहास" })}</Link>
           </div>
-          {data.activity.length ? (
-            <ol className="dash-timeline">
-              {data.activity.map((item) => (
-                <li key={item.id} className={"is-" + item.action.toLowerCase()}>
-                  <Activity size={14} aria-hidden="true" />
-                  <div>
-                    <p>
-                      <strong>{item.actor || tr({ en: "System", kn: "ವ್ಯವಸ್ಥೆ", hi: "सिस्टम" })}</strong>{" "}
-                      {name(actionNames, item.action, tr)} {name(tableNames, item.table, tr)}
-                    </p>
-                    <span>
-                      {new Intl.RelativeTimeFormat(locale + "-IN", { numeric: "auto" }).format(
-                        item.minutesAgo < 60 ? -item.minutesAgo : item.minutesAgo < 1440 ? -Math.round(item.minutesAgo / 60) : -Math.round(item.minutesAgo / 1440),
-                        item.minutesAgo < 60 ? "minute" : item.minutesAgo < 1440 ? "hour" : "day",
-                      )}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ol>
+          {sample ? (
+            <ActivityList activity={data.activity} />
           ) : (
-            <p className="dash-chart-empty is-inline">
-              {tr({ en: "Edits by your team will appear here.", kn: "ನಿಮ್ಮ ತಂಡದ ಸಂಪಾದನೆಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.", hi: "आपकी टीम के संपादन यहाँ दिखेंगे।" })}
-            </p>
+            <Suspense fallback={<div className="skeleton-block dash-activity-loading" aria-hidden="true" />}>
+              <RecentActivity db={db} userId={user.id} />
+            </Suspense>
           )}
         </section>
 
@@ -553,7 +556,103 @@ export default async function Dashboard({
             ))}
           </div>
         </section>
+
+        {keepAlive !== undefined && (
+          <section className="dash-card span-4" style={card(19)}>
+            <div className="dash-card-head">
+              <div>
+                <h2>{tr({ en: "Database keep-alive", kn: "ಡೇಟಾಬೇಸ್ ಸಕ್ರಿಯತೆ", hi: "डेटाबेस कीप-अलाइव" })}</h2>
+                <p>{tr({ en: "Pinged every 2 days by GitHub Actions", kn: "GitHub Actions ಪ್ರತಿ 2 ದಿನಕ್ಕೊಮ್ಮೆ ಪಿಂಗ್ ಮಾಡುತ್ತದೆ", hi: "GitHub Actions हर 2 दिन में पिंग करता है" })}</p>
+              </div>
+              <span className={"dash-delta " + (keepAliveHealthy ? "is-up" : "is-down")}>
+                <Database size={12} aria-hidden="true" />
+                {keepAliveHealthy
+                  ? tr({ en: "Healthy", kn: "ಸಕ್ರಿಯ", hi: "सक्रिय" })
+                  : tr({ en: "Needs attention", kn: "ಗಮನಿಸಿ", hi: "ध्यान दें" })}
+              </span>
+            </div>
+            <ul className="dash-review">
+              <li>
+                <span>{tr({ en: "Last ping", kn: "ಕೊನೆಯ ಪಿಂಗ್", hi: "आख़िरी पिंग" })}</span>
+                <strong>
+                  {pingAge === null
+                    ? tr({ en: "Never", kn: "ಇನ್ನೂ ಇಲ್ಲ", hi: "कभी नहीं" })
+                    : new Intl.RelativeTimeFormat(locale + "-IN", { numeric: "auto" }).format(
+                        pingAge < 60 ? -pingAge : pingAge < 1440 ? -Math.round(pingAge / 60) : -Math.round(pingAge / 1440),
+                        pingAge < 60 ? "minute" : pingAge < 1440 ? "hour" : "day",
+                      )}
+                </strong>
+              </li>
+              <li>
+                <span>{tr({ en: "Total pings", kn: "ಒಟ್ಟು ಪಿಂಗ್‌ಗಳು", hi: "कुल पिंग" })}</span>
+                <strong>{formatValue(keepAlive?.ping_count ?? 0, "number", locale)}</strong>
+              </li>
+            </ul>
+            {!keepAliveHealthy && (
+              <p role="alert">
+                {tr({
+                  en: "No ping in the last 4 days. Check the “Supabase keep-alive” workflow on GitHub, or the project may pause.",
+                  kn: "ಕಳೆದ 4 ದಿನಗಳಲ್ಲಿ ಪಿಂಗ್ ಆಗಿಲ್ಲ. GitHub ನಲ್ಲಿ “Supabase keep-alive” ವರ್ಕ್‌ಫ್ಲೋ ಪರಿಶೀಲಿಸಿ, ಇಲ್ಲದಿದ್ದರೆ ಪ್ರಾಜೆಕ್ಟ್ ನಿಲ್ಲಬಹುದು.",
+                  hi: "पिछले 4 दिनों में कोई पिंग नहीं। GitHub पर “Supabase keep-alive” वर्कफ़्लो जाँचें, वरना प्रोजेक्ट रुक सकता है।",
+                })}
+              </p>
+            )}
+          </section>
+        )}
       </div>
     </div>
+  );
+}
+
+async function RecentActivity({ db, userId }: { db: SupabaseClient; userId: string }) {
+  // The dashboard is behind requireStaff(), the same admin.access check the
+  // audit_log policy runs per row; the server client skips that per-row cost.
+  const reader = getAdminClient() ?? db;
+  const activity = await cached(`activity-v2:${userId}`, async () => {
+    const rows = await loadActivity(reader);
+    if (!rows) throw new Error("activity unavailable");
+    return rows;
+  }).catch(() => null);
+  return <ActivityList activity={activity} />;
+}
+
+async function ActivityList({ activity }: { activity: DashboardActivity | null }) {
+  const { tr, locale } = await getUiStrings();
+  if (!activity)
+    return (
+      <p className="dash-chart-empty is-inline">
+        {tr({
+          en: "Recent activity is taking too long to load. The rest of the dashboard is up to date.",
+          kn: "ಇತ್ತೀಚಿನ ಚಟುವಟಿಕೆ ಲೋಡ್ ಆಗಲು ತಡವಾಗುತ್ತಿದೆ. ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ನ ಉಳಿದ ಭಾಗ ನವೀಕೃತವಾಗಿದೆ.",
+          hi: "हाल की गतिविधि लोड होने में देर हो रही है। डैशबोर्ड का बाकी हिस्सा अद्यतन है।",
+        })}
+      </p>
+    );
+  if (!activity.length)
+    return (
+      <p className="dash-chart-empty is-inline">
+        {tr({ en: "Edits by your team will appear here.", kn: "ನಿಮ್ಮ ತಂಡದ ಸಂಪಾದನೆಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.", hi: "आपकी टीम के संपादन यहाँ दिखेंगे।" })}
+      </p>
+    );
+  return (
+    <ol className="dash-timeline">
+      {activity.map((item) => (
+        <li key={item.id} className={"is-" + item.action.toLowerCase()}>
+          <Activity size={14} aria-hidden="true" />
+          <div>
+            <p>
+              <strong>{item.actor || tr({ en: "System", kn: "ವ್ಯವಸ್ಥೆ", hi: "सिस्टम" })}</strong>{" "}
+              {name(actionNames, item.action, tr)} {name(tableNames, item.table, tr)}
+            </p>
+            <span>
+              {new Intl.RelativeTimeFormat(locale + "-IN", { numeric: "auto" }).format(
+                item.minutesAgo < 60 ? -item.minutesAgo : item.minutesAgo < 1440 ? -Math.round(item.minutesAgo / 60) : -Math.round(item.minutesAgo / 1440),
+                item.minutesAgo < 60 ? "minute" : item.minutesAgo < 1440 ? "hour" : "day",
+              )}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }

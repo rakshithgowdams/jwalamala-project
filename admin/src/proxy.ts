@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { site } from "@/config/site";
 import { supabaseFetch } from "@/lib/supabase/fetch";
 import { isAdminPath, loginPath } from "@/lib/auth/paths";
+import { sectionForPath } from "@/lib/admin/sections";
 
 function authCookieValue(request: NextRequest) {
   return request.cookies
@@ -35,14 +36,60 @@ function accessTokenIsFresh(request: NextRequest) {
   }
 }
 
-function jwtExpMs(token: string) {
+function jwtPayload(token: string): { exp?: number; sub?: string } {
   const payload = token.split(".")[1];
-  if (!payload) return 0;
+  if (!payload) return {};
   const padded =
     payload.replace(/-/g, "+").replace(/_/g, "/") +
     "=".repeat((4 - (payload.length % 4)) % 4);
-  const exp = JSON.parse(atob(padded)).exp;
+  return JSON.parse(atob(padded));
+}
+
+function jwtExpMs(token: string) {
+  const exp = jwtPayload(token).exp;
   return typeof exp === "number" ? exp * 1000 : 0;
+}
+
+function accessToken(request: NextRequest) {
+  let raw = authCookieValue(request);
+  if (!raw) return null;
+  try {
+    if (raw.startsWith("base64-")) raw = atob(raw.slice("base64-".length));
+    return (JSON.parse(raw) as { access_token?: string }).access_token || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sidebar features granted to a staff account, or null for every other role.
+ * Looked up with the account's own token, so the database still decides what
+ * it may read; a short cache keeps page clicks off an extra round-trip.
+ */
+const staffCache = new Map<string, { at: number; sections: string[] | null }>();
+async function staffSections(request: NextRequest, url: string, key: string) {
+  const token = accessToken(request);
+  const sub = token ? jwtPayload(token).sub : undefined;
+  if (!token || !sub) return null;
+  const hit = staffCache.get(sub);
+  if (hit && Date.now() - hit.at < 30_000) return hit.sections;
+  try {
+    const result = await fetch(
+      `${url}/rest/v1/profiles?select=role,admin_sections&id=eq.${encodeURIComponent(sub)}`,
+      {
+        headers: { apikey: key, Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(3000),
+      },
+    );
+    if (!result.ok) return null;
+    const [row] = (await result.json()) as { role?: string; admin_sections?: string[] | null }[];
+    const sections = row?.role === "staff" ? ["", ...(row.admin_sections || [])] : null;
+    if (staffCache.size > 500) staffCache.clear();
+    staffCache.set(sub, { at: Date.now(), sections });
+    return sections;
+  } catch {
+    return null;
+  }
 }
 
 /** Every admin screen needs a signed-in account holding admin.access. */
@@ -73,9 +120,29 @@ export async function proxy(request: NextRequest) {
   if (!restricted) return finish(response);
   const hasCookie = Boolean(authCookieValue(request));
   if (!hasCookie) return toLogin();
+  // Staff accounts only open the sidebar features an administrator granted;
+  // any other admin page shows "No access" instead.
+  const gate = async () => {
+    if (path === "/admin/no-access") return finish(response);
+    const sections = await staffSections(request, url, key);
+    const section = sectionForPath(path);
+    // Tasks staff may open the article editor for posts assigned to them.
+    const tasksMayEditPost =
+      section === "posts" &&
+      Boolean(sections?.includes("tasks")) &&
+      /^\/admin\/posts\/[^/]+\/?$/.test(path) &&
+      !path.endsWith("/new") &&
+      !path.includes("/bin");
+    if (
+      sections &&
+      (section === null || (!sections.includes(section) && !tasksMayEditPost))
+    )
+      return finish(NextResponse.rewrite(new URL("/admin/no-access", request.url)));
+    return finish(response);
+  };
   // A still-valid access token does not need getUser() here. The layout
   // still verifies the account. This keeps page clicks off an 8s Auth wait.
-  if (accessTokenIsFresh(request)) return finish(response);
+  if (accessTokenIsFresh(request)) return gate();
   try {
     const db = createServerClient(url, key, {
       global: { fetch: supabaseFetch },
@@ -99,7 +166,7 @@ export async function proxy(request: NextRequest) {
     // kicking them to login is what made page clicks feel like a minute hang.
     if (!hasCookie) return toLogin();
   }
-  return finish(response);
+  return gate();
 }
 export const config = {
   matcher: ["/((?!_next/static|_next/image|fonts/|images/|icons/|favicon.ico).*)"],

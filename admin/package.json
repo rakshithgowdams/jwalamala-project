@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack -p 3001",
+    "chat": "node ./server/chat-socket.mjs",
     "build": "next build --webpack",
     "start": "next start -p 3001",
     "typecheck": "next typegen && tsc --noEmit",
@@ -25,6 +26,8 @@
     "react-dom": "19.3.0",
     "sanitize-html": "2.17.7",
     "sharp": "0.35.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "suncalc": "2.0.2",
     "zod": "4.6.5"
   },

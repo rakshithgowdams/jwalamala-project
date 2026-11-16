@@ -418,8 +418,14 @@ img {
 }
 .main-nav-dropdown.columns {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 8px;
+  gap: 8px;
   min-width: 400px;
+}
+.main-nav-dropdown:not(.columns) > li:not(:last-child) {
+  padding-bottom: 6px;
+}
+.main-nav-dropdown:not(.columns) > li:not(:first-child) {
+  padding-top: 6px;
 }
 .main-nav-dropdown a {
   display: block;
@@ -1755,14 +1761,6 @@ textarea {
 .install-app-short {
   display: none;
 }
-@media (max-width: 1100px) and (min-width: 641px) {
-  .masthead-actions .install-app-label {
-    display: none;
-  }
-  .masthead-actions .install-app-short {
-    display: inline;
-  }
-}
 .install-app-button.is-wide {
   width: 100%;
   justify-content: center;
@@ -2146,9 +2144,6 @@ textarea {
   }
   .masthead-actions .button svg {
     width: 14px;
-  }
-  .masthead-actions .install-app-button {
-    display: none;
   }
   .category-nav {
     gap: 23px;

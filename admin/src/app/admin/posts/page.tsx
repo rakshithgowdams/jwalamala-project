@@ -52,18 +52,20 @@ export default async function Posts({
   const { kn, tr } = await getUiStrings();
   return (
     <>
-      <div className="section-title">
-        <h1>{kn.posts}</h1>
-        <div className="page-actions">
-          <Link href="/admin/posts/bin" className="button button-outline">
-            {tr({ en: "Recycle bin", kn: "ಮರುಬಳಕೆ ಡಬ್ಬಿ", hi: "रीसायकल बिन" })}
-          </Link>
-          <Link href="/admin/posts/new" className="button button-ember">
-            {kn.newPost}
-          </Link>
+      <div className="list-sticky-head">
+        <div className="section-title">
+          <h1>{kn.posts}</h1>
+          <div className="page-actions">
+            <Link href="/admin/posts/bin" className="button button-outline">
+              {tr({ en: "Recycle bin", kn: "ಮರುಬಳಕೆ ಡಬ್ಬಿ", hi: "रीसायकल बिन" })}
+            </Link>
+            <Link href="/admin/posts/new" className="button button-ember">
+              {kn.newPost}
+            </Link>
+          </div>
         </div>
+        <PostFilters q={filters.q} status={filters.status} type={filters.type} sort={filters.sort} />
       </div>
-      <PostFilters q={filters.q} status={filters.status} type={filters.type} sort={filters.sort} />
       <Suspense
         key={[filters.page, filters.q, filters.status, filters.type, filters.sort].join("|")}
         fallback={<PostGridFallback />}
@@ -76,18 +78,27 @@ export default async function Posts({
 
 async function PostResults({ filters }: { filters: PostFiltersQuery }) {
   const page = Math.max(1, Math.min(10000, Math.floor(Number(filters.page)) || 1));
-  const [{ db, profile }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+  const [{ db, profile, user }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const canDelete = profile.role === "admin";
   const sort = ["updated", "oldest", "published", "title"].includes(filters.sort || "")
     ? filters.sort
     : "updated";
   const pageSize = 30;
-  let query = db
-    .from("posts")
-    .select(
-      "id,title_kn,slug,status,type,updated_at,published_at,thumbnail_url,video_url",
-      { count: "planned" },
-    );
+  // Staff only browse articles assigned to them (join — never .in() thousands of UUIDs).
+  const staffOnly = profile.role === "staff";
+  let query = staffOnly
+    ? db
+        .from("posts")
+        .select(
+          "id,title_kn,slug,status,type,updated_at,published_at,thumbnail_url,video_url,article_tasks!inner(assignee_id,status)",
+          { count: "exact" },
+        )
+        .eq("article_tasks.assignee_id", user.id)
+        .eq("article_tasks.status", "open")
+    : db.from("posts").select(
+        "id,title_kn,slug,status,type,updated_at,published_at,thumbnail_url,video_url",
+        { count: "exact" },
+      );
   if (sort === "oldest") query = query.order("updated_at", { ascending: true });
   else if (sort === "title") query = query.order("title_kn", { ascending: true });
   else if (sort === "published") query = query.order("published_at", { ascending: false, nullsFirst: false });
@@ -103,18 +114,58 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
     query = query.eq("status", filters.status!);
   if (["article", "video", "short"].includes(filters.type || ""))
     query = query.eq("type", filters.type!);
-  const from = (page - 1) * pageSize;
-  const {
+  // Prefer an exact staff assignment total so the pager can show 1 2 3 4 … last.
+  let knownTotal: number | null = null;
+  if (staffOnly && !filters.q && !filters.status && !filters.type) {
+    const { count: taskCount } = await db
+      .from("article_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("assignee_id", user.id)
+      .eq("status", "open");
+    if (typeof taskCount === "number") knownTotal = taskCount;
+  }
+  const guessedPages =
+    knownTotal != null ? Math.max(1, Math.ceil(knownTotal / pageSize)) : null;
+  let safePage = guessedPages != null ? Math.min(page, guessedPages) : page;
+  let from = (safePage - 1) * pageSize;
+  let {
     data: posts,
     error,
     count,
   } = await query.range(from, from + pageSize - 1);
-  if (error) throw error;
-  const pages = Math.max(
-    page,
-    Math.ceil((count || 0) / pageSize),
-    (posts?.length || 0) === pageSize ? page + 1 : page,
-  );
+  if (error) {
+    if (staffOnly && /article_tasks|relationship|embed|Bad Request/i.test(error.message || "")) {
+      return (
+        <p>
+          {tr({
+            en: "No articles are assigned to you yet, or Tasks is not set up. Ask an administrator to assign work on Tasks.",
+            kn: "ನಿಮಗೆ ಇನ್ನೂ ಲೇಖನಗಳನ್ನು ನಿಯೋಜಿಸಿಲ್ಲ, ಅಥವಾ ಕಾರ್ಯಗಳು ಸಿದ್ಧವಿಲ್ಲ. ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
+            hi: "अभी आपके नाम लेख नहीं हैं, या Tasks सेट नहीं है। एडमिन से असाइन करवाएँ।",
+          })}
+        </p>
+      );
+    }
+    throw error;
+  }
+  const total = typeof count === "number" ? count : knownTotal || 0;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (safePage > pages) {
+    safePage = pages;
+    from = (safePage - 1) * pageSize;
+    const again = await query.range(from, from + pageSize - 1);
+    if (!again.error) posts = again.data;
+  }
+  if (staffOnly && !(posts?.length || total)) {
+    return (
+      <p>
+        {tr({
+          en: "No articles are assigned to you yet. Open Tasks when an administrator gives you work.",
+          kn: "ನಿಮಗೆ ಇನ್ನೂ ಲೇಖನಗಳನ್ನು ನಿಯೋಜಿಸಿಲ್ಲ. ನಿರ್ವಾಹಕರು ಕೆಲಸ ನೀಡಿದಾಗ ಕಾರ್ಯಗಳು ತೆರೆಯಿರಿ.",
+          hi: "अभी आपके नाम कोई लेख नहीं है। एडमिन काम दें तो Tasks खोलें।",
+        })}
+      </p>
+    );
+  }
   const updatedOn = new Intl.DateTimeFormat("en-IN", {
     day: "numeric",
     month: "short",
@@ -181,7 +232,7 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
         )}
       </div>
       <Pagination
-        page={page}
+        page={safePage}
         pages={pages}
         query={{ q: filters.q, status: filters.status, type: filters.type, sort: filters.sort }}
       />

@@ -110,12 +110,11 @@ export async function loadDashboard(db: SupabaseClient, range: Range): Promise<D
     sinceIso = new Date(Date.now() - range * DAY).toISOString(),
     now = new Date().toISOString();
   const head = (table: string) => db.from(table).select("*", { count: "exact", head: true });
-
   const [
     published, publishedInRange, drafts, scheduled, archived, featured, upcomingEvents,
     newSubmissions, pendingComments, pendingCommunity, pendingShops,
     readers, readersInRange, activeAds, places,
-    views, engagement, traffic, adStats, categories, recent, homepage, audit, events,
+    views, engagement, traffic, adStats, categories, recent, homepage, events,
   ] = await Promise.all([
     count(head("posts").eq("status", "published")),
     count(head("posts").eq("status", "published").gte("published_at", sinceIso)),
@@ -139,7 +138,6 @@ export async function loadDashboard(db: SupabaseClient, range: Range): Promise<D
     db.from("categories").select("name_kn,post_categories(count)"),
     db.from("posts").select("id,title_kn,status,updated_at").order("updated_at", { ascending: false }).limit(6),
     db.from("site_settings").select("value").eq("key", "homepage").maybeSingle(),
-    db.from("audit_log").select("id,action,table_name,created_at,profiles(full_name)").order("created_at", { ascending: false }).limit(8),
     db.from("events").select("id,name_kn,start_date,place").gte("end_date", today).order("start_date").limit(5),
   ]);
 
@@ -183,7 +181,6 @@ export async function loadDashboard(db: SupabaseClient, range: Range): Promise<D
   const adClicks = sumBy(adRows, (r) => r.day, (r) => Number(r.clicks));
 
   type CategoryRow = { name_kn: string; post_categories: { count: number }[] };
-  type AuditRow = { id: string; action: string; table_name: string; created_at: string; profiles: { full_name: string | null } | null };
   type EventRow = { id: string; name_kn: string; start_date: string; place: string | null };
   const homeLead = (homepage.data?.value as { lead_id?: string } | null)?.lead_id;
   const pending = [newSubmissions, pendingComments, pendingCommunity, pendingShops];
@@ -231,9 +228,7 @@ export async function loadDashboard(db: SupabaseClient, range: Range): Promise<D
       .filter((c) => c.value > 0)
       .sort((a, b) => b.value - a.value)
       .slice(0, 7),
-    activity: ((audit.data || []) as unknown as AuditRow[]).map((r) => ({
-      id: r.id, action: r.action, table: r.table_name, minutesAgo: Math.max(0, Math.round((Date.now() - Date.parse(r.created_at)) / 60000)), actor: r.profiles?.full_name || null,
-    })),
+    activity: [],
     events: ((events.data || []) as EventRow[]).map((e) => ({ id: e.id, name: e.name_kn, start: e.start_date, daysUntil: Math.max(0, Math.round((Date.parse(e.start_date) - Date.parse(today)) / DAY)), place: e.place })),
     review: review(pending),
     recent: (recent.data || []) as DashboardData["recent"],
@@ -245,6 +240,66 @@ export async function loadDashboard(db: SupabaseClient, range: Range): Promise<D
       (activeAds || 0) > 0,
     ]),
   };
+}
+
+type AuditRow = { id: string; action: string; table_name: string; created_at: string; profiles: { full_name: string | null } | null };
+
+/**
+ * The audit log grows with every content edit, so it loads on its own and gives
+ * up quickly: a slow read must never hold the rest of the dashboard. Null means
+ * the activity could not be read in time.
+ */
+export async function loadActivity(db: SupabaseClient): Promise<DashboardData["activity"] | null> {
+  const { data, error } = await db
+    .from("audit_log")
+    .select("id,action,table_name,created_at,profiles(full_name)")
+    .order("created_at", { ascending: false })
+    .limit(8)
+    .abortSignal(AbortSignal.timeout(3000));
+  if (error) return null;
+  return ((data || []) as unknown as AuditRow[]).map((r) => ({
+    id: r.id,
+    action: r.action,
+    table: r.table_name,
+    minutesAgo: Math.max(0, Math.round((Date.now() - Date.parse(r.created_at)) / 60000)),
+    actor: r.profiles?.full_name || null,
+  }));
+}
+
+/**
+ * Per-admin, per-range memory cache. Fresh results are reused for a minute;
+ * older ones are shown at once while a refresh runs. Failed loads are dropped
+ * so the next visit retries instead of reusing an error.
+ */
+const FRESH_MS = 60_000;
+const STALE_MS = 10 * 60_000;
+type Entry = { at: number; value: Promise<unknown>; refreshing?: boolean };
+const cache = new Map<string, Entry>();
+
+export function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key);
+  const age = hit ? Date.now() - hit.at : Infinity;
+  if (hit && age < FRESH_MS) return hit.value as Promise<T>;
+  const start = (storeNow: boolean) => {
+    const entry: Entry = { at: Date.now(), value: load() };
+    if (storeNow) cache.set(key, entry);
+    entry.value.then(
+      () => cache.set(key, entry),
+      () => {
+        if (cache.get(key) === entry) cache.delete(key);
+        else if (hit) hit.refreshing = false;
+      },
+    );
+    return entry.value as Promise<T>;
+  };
+  if (hit && age < STALE_MS) {
+    if (!hit.refreshing) {
+      hit.refreshing = true;
+      start(false).catch(() => {});
+    }
+    return hit.value as Promise<T>;
+  }
+  return start(true);
 }
 
 /** Clearly labelled preview numbers for reviewing the design before real traffic exists. */

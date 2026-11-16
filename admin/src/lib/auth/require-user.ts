@@ -17,7 +17,7 @@ export const requireUser = cache(async (next = "/admin") => {
 export const requireStaff = cache(async () => {
   const { db, user } = await requireUser("/admin");
   const [{ data: profile }, { data: allowed }] = await Promise.all([
-    db.from("profiles").select("id,role,full_name").eq("id", user.id).single(),
+    db.from("profiles").select("id,role,full_name,admin_sections").eq("id", user.id).single(),
     db.rpc("has_permission", { requested: "admin.access" }),
   ]);
   if (!profile) notFound();

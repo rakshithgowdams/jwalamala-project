@@ -3,6 +3,22 @@ import { useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 
+/** Build 1 2 3 4 … N (or a sliding window around the current page). */
+function pageItems(page: number, pages: number): number[] {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const picks = new Set<number>([1, pages]);
+  if (page <= 4) {
+    for (let n = 2; n <= 4; n++) picks.add(n);
+  } else if (page >= pages - 3) {
+    for (let n = pages - 3; n < pages; n++) picks.add(n);
+  } else {
+    picks.add(page - 1);
+    picks.add(page);
+    picks.add(page + 1);
+  }
+  return [...picks].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+}
+
 export function Pagination({
   page,
   pages,
@@ -12,20 +28,12 @@ export function Pagination({
   pages: number;
   query?: Record<string, string | undefined>;
 }) {
-  const { kn } = useUiStrings();
+  const { kn, tr } = useUiStrings();
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   if (pages <= 1) return null;
-  const numbers = [
-    ...new Set([
-      1,
-      ...Array.from({ length: 7 }, (_, i) => page + i - 3).filter(
-        (n) => n > 1 && n < pages,
-      ),
-      pages,
-    ]),
-  ].sort((a, b) => a - b);
+  const numbers = pageItems(page, pages);
 
   function go(nextPage: number) {
     if (nextPage === page || pending) return;
@@ -49,10 +57,12 @@ export function Pagination({
       aria-busy={pending || undefined}
     >
       {numbers.map((n, i) => (
-        <span key={n}>
-          {i > 0 && n > numbers[i - 1] + 1 && (
-            <span aria-hidden="true"> … </span>
-          )}
+        <span key={n} className="pagination-item">
+          {i > 0 && n > numbers[i - 1] + 1 ? (
+            <span className="pagination-ellipsis" aria-hidden="true">
+              …
+            </span>
+          ) : null}
           <button
             type="button"
             className={"chip " + (n === page ? "active" : "")}
@@ -64,6 +74,13 @@ export function Pagination({
           </button>
         </span>
       ))}
+      <span className="pagination-total">
+        {tr({
+          en: `Page ${page} of ${pages}`,
+          kn: `ಪುಟ ${page} / ${pages}`,
+          hi: `पृष्ठ ${page} / ${pages}`,
+        })}
+      </span>
     </nav>
   );
 }

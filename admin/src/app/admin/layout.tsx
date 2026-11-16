@@ -1,4 +1,5 @@
 import { requireStaff } from "@/lib/auth/require-user";
+import { getSectionAccess } from "@/lib/auth/section-access";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { AdminTopBar } from "@/components/admin/AdminTopBar";
 import { site } from "@/config/site";
@@ -13,12 +14,16 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, profile } = await requireStaff();
+  const [{ user, profile }, allowed] = await Promise.all([requireStaff(), getSectionAccess()]);
   return (
     <>
-      <AdminTopBar email={user.email || ""} role={String(profile.role)} />
+      <AdminTopBar
+        name={(profile.full_name as string | null)?.trim() || user.email?.split("@")[0] || ""}
+        email={user.email || ""}
+        role={String(profile.role)}
+      />
       <div className="container page-shell admin-layout">
-        <AdminNav />
+        <AdminNav allowed={allowed} />
         <section className="admin-main">{children}</section>
       </div>
     </>

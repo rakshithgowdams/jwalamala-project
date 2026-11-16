@@ -10,9 +10,19 @@ export default async function EditPost({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { db, profile } = await requireStaff();
+  const { db, profile, user } = await requireStaff();
   const options = await editorChoices(db);
   const { id } = await params;
+  if (profile.role === "staff") {
+    const { data: task } = await db
+      .from("article_tasks")
+      .select("id")
+      .eq("post_id", id)
+      .eq("assignee_id", user.id)
+      .eq("status", "open")
+      .maybeSingle();
+    if (!task) notFound();
+  }
   const [{ data: p }, { data: categories }] = await Promise.all([
     db
       .from("posts")

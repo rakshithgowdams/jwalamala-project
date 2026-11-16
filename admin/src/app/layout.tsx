@@ -29,7 +29,7 @@ export default async function AdminRootLayout({
   const { locale } = await getUiStrings();
   return (
     <html lang={locale} className="font-local" data-theme="light">
-      <body>
+      <body suppressHydrationWarning>
         <LanguageProvider locale={locale}>
           <PlaceNamesProvider names={{}}>
             <main id="main">{children}</main>

@@ -94,7 +94,11 @@ const loadCategories = unstable_cache(
 
 export const getCategories = cache(async (): Promise<Category[]> => {
   if (site.demo) return categories;
-  return loadCategories();
+  // The header renders on every page, so an unreachable database must not take the whole site down.
+  return loadCategories().catch((error) => {
+    console.error("categories unavailable", error);
+    return [];
+  });
 });
 
 const loadPublishedPlaceIds = unstable_cache(
@@ -142,7 +146,10 @@ const loadEvents = unstable_cache(
 
 export const getEvents = cache(async (): Promise<NewsEvent[]> => {
   if (site.demo) return demoEvents;
-  return loadEvents();
+  return loadEvents().catch((error) => {
+    console.error("events unavailable", error);
+    return [];
+  });
 });
 
 const loadPost = unstable_cache(

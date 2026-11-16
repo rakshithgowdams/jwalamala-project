@@ -9,7 +9,7 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { PasswordField } from "./PasswordField";
 import { isAuthRateLimited, submitEmailAuth } from "@/lib/auth/email";
 import type { AuthMethods } from "@/lib/auth/settings";
-import { adminReturnPath } from "@/lib/auth/paths";
+import { adminReturnPath, resolvePostLoginPath } from "@/lib/auth/paths";
 
 export function AdminLoginForm({ next = "/admin", authError, methods, problems = [] }: {
   next?: string;
@@ -54,10 +54,11 @@ export function AdminLoginForm({ next = "/admin", authError, methods, problems =
         return;
       }
       if (allowed !== true) {
-        setMessage("This account does not have administrator access. Contact your site administrator.");
+        setMessage("This account does not have admin access. Contact your site administrator.");
         return;
       }
-      router.replace(adminReturnPath(next));
+      const { data: profile } = await db.from("profiles").select("role,admin_sections").maybeSingle();
+      router.replace(resolvePostLoginPath(next, profile || {}));
       router.refresh();
     } catch (error) {
       setMessage(isAuthRateLimited(error)
