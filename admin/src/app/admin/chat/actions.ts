@@ -6,6 +6,12 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { getUiStrings } from "@/lib/i18n/server";
 import { validateChatBody } from "@/lib/chat/message";
 import { broadcastChatMessage } from "@/lib/chat/broadcast";
+import {
+  CHAT_WEBHOOK_SETTINGS_KEY,
+  createChatWebhookSecret,
+  getChatWebhookSecretStatus,
+  type ChatWebhookSecretStatus,
+} from "@/lib/chat/webhook-secret";
 
 type Result = { ok?: true; error?: string; id?: string };
 
@@ -152,6 +158,155 @@ export async function sendChatMessage(input: unknown): Promise<Result & { messag
   };
   await broadcastChatMessage(message);
   return { ok: true, id: message.id, message };
+}
+
+export async function deleteChatMessage(input: unknown): Promise<Result> {
+  const access = await gate();
+  if ("denied" in access) return access.denied;
+  const { server, user, fail, isAdmin } = access;
+  const parsed = z.object({ messageId: uuid, roomId: uuid }).safeParse(input);
+  if (!parsed.success)
+    return fail("Message not found.", "ಸಂದೇಶ ಸಿಗಲಿಲ್ಲ.", "संदेश नहीं मिला।");
+
+  const { data: row } = await server
+    .from("chat_messages")
+    .select("id,sender_id,room_id")
+    .eq("id", parsed.data.messageId)
+    .eq("room_id", parsed.data.roomId)
+    .maybeSingle();
+  if (!row) return fail("Message not found.", "ಸಂದೇಶ ಸಿಗಲಿಲ್ಲ.", "संदेश नहीं मिला।");
+
+  if (!isAdmin && row.sender_id !== user.id)
+    return fail(
+      "You can only delete your own messages.",
+      "ನೀವು ನಿಮ್ಮ ಸಂದೇಶಗಳನ್ನು ಮಾತ್ರ ಅಳಿಸಬಹುದು.",
+      "आप केवल अपने संदेश हटा सकते हैं।",
+    );
+
+  if (!isAdmin) {
+    const { data: membership } = await server
+      .from("chat_room_members")
+      .select("user_id")
+      .eq("room_id", parsed.data.roomId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!membership)
+      return fail("You are not in this group.", "ನೀವು ಈ ಗುಂಪಿನಲ್ಲಿ ಇಲ್ಲ.", "आप इस समूह में नहीं हैं।");
+  }
+
+  const { error } = await server.from("chat_messages").delete().eq("id", parsed.data.messageId);
+  if (error)
+    return fail(error.message || "Could not delete the message.", "ಸಂದೇಶ ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "संदेश नहीं हटाया जा सका।");
+  revalidatePath("/admin/chat");
+  return { ok: true };
+}
+
+export async function deleteChatRoom(input: unknown): Promise<Result> {
+  const access = await gate();
+  if ("denied" in access) return access.denied;
+  const { server, fail, isAdmin } = access;
+  if (!isAdmin)
+    return fail(
+      "Only administrators can delete groups.",
+      "ಗುಂಪುಗಳನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಅಳಿಸಬಹುದು.",
+      "केवल एडमिन समूह हटा सकते हैं।",
+    );
+  const parsed = z.object({ roomId: uuid }).safeParse(input);
+  if (!parsed.success) return fail("Group not found.", "ಗುಂಪು ಸಿಗಲಿಲ್ಲ.", "समूह नहीं मिला।");
+
+  const { error } = await server.from("chat_rooms").delete().eq("id", parsed.data.roomId);
+  if (error)
+    return fail(error.message || "Could not delete the group.", "ಗುಂಪು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "समूह नहीं हटाया जा सका।");
+  revalidatePath("/admin/chat");
+  return { ok: true };
+}
+
+export async function fetchChatWebhookSecretStatus(): Promise<
+  ChatWebhookSecretStatus & { error?: string }
+> {
+  const access = await gate();
+  if ("denied" in access) return { configured: false, source: "none", hint: null, rotatedAt: null, error: access.denied.error };
+  const { server, isAdmin, fail } = access;
+  if (!isAdmin)
+    return {
+      configured: false,
+      source: "none",
+      hint: null,
+      rotatedAt: null,
+      error: fail(
+        "Only administrators can manage the webhook secret.",
+        "ವೆಬ್‌ಹುಕ್ ಸೀಕ್ರೆಟ್ ಅನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ನಿರ್ವಹಿಸಬಹುದು.",
+        "वेबहुक सीक्रेट केवल एडमिन प्रबंधित कर सकते हैं।",
+      ).error,
+    };
+  return getChatWebhookSecretStatus(server);
+}
+
+export async function rotateChatWebhookSecret(): Promise<
+  Result & { secret?: string; status?: ChatWebhookSecretStatus }
+> {
+  const access = await gate();
+  if ("denied" in access) return access.denied;
+  const { server, user, fail, isAdmin } = access;
+  if (!isAdmin)
+    return fail(
+      "Only administrators can generate the webhook secret.",
+      "ವೆಬ್‌ಹುಕ್ ಸೀಕ್ರೆಟ್ ಅನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ರಚಿಸಬಹುದು.",
+      "वेबहुक सीक्रेट केवल एडमिन बना सकते हैं।",
+    );
+
+  const { secret, hint, hash } = createChatWebhookSecret();
+  const rotatedAt = new Date().toISOString();
+  const { error } = await server.from("site_settings").upsert({
+    key: CHAT_WEBHOOK_SETTINGS_KEY,
+    value: {
+      secret_hash: hash,
+      hint,
+      rotated_at: rotatedAt,
+      rotated_by: user.id,
+    },
+  });
+  if (error)
+    return fail(
+      error.message || "Could not save the webhook secret.",
+      "ವೆಬ್‌ಹುಕ್ ಸೀಕ್ರೆಟ್ ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "वेबहुक सीक्रेट सहेजा नहीं जा सका।",
+    );
+
+  revalidatePath("/admin/chat");
+  return {
+    ok: true,
+    secret,
+    status: {
+      configured: true,
+      source: process.env.CHAT_WEBHOOK_SECRET?.trim() ? "both" : "database",
+      hint,
+      rotatedAt,
+    },
+  };
+}
+
+export async function revokeChatWebhookSecret(): Promise<Result & { status?: ChatWebhookSecretStatus }> {
+  const access = await gate();
+  if ("denied" in access) return access.denied;
+  const { server, fail, isAdmin } = access;
+  if (!isAdmin)
+    return fail(
+      "Only administrators can revoke the webhook secret.",
+      "ವೆಬ್‌ಹುಕ್ ಸೀಕ್ರೆಟ್ ಅನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ರದ್ದುಮಾಡಬಹುದು.",
+      "वेबहुक सीक्रेट केवल एडमिन रद्द कर सकते हैं।",
+    );
+
+  const { error } = await server.from("site_settings").delete().eq("key", CHAT_WEBHOOK_SETTINGS_KEY);
+  if (error)
+    return fail(
+      error.message || "Could not revoke the webhook secret.",
+      "ವೆಬ್‌ಹುಕ್ ಸೀಕ್ರೆಟ್ ರದ್ದುಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "वेबहुक सीक्रेट रद्द नहीं हो सका।",
+    );
+
+  revalidatePath("/admin/chat");
+  return { ok: true, status: await getChatWebhookSecretStatus(server) };
 }
 
 export async function loadChatMessages(roomId: string, before?: string) {

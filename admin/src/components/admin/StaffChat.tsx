@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { io, type Socket } from "socket.io-client";
-import { Link2, MessageSquarePlus, Send, Users } from "lucide-react";
+import { CircleAlert, MessageSquarePlus, Send, Settings2, Trash2, Users } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { ChatGroupSettingsModal } from "@/components/admin/ChatGroupSettingsModal";
 import { linkify, validateChatBody } from "@/lib/chat/message";
 import {
   chatNotificationPermission,
@@ -14,6 +16,8 @@ import {
 import { getBrowserClient } from "@/lib/supabase/client";
 import {
   createChatRoom,
+  deleteChatMessage,
+  deleteChatRoom,
   loadChatMessages,
   sendChatMessage,
   setChatMembers,
@@ -47,7 +51,7 @@ export type ChatRoom = {
   updatedAt: string;
 };
 
-export type ChatStaff = { id: string; name: string };
+export type ChatStaff = { id: string; name: string; role: "admin" | "staff" };
 
 export type ChatMessage = {
   id: string;
@@ -59,6 +63,13 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+type WebhookStatus = {
+  configured: boolean;
+  source: "database" | "env" | "both" | "none";
+  hint: string | null;
+  rotatedAt: string | null;
+};
+
 type Props = {
   isAdmin: boolean;
   userId: string;
@@ -67,6 +78,7 @@ type Props = {
   staff: ChatStaff[];
   socketUrl: string;
   webhookPath: string;
+  webhookStatus?: WebhookStatus;
 };
 
 export function StaffChat({
@@ -77,6 +89,7 @@ export function StaffChat({
   staff,
   socketUrl,
   webhookPath,
+  webhookStatus,
 }: Props) {
   const { tr } = useUiStrings();
   const [rooms, setRooms] = useState(initialRooms);
@@ -86,6 +99,9 @@ export function StaffChat({
   const [groupName, setGroupName] = useState("");
   const [groupDesc, setGroupDesc] = useState("");
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ChatMessage | null>(null);
   const [pending, start] = useTransition();
   const [status, setStatus] = useState<{ error?: string; ok?: string }>({});
   const [socketLive, setSocketLive] = useState(false);
@@ -317,6 +333,28 @@ export function StaffChat({
     socket.on("message:new", (payload: ChatMessage) => {
       ingestMessage(payload);
     });
+    socket.on("message:removed", (payload: { roomId?: string; messageId?: string }) => {
+      if (!payload?.messageId) return;
+      seenIdsRef.current.delete(payload.messageId);
+      if (payload.roomId === activeIdRef.current) {
+        setMessages((current) => current.filter((m) => m.id !== payload.messageId));
+      }
+    });
+    socket.on("room:removed", (payload: { roomId?: string }) => {
+      if (!payload?.roomId) return;
+      setRooms((current) => current.filter((r) => r.id !== payload.roomId));
+      setUnread((current) => {
+        if (!current[payload.roomId!]) return current;
+        const next = { ...current };
+        delete next[payload.roomId!];
+        return next;
+      });
+      if (activeIdRef.current === payload.roomId) {
+        setActiveId("");
+        setMessages([]);
+        setSettingsOpen(false);
+      }
+    });
     socket.on("typing:start", (payload: { roomId?: string; userId?: string; name?: string }) => {
       if (!payload?.userId || payload.userId === userId) return;
       if (payload.roomId !== activeIdRef.current) return;
@@ -454,30 +492,35 @@ export function StaffChat({
           {rooms.map((room) => {
             const count = unread[room.id] || 0;
             return (
-            <li key={room.id}>
-              <button
-                type="button"
-                className={
-                  "staff-chat-room" +
-                  (room.id === activeId ? " is-active" : "") +
-                  (count ? " has-unread" : "")
-                }
-                onClick={() => setActiveId(room.id)}
-              >
-                <span className="staff-chat-room-title">
-                  <strong>{room.name}</strong>
-                  {count ? (
-                    <span className="staff-chat-unread" aria-label={`${count} unread`}>
-                      {count > 99 ? "99+" : count}
+              <li key={room.id}>
+                <button
+                  type="button"
+                  className={
+                    "staff-chat-room" +
+                    (room.id === activeId ? " is-active" : "") +
+                    (count ? " has-unread" : "")
+                  }
+                  onClick={() => setActiveId(room.id)}
+                >
+                  <span className="staff-chat-room-avatar" aria-hidden="true">
+                    {room.name.trim().charAt(0).toUpperCase() || "G"}
+                  </span>
+                  <span className="staff-chat-room-meta">
+                    <span className="staff-chat-room-title">
+                      <strong>{room.name}</strong>
+                      {count ? (
+                        <span className="staff-chat-unread" aria-label={`${count} unread messages`}>
+                          {count > 99 ? "99+" : count}
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </span>
-                <small>
-                  {room.memberIds.length}{" "}
-                  {tr({ en: "members", kn: "ಸದಸ್ಯರು", hi: "सदस्य" })}
-                </small>
-              </button>
-            </li>
+                    <small>
+                      {room.memberIds.length}{" "}
+                      {tr({ en: "members", kn: "ಸದಸ್ಯರು", hi: "सदस्य" })}
+                    </small>
+                  </span>
+                </button>
+              </li>
             );
           })}
           {!rooms.length ? (
@@ -492,50 +535,12 @@ export function StaffChat({
         </ul>
 
         {isAdmin ? (
-          <form
-            className="staff-chat-create"
-            onSubmit={(e) => {
-              e.preventDefault();
-              run(
-                async () => {
-                  const result = await createChatRoom({ name: groupName, description: groupDesc });
-                  if (result.ok && result.id) {
-                    setRooms((current) => [
-                      {
-                        id: result.id!,
-                        name: groupName.trim(),
-                        description: groupDesc.trim(),
-                        memberIds: [userId],
-                        updatedAt: new Date().toISOString(),
-                      },
-                      ...current,
-                    ]);
-                    setActiveId(result.id);
-                    setGroupName("");
-                    setGroupDesc("");
-                  }
-                  return result;
-                },
-                tr({ en: "Group created.", kn: "ಗುಂಪು ರಚಿಸಲಾಯಿತು.", hi: "समूह बना।" }),
-              );
-            }}
-          >
-            <h3>
+          <div className="staff-chat-side-foot">
+            <button type="button" className="button button-ember staff-chat-create-btn" onClick={() => setCreateOpen(true)}>
               <MessageSquarePlus size={16} aria-hidden="true" />
-              {tr({ en: "New group", kn: "ಹೊಸ ಗುಂಪು", hi: "नया समूह" })}
-            </h3>
-            <label className="field">
-              <span>{tr({ en: "Name", kn: "ಹೆಸರು", hi: "नाम" })}</span>
-              <input value={groupName} onChange={(e) => setGroupName(e.target.value)} maxLength={80} required />
-            </label>
-            <label className="field">
-              <span>{tr({ en: "Purpose", kn: "ಉದ್ದೇಶ", hi: "उद्देश्य" })}</span>
-              <input value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} maxLength={240} />
-            </label>
-            <button type="submit" className="button button-ember" disabled={pending || !groupName.trim()}>
               {tr({ en: "Create group", kn: "ಗುಂಪು ರಚಿಸಿ", hi: "समूह बनाएँ" })}
             </button>
-          </form>
+          </div>
         ) : null}
       </aside>
 
@@ -554,100 +559,35 @@ export function StaffChat({
         ) : (
           <>
             <header className="staff-chat-main-head">
-              <div>
+              <div className="staff-chat-main-head-text">
                 <h2>{active.name}</h2>
-                {active.description ? <p>{active.description}</p> : null}
+                <p>
+                  {active.memberIds.length}{" "}
+                  {tr({ en: "members", kn: "ಸದಸ್ಯರು", hi: "सदस्य" })}
+                  {active.description ? ` · ${active.description}` : ""}
+                </p>
               </div>
-              <p className="staff-chat-hint">
-                <Link2 size={14} aria-hidden="true" />
-                {tr({
-                  en: "Text and web links only — no images or videos.",
-                  kn: "ಪಠ್ಯ ಮತ್ತು ವೆಬ್ ಲಿಂಕ್‌ಗಳು ಮಾತ್ರ — ಚಿತ್ರ/ವೀಡಿಯೊ ಇಲ್ಲ.",
-                  hi: "केवल टेक्स्ट और वेब लिंक — चित्र/वीडियो नहीं।",
-                })}
-              </p>
-            </header>
-
-            {isAdmin ? (
-              <details className="staff-chat-settings">
-                <summary>
-                  {tr({
-                    en: "Group settings · members & webhook",
-                    kn: "ಗುಂಪು ಸೆಟ್ಟಿಂಗ್ · ಸದಸ್ಯರು ಮತ್ತು ವೆಬ್‌ಹುಕ್",
-                    hi: "समूह सेटिंग · सदस्य और वेबहुक",
-                  })}
-                </summary>
-                <div className="staff-chat-members">
-                  <h3>{tr({ en: "Members", kn: "ಸದಸ್ಯರು", hi: "सदस्य" })}</h3>
-                  <div className="staff-chat-member-grid">
-                    {staff.map((person) => {
-                      const checked = memberIds.includes(person.id);
-                      return (
-                        <label key={person.id} className="staff-chat-member">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() =>
-                              setMemberIds((current) =>
-                                checked ? current.filter((id) => id !== person.id) : [...current, person.id],
-                              )
-                            }
-                          />
-                          <span>{person.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+              <div className="staff-chat-main-head-actions">
+                {isAdmin ? (
                   <button
                     type="button"
-                    className="button button-outline"
-                    disabled={pending}
-                    onClick={() =>
-                      run(async () => {
-                        const result = await setChatMembers({ roomId: active.id, memberIds });
-                        if (result.ok) {
-                          setRooms((current) =>
-                            current.map((room) =>
-                              room.id === active.id ? { ...room, memberIds: [...memberIds] } : room,
-                            ),
-                          );
-                        }
-                        return result;
-                      }, tr({ en: "Members updated.", kn: "ಸದಸ್ಯರು ನವೀಕರಿಸಲಾಯಿತು.", hi: "सदस्य अपडेट हुए।" }))
-                    }
+                    className="button button-ghost staff-chat-settings-btn"
+                    onClick={() => setSettingsOpen(true)}
                   >
-                    {tr({ en: "Save members", kn: "ಸದಸ್ಯರನ್ನು ಉಳಿಸಿ", hi: "सदस्य सहेजें" })}
+                    <Settings2 size={16} aria-hidden="true" />
+                    {tr({ en: "Settings", kn: "ಸೆಟ್ಟಿಂಗ್", hi: "सेटिंग" })}
                   </button>
-                  <div className="staff-chat-webhook">
-                    <strong>
-                      {tr({ en: "Webhook for this group", kn: "ಈ ಗುಂಪಿನ ವೆಬ್‌ಹುಕ್", hi: "इस समूह का वेबहुक" })}
-                    </strong>
-                    <p>
-                      {tr({
-                        en: "POST text or a URL into this group from another system.",
-                        kn: "ಬೇರೆ ವ್ಯವಸ್ಥೆಯಿಂದ ಈ ಗುಂಪಿಗೆ ಪಠ್ಯ ಅಥವಾ URL ಕಳುಹಿಸಿ.",
-                        hi: "दूसरे सिस्टम से इस समूह में टेक्स्ट या URL भेजें।",
-                      })}
-                    </p>
-                    <code>{webhookPath}</code>
-                    <pre>{`Authorization: Bearer <CHAT_WEBHOOK_SECRET>
-Content-Type: application/json
-
-{
-  "roomId": "${active.id}",
-  "body": "Desk update https://example.com/story",
-  "senderName": "Automation"
-}`}</pre>
-                  </div>
-                </div>
-              </details>
-            ) : null}
+                ) : null}
+              </div>
+            </header>
 
             <div className="staff-chat-body">
               {status.error ? <p role="alert">{status.error}</p> : null}
               {status.ok ? <p role="status">{status.ok}</p> : null}
               <div className="staff-chat-thread" ref={threadRef} aria-live="polite">
-                {messages.map((msg) => (
+                {messages.map((msg) => {
+                  const canDelete = isAdmin || msg.senderId === userId;
+                  return (
                   <article
                     key={msg.id}
                     className={
@@ -658,15 +598,29 @@ Content-Type: application/json
                   >
                     <header>
                       <strong>{msg.senderName}</strong>
-                      <time dateTime={msg.createdAt}>
-                        {new Intl.DateTimeFormat("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "numeric",
-                          minute: "2-digit",
-                          timeZone: "Asia/Kolkata",
-                        }).format(new Date(msg.createdAt))}
-                      </time>
+                      <span className="staff-chat-bubble-meta">
+                        <time dateTime={msg.createdAt}>
+                          {new Intl.DateTimeFormat("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "numeric",
+                            minute: "2-digit",
+                            timeZone: "Asia/Kolkata",
+                          }).format(new Date(msg.createdAt))}
+                        </time>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="staff-chat-msg-delete"
+                            title={tr({ en: "Delete message", kn: "ಸಂದೇಶ ಅಳಿಸಿ", hi: "संदेश हटाएँ" })}
+                            aria-label={tr({ en: "Delete message", kn: "ಸಂದೇಶ ಅಳಿಸಿ", hi: "संदेश हटाएँ" })}
+                            disabled={pending}
+                            onClick={() => setPendingDelete(msg)}
+                          >
+                            <Trash2 size={13} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </span>
                     </header>
                     <p>
                       {msg.kind === "url" ? (
@@ -686,7 +640,8 @@ Content-Type: application/json
                       )}
                     </p>
                   </article>
-                ))}
+                  );
+                })}
                 {typingLabel ? (
                   <div className="staff-chat-typing" aria-live="polite">
                     <span className="staff-chat-typing-dots" aria-hidden="true">
@@ -779,6 +734,208 @@ Content-Type: application/json
           </>
         )}
       </section>
+
+      {pendingDelete && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setPendingDelete(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-chat-message-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="confirm-dialog-icon" aria-hidden="true">
+                  <CircleAlert size={28} strokeWidth={2.25} />
+                </div>
+                <h2 id="delete-chat-message-title">
+                  {tr({
+                    en: "Are you sure?",
+                    kn: "ನೀವು ಖಚಿತವೇ?",
+                    hi: "क्या आप सुनिश्चित हैं?",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: "Are you sure you want to delete this message? This cannot be undone.",
+                    kn: "ಈ ಸಂದೇಶವನ್ನು ಅಳಿಸುವುದೇ? ಇದನ್ನು ಹಿಂದಕ್ಕೆ ತೆಗೆಯಲಾಗುವುದಿಲ್ಲ.",
+                    hi: "क्या आप वाकई इस संदेश को हटाना चाहते हैं? इसे वापस नहीं किया जा सकता।",
+                  })}
+                </p>
+                <div className="confirm-dialog-preview">
+                  <div>
+                    <strong>{pendingDelete.senderName}</strong>
+                    <small>{pendingDelete.body.slice(0, 120)}</small>
+                  </div>
+                </div>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setPendingDelete(null)}
+                  >
+                    {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-danger"
+                    disabled={pending || !active}
+                    onClick={() => {
+                      const msg = pendingDelete;
+                      const roomId = active?.id;
+                      if (!msg || !roomId) return;
+                      run(async () => {
+                        const result = await deleteChatMessage({
+                          messageId: msg.id,
+                          roomId,
+                        });
+                        if (result.ok) {
+                          setMessages((current) => current.filter((m) => m.id !== msg.id));
+                          seenIdsRef.current.delete(msg.id);
+                          socketRef.current?.emit("message:delete", {
+                            roomId,
+                            messageId: msg.id,
+                          });
+                          setPendingDelete(null);
+                        }
+                        return result;
+                      }, tr({ en: "Message deleted.", kn: "ಸಂದೇಶ ಅಳಿಸಲಾಯಿತು.", hi: "संदेश हटाया।" }));
+                    }}
+                  >
+                    {tr({ en: "Delete message", kn: "ಸಂದೇಶ ಅಳಿಸಿ", hi: "संदेश हटाएँ" })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {isAdmin && active ? (
+        <ChatGroupSettingsModal
+          open={settingsOpen}
+          room={active}
+          staff={staff}
+          webhookPath={webhookPath}
+          webhookStatus={webhookStatus}
+          pending={pending}
+          onClose={() => setSettingsOpen(false)}
+          onSaveMembers={(ids) => {
+            setMemberIds(ids);
+            run(async () => {
+              const result = await setChatMembers({ roomId: active.id, memberIds: ids });
+              if (result.ok) {
+                setRooms((current) =>
+                  current.map((room) => (room.id === active.id ? { ...room, memberIds: [...ids] } : room)),
+                );
+                setSettingsOpen(false);
+              }
+              return result;
+            }, tr({ en: "Members updated.", kn: "ಸದಸ್ಯರು ನವೀಕರಿಸಲಾಯಿತು.", hi: "सदस्य अपडेट हुए।" }));
+          }}
+          onDeleteGroup={() => {
+            run(async () => {
+              const result = await deleteChatRoom({ roomId: active.id });
+              if (result.ok) {
+                socketRef.current?.emit("room:delete", { roomId: active.id });
+                setRooms((current) => current.filter((r) => r.id !== active.id));
+                setSettingsOpen(false);
+                setActiveId("");
+                setMessages([]);
+              }
+              return result;
+            }, tr({ en: "Community deleted.", kn: "ಸಮುದಾಯ ಅಳಿಸಲಾಯಿತು.", hi: "समुदाय हटाया।" }));
+          }}
+        />
+      ) : null}
+
+      {isAdmin && createOpen ? (
+        <div className="staff-chat-modal-root" role="presentation" onClick={() => setCreateOpen(false)}>
+          <form
+            className="staff-chat-modal staff-chat-create-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={tr({ en: "Create group", kn: "ಗುಂಪು ರಚಿಸಿ", hi: "समूह बनाएँ" })}
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(
+                async () => {
+                  const result = await createChatRoom({ name: groupName, description: groupDesc });
+                  if (result.ok && result.id) {
+                    setRooms((current) => [
+                      {
+                        id: result.id!,
+                        name: groupName.trim(),
+                        description: groupDesc.trim(),
+                        memberIds: [userId],
+                        updatedAt: new Date().toISOString(),
+                      },
+                      ...current,
+                    ]);
+                    setActiveId(result.id);
+                    setGroupName("");
+                    setGroupDesc("");
+                    setCreateOpen(false);
+                    setSettingsOpen(true);
+                  }
+                  return result;
+                },
+                tr({ en: "Group created.", kn: "ಗುಂಪು ರಚಿಸಲಾಯಿತು.", hi: "समूह बना।" }),
+              );
+            }}
+          >
+            <header className="staff-chat-modal-head">
+              <div>
+                <h3>{tr({ en: "Create group", kn: "ಗುಂಪು ರಚಿಸಿ", hi: "समूह बनाएँ" })}</h3>
+                <p>
+                  {tr({
+                    en: "After creating, add members and webhook settings in the popup.",
+                    kn: "ರಚಿಸಿದ ನಂತರ ಪಾಪ್‌ಅಪ್‌ನಲ್ಲಿ ಸದಸ್ಯರು ಮತ್ತು ವೆಬ್‌ಹುಕ್ ಸೆಟ್ಟಿಂಗ್ ಸೇರಿಸಿ.",
+                    hi: "बनाने के बाद पॉपअप में सदस्य और वेबहुक सेटिंग जोड़ें।",
+                  })}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="staff-chat-modal-close"
+                onClick={() => setCreateOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </header>
+            <div className="staff-chat-modal-body">
+              <label className="field">
+                <span>{tr({ en: "Name", kn: "ಹೆಸರು", hi: "नाम" })}</span>
+                <input
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  maxLength={80}
+                  required
+                  autoFocus
+                />
+              </label>
+              <label className="field">
+                <span>{tr({ en: "Purpose", kn: "ಉದ್ದೇಶ", hi: "उद्देश्य" })}</span>
+                <input value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} maxLength={240} />
+              </label>
+              <div className="staff-chat-modal-actions">
+                <button type="button" className="button button-ghost" onClick={() => setCreateOpen(false)}>
+                  {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
+                </button>
+                <button type="submit" className="button button-ember" disabled={pending || !groupName.trim()}>
+                  {tr({ en: "Create group", kn: "ಗುಂಪು ರಚಿಸಿ", hi: "समूह बनाएँ" })}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

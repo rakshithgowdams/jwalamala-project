@@ -1,12 +1,14 @@
 import { requireStaff } from "@/lib/auth/require-user";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getUiStrings } from "@/lib/i18n/server";
+import { getChatWebhookSecretStatus } from "@/lib/chat/webhook-secret";
 import { StaffChat, type ChatRoom } from "@/components/admin/StaffChat";
 
 export default async function ChatPage() {
   const [{ user, profile, db }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const isAdmin = profile.role === "admin";
   const server = getAdminClient() || db;
+  const webhookStatus = isAdmin ? await getChatWebhookSecretStatus(getAdminClient() || server) : undefined;
 
   const staffRes = isAdmin
     ? await server.from("profiles").select("id,full_name,role").in("role", ["staff", "admin"]).order("full_name")
@@ -69,13 +71,6 @@ export default async function ChatPage() {
       <div className="section-title">
         <h1>{tr({ en: "Chat", kn: "ಚಾಟ್", hi: "चैट" })}</h1>
       </div>
-      <p>
-        {tr({
-          en: "Desk groups for administrators and staff. Send messages and web links only — images and videos are blocked.",
-          kn: "ನಿರ್ವಾಹಕರು ಮತ್ತು ಸಿಬ್ಬಂದಿಗಾಗಿ ಡೆಸ್ಕ್ ಗುಂಪುಗಳು. ಸಂದೇಶ ಮತ್ತು ವೆಬ್ ಲಿಂಕ್‌ಗಳು ಮಾತ್ರ — ಚಿತ್ರ/ವೀಡಿಯೊ ನಿರ್ಬಂಧ.",
-          hi: "एडमिन और स्टाफ़ के लिए डेस्क समूह। केवल संदेश और वेब लिंक — चित्र/वीडियो बंद।",
-        })}
-      </p>
       <StaffChat
         isAdmin={isAdmin}
         userId={user.id}
@@ -84,9 +79,11 @@ export default async function ChatPage() {
         staff={(staffRes.data || []).map((row) => ({
           id: row.id as string,
           name: (row.full_name as string) || (row.id as string),
+          role: row.role === "admin" ? ("admin" as const) : ("staff" as const),
         }))}
         socketUrl={socketUrl}
         webhookPath={`${siteUrl}/api/chat/webhook`}
+        webhookStatus={webhookStatus}
       />
     </>
   );

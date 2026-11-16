@@ -132,6 +132,19 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("message:delete", (payload) => {
+    const id = roomIdOf(payload?.roomId);
+    const messageId = String(payload?.messageId || "");
+    if (!id || !/^[0-9a-f-]{36}$/i.test(messageId)) return;
+    socket.to(`room:${id}`).emit("message:removed", { roomId: id, messageId });
+  });
+
+  socket.on("room:delete", (payload) => {
+    const id = roomIdOf(payload?.roomId);
+    if (!id) return;
+    socket.to(`room:${id}`).emit("room:removed", { roomId: id });
+  });
+
   socket.on("disconnect", () => {
     for (const room of socket.rooms) {
       if (!room.startsWith("room:")) continue;

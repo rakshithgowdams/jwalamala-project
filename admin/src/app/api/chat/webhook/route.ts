@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { validateChatBody } from "@/lib/chat/message";
 import { broadcastChatMessage } from "@/lib/chat/broadcast";
+import { getChatWebhookSecretStatus, verifyChatWebhookToken } from "@/lib/chat/webhook-secret";
 
 export const runtime = "nodejs";
 
@@ -10,17 +11,20 @@ export const runtime = "nodejs";
  * External systems post text/URL into a staff chat group.
  *
  * POST /api/chat/webhook
- * Authorization: Bearer <CHAT_WEBHOOK_SECRET>
+ * Authorization: Bearer <secret>
  * Body: { "roomId": "<uuid>", "body": "text or https://…", "senderName": "optional" }
+ *
+ * Accepts a secret generated in Group settings (stored hashed) or CHAT_WEBHOOK_SECRET env.
  */
 export async function POST(request: Request) {
-  const secret = process.env.CHAT_WEBHOOK_SECRET;
-  if (!secret)
+  const server = getAdminClient();
+  const status = await getChatWebhookSecretStatus(server);
+  if (!status.configured)
     return NextResponse.json({ error: "Chat webhook is not configured." }, { status: 503 });
 
   const header = request.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!token || token !== secret)
+  if (!(await verifyChatWebhookToken(server, token)))
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   let json: unknown;
@@ -46,7 +50,6 @@ export async function POST(request: Request) {
   const checked = validateChatBody(parsed.data.body);
   if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
 
-  const server = getAdminClient();
   if (!server) return NextResponse.json({ error: "Server key missing." }, { status: 503 });
 
   const { data: room } = await server
