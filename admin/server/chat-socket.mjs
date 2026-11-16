@@ -34,8 +34,13 @@ const httpServer = createServer(async (req, res) => {
     for await (const chunk of req) chunks.push(chunk);
     try {
       const payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-      if (payload?.roomId) {
-        io.to(`room:${payload.roomId}`).emit("message:new", payload);
+      if (payload?.event === "room:sync" && payload?.roomId) {
+        // Fan out to everyone so newly added staff pick up the group live.
+        io.emit("room:sync", payload);
+      } else if (payload?.roomId) {
+        // System activity must reach desks that just gained membership.
+        if (payload.kind === "system") io.emit("message:new", payload);
+        else io.to(`room:${payload.roomId}`).emit("message:new", payload);
         io.to(`room:${payload.roomId}`).emit("typing:stop", {
           roomId: payload.roomId,
           userId: payload.senderId || "webhook",

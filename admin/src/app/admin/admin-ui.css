@@ -310,7 +310,7 @@
   border-radius: var(--ui-radius);
   font-size: 14px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -319,6 +319,12 @@
     color 140ms ease,
     box-shadow 140ms ease,
     transform 80ms ease;
+}
+:where(.admin-main) .button svg,
+:where(.admin-main) button svg {
+  display: block;
+  flex: 0 0 auto;
+  translate: 0 -0.5px;
 }
 :where(.admin-main) .button:active:not(:disabled),
 :where(.admin-main) button:not([class]):active:not(:disabled) {
@@ -383,23 +389,31 @@
   border-top: 1px solid var(--border);
 }
 :where(.admin-main) .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 36px;
   min-height: 36px;
+  padding: 0;
   border-radius: var(--ui-radius);
+  line-height: 1;
 }
 
 /* ── Chips ── */
 :where(.admin-main) .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 34px;
-  padding: 6px 12px;
+  padding: 0 12px;
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   background: var(--bg);
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 1;
   cursor: pointer;
   transition:
     background-color 140ms ease,
@@ -2312,6 +2326,7 @@ body:has(.admin-main .staff-chat) {
   scrollbar-width: thin;
 }
 .admin-main .staff-chat-room {
+  position: relative;
   width: 100%;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
@@ -2325,16 +2340,25 @@ body:has(.admin-main .staff-chat) {
   text-align: left;
   cursor: pointer;
 }
+.admin-main .staff-chat-room-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+}
 .admin-main .staff-chat-room-avatar {
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: color-mix(in srgb, var(--accent, #c62828) 16%, var(--surface, #fff));
   color: var(--accent, #c62828);
   font-weight: 700;
   font-size: 15px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .admin-main .staff-chat-room-meta {
   min-width: 0;
@@ -2349,6 +2373,15 @@ body:has(.admin-main .staff-chat) {
 .admin-main .staff-chat-create-btn {
   width: 100%;
   justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+.admin-main .staff-chat-create-btn svg,
+.admin-main .staff-chat-settings-btn svg,
+.admin-main .staff-chat-hint svg {
+  display: block;
+  flex: 0 0 auto;
+  translate: 0 -0.5px;
 }
 .admin-main .staff-chat-room-title {
   display: flex;
@@ -2378,20 +2411,30 @@ body:has(.admin-main .staff-chat) {
 .admin-main .staff-chat-room.has-unread strong {
   font-weight: 700;
 }
+.chat-unread-badge,
 .admin-main .staff-chat-unread {
   flex: 0 0 auto;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  display: inline-grid;
-  place-items: center;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: var(--accent, #c62828);
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--surface, #fff) 80%, transparent);
   animation: staff-chat-unread-pop 0.28s ease both;
+}
+.chat-unread-badge-value {
+  display: block;
+  line-height: 1;
+  translate: 0 0.5px;
 }
 @keyframes staff-chat-unread-pop {
   from {
@@ -2452,7 +2495,11 @@ body:has(.admin-main .staff-chat) {
   gap: 8px;
 }
 .admin-main .staff-chat-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
+  line-height: 1;
 }
 .admin-main .staff-chat-body {
   display: flex;
@@ -2513,16 +2560,21 @@ body:has(.admin-main .staff-chat) {
 }
 .admin-main .staff-chat-members-count {
   flex: 0 0 auto;
-  margin-top: 1px;
-  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  margin-top: 0;
+  padding: 0 9px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg) 70%, var(--surface, #fff));
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .admin-main .staff-chat-member-groups {
   display: grid;
@@ -2786,6 +2838,60 @@ body:has(.admin-main .staff-chat) {
   padding: 12px 16px 16px;
   scroll-behavior: smooth;
   background: color-mix(in srgb, var(--surface, #fff) 92%, var(--bg));
+  scrollbar-width: thin;
+  scrollbar-color: rgb(31 36 71 / 0.1) transparent;
+}
+.admin-main .staff-chat-thread::-webkit-scrollbar {
+  width: 8px;
+}
+.admin-main .staff-chat-thread::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-main .staff-chat-thread::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: rgb(31 36 71 / 0.1);
+}
+.admin-main .staff-chat-thread::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.admin-main .staff-chat-thread-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  width: 100%;
+}
+.admin-main .staff-chat-day-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 4px 0 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  user-select: none;
+}
+.admin-main .staff-chat-day-divider::before,
+.admin-main .staff-chat-day-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 88%, transparent);
+}
+.admin-main .staff-chat-day-divider span {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface, #fff) 92%, var(--bg));
+  box-shadow: 0 1px 2px rgb(31 36 71 / 0.04);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .admin-main .staff-chat-bubble {
   position: relative;
@@ -2795,6 +2901,9 @@ body:has(.admin-main .staff-chat) {
   padding: 10px 12px;
   border-radius: 14px 14px 14px 4px;
   background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.admin-main .staff-chat-thread-item .staff-chat-bubble.is-mine {
+  align-self: flex-end;
 }
 .admin-main .staff-chat-bubble.is-enter {
   animation: staff-chat-bubble-in 0.22s ease both;
@@ -2814,6 +2923,22 @@ body:has(.admin-main .staff-chat) {
   background: transparent;
   color: var(--muted);
   font-size: 12px;
+  padding: 4px 10px;
+  box-shadow: none;
+  border: 0;
+}
+.admin-main .staff-chat-bubble.is-system p {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+}
+.admin-main .staff-chat-bubble.is-system time {
+  opacity: 0.7;
+  font-size: 11px;
+  white-space: nowrap;
 }
 .admin-main .staff-chat-bubble header {
   display: flex;
@@ -3084,6 +3209,82 @@ body:has(.admin-main .staff-chat) {
   background: #c62828;
   color: #fff;
   border-color: #c62828;
+}
+
+/* ── Task requests board + editor banner ── */
+.admin-main .task-request-board {
+  display: grid;
+  gap: 16px;
+}
+.admin-main .task-request-panel {
+  display: grid;
+  gap: 14px;
+}
+.admin-main .task-request-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-main .task-request-toolbar h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.admin-main .task-request-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.admin-main .task-request-lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.admin-main .task-request-admin-note,
+.admin-main .task-request-drive {
+  margin: 0;
+  font-size: 13px;
+}
+.admin-main .task-request-drive a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+.admin-main .task-request-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface, #fff));
+}
+.admin-main .task-request-banner-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.admin-main .task-request-banner-copy strong {
+  font-size: 14px;
+  line-height: 1.3;
+}
+.admin-main .task-request-banner-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.admin-main .task-request-banner-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .admin-main .button-danger:disabled {
   opacity: 0.45;

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Menu, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { sectionGroups } from "@/lib/admin/sections";
+import { ChatUnreadBadge } from "@/components/admin/ChatUnreadBadge";
+import { getChatUnreadTotal, subscribeChatUnread } from "@/lib/chat/unread";
 
 /** Null shows every feature (administrators); otherwise only the granted ones. */
 export function AdminNav({ allowed }: { allowed: string[] | null }) {
@@ -14,10 +16,15 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
   const [open, setOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [chatUnread, setChatUnread] = useState(0);
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!pending) setPendingHref(null);
   }, [pending, pathname]);
+  useEffect(() => {
+    setChatUnread(getChatUnreadTotal());
+    return subscribeChatUnread((map) => setChatUnread(getChatUnreadTotal(map)));
+  }, []);
   // Scroll only the sidebar, never the page, so the current section stays visible.
   useEffect(() => {
     const nav = navRef.current;
@@ -60,8 +67,10 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
-        {tr({ en: "Menu", kn: "ಮೆನು", hi: "मेनू" })}
+        <span className="admin-nav-toggle-action">
+          {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+          <span>{tr({ en: "Menu", kn: "ಮೆನು", hi: "मेनू" })}</span>
+        </span>
       </button>
       <div className="admin-nav-groups">
         {groups.map((group) => (
@@ -75,7 +84,14 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
                   key={path}
                   prefetch={false}
                   aria-current={isCurrent(path) ? "page" : undefined}
-                  className={pendingHref === href ? "is-pending" : undefined}
+                  className={
+                    [
+                      pendingHref === href ? "is-pending" : "",
+                      path === "chat" && chatUnread ? "has-chat-unread" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
                   onClick={(event) => {
                     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
                       setOpen(false);
@@ -85,7 +101,10 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
                     go(href);
                   }}
                 >
-                  {tr(title)}
+                  <span className="admin-nav-link-label">{tr(title)}</span>
+                  {path === "chat" ? (
+                    <ChatUnreadBadge count={chatUnread} className="admin-nav-chat-badge" />
+                  ) : null}
                 </Link>
               );
             })}

@@ -145,6 +145,22 @@ export default async function TasksPage() {
     };
   });
 
+  const openTaskIds = tasks.filter((t) => t.status === "open").map((t) => t.id);
+  const activeRequests: Record<string, { id: string; status: string }> = {};
+  if (openTaskIds.length) {
+    const { data: requestRows } = await server
+      .from("article_task_requests")
+      .select("id,task_id,status")
+      .in("task_id", openTaskIds)
+      .in("status", ["requested", "processing", "ready"]);
+    for (const row of requestRows || []) {
+      activeRequests[row.task_id as string] = {
+        id: row.id as string,
+        status: row.status as string,
+      };
+    }
+  }
+
   return (
     <>
       <div className="section-title">
@@ -158,6 +174,7 @@ export default async function TasksPage() {
           name: s.full_name || s.id,
         }))}
         tasks={tasks}
+        activeRequests={activeRequests}
       />
     </>
   );

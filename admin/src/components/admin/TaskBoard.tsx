@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CircleAlert, ExternalLink, Pencil } from "lucide-react";
+import { CircleAlert, ExternalLink, Pencil, SendHorizontal } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { ArticleCardSearch } from "@/components/admin/ArticleCardSearch";
 import { PostThumb } from "@/components/admin/PostThumb";
@@ -15,6 +15,7 @@ import {
   assignSingleArticle,
   setTaskStatus,
 } from "@/app/admin/tasks/actions";
+import { createTaskRequest } from "@/app/admin/task-requests/actions";
 
 export type TaskRow = {
   id: string;
@@ -50,6 +51,11 @@ const taskStatusNames: Record<string, Tri> = {
   done: { en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" },
   cancelled: { en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" },
 };
+const requestStatusNames: Record<string, Tri> = {
+  requested: { en: "Requested", kn: "ವಿನಂತಿಸಲಾಗಿದೆ", hi: "अनुरोधित" },
+  processing: { en: "Processing", kn: "ಸಂಸ್ಕರಣೆ", hi: "प्रोसेसिंग" },
+  ready: { en: "Ready", kn: "ಸಿದ್ಧ", hi: "तैयार" },
+};
 
 function cardThumbnail(thumbnail: string | null, video: string | null) {
   const cover = (thumbnail || "").trim();
@@ -64,14 +70,17 @@ function cardThumbnail(thumbnail: string | null, video: string | null) {
 
 export type StaffOption = { id: string; name: string };
 
+export type ActiveRequestInfo = { id: string; status: string };
+
 type Props = {
   isAdmin: boolean;
   totalArticles: number;
   staff: StaffOption[];
   tasks: TaskRow[];
+  activeRequests?: Record<string, ActiveRequestInfo>;
 };
 
-export function TaskBoard({ isAdmin, totalArticles, staff, tasks }: Props) {
+export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests = {} }: Props) {
   const { tr } = useUiStrings();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -85,6 +94,8 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks }: Props) {
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterStatus, setFilterStatus] = useState<"open" | "done" | "cancelled" | "all">("open");
   const [cancelTask, setCancelTask] = useState<TaskRow | null>(null);
+  const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
+  const [requestNote, setRequestNote] = useState("");
 
   useEffect(() => {
     if (!cancelTask) return;
@@ -349,6 +360,13 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks }: Props) {
                     <span className={"status-pill is-" + (task.status === "open" ? "scheduled" : task.status === "done" ? "published" : "archived")}>
                       {taskStatusNames[task.status] ? tr(taskStatusNames[task.status]) : task.status}
                     </span>
+                    {activeRequests[task.id] ? (
+                      <span className="status-pill is-draft">
+                        {requestStatusNames[activeRequests[task.id].status]
+                          ? tr(requestStatusNames[activeRequests[task.id].status])
+                          : activeRequests[task.id].status}
+                      </span>
+                    ) : null}
                   </div>
                   {task.updatedAt ? (
                     <time className="post-card-updated" dateTime={task.updatedAt}>
@@ -393,6 +411,29 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks }: Props) {
                         <ExternalLink size={15} aria-hidden="true" />
                         {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
                       </a>
+                    ) : null}
+                    {!isAdmin && task.status === "open" && !activeRequests[task.id] ? (
+                      <button
+                        type="button"
+                        className="button button-outline is-compact"
+                        disabled={pending}
+                        onClick={() => {
+                          setRequestTask(task);
+                          setRequestNote("");
+                        }}
+                      >
+                        <SendHorizontal size={15} aria-hidden="true" />
+                        {tr({ en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}
+                      </button>
+                    ) : null}
+                    {!isAdmin && task.status === "open" && activeRequests[task.id] ? (
+                      <Link
+                        href="/admin/task-requests"
+                        prefetch={false}
+                        className="button button-outline is-compact"
+                      >
+                        {tr({ en: "View request", kn: "ವಿನಂತಿ ನೋಡಿ", hi: "अनुरोध देखें" })}
+                      </Link>
                     ) : null}
                     {task.status === "open" ? (
                       <button
@@ -526,6 +567,89 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks }: Props) {
                   </button>
                 </div>
               </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {requestTask && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setRequestTask(null)}
+            >
+              <form
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="request-task-title"
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const taskId = requestTask.id;
+                  const staffNote = requestNote.trim();
+                  setRequestTask(null);
+                  setRequestNote("");
+                  run(
+                    () => createTaskRequest({ taskId, staffNote }),
+                    tr({
+                      en: "Request sent to admin.",
+                      kn: "ವಿನಂತಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
+                      hi: "अनुरोध एडमिन को भेजा।",
+                    }),
+                  );
+                }}
+              >
+                <h2 id="request-task-title">
+                  {tr({
+                    en: "Request verification",
+                    kn: "ಪರಿಶೀಲನೆ ವಿನಂತಿ",
+                    hi: "सत्यापन अनुरोध",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: "Send this assigned article to the admin for the Drive link and next steps.",
+                    kn: "Drive ಲಿಂಕ್ ಮತ್ತು ಮುಂದಿನ ಹಂತಗಳಿಗಾಗಿ ಈ ನಿಯೋಜಿತ ಲೇಖನವನ್ನು ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ.",
+                    hi: "Drive लिंक और अगले चरणों के लिए इस असाइन लेख को एडमिन को भेजें।",
+                  })}
+                </p>
+                <div className="confirm-dialog-preview">
+                  <span className="confirm-dialog-thumb">
+                    <PostThumb src={cardThumbnail(requestTask.thumbnail, requestTask.videoUrl)} eager />
+                  </span>
+                  <div>
+                    <strong>{requestTask.title || requestTask.postId}</strong>
+                  </div>
+                </div>
+                <label className="field" style={{ display: "grid", gap: 6, textAlign: "left", width: "100%" }}>
+                  <span>{tr({ en: "Note for admin", kn: "ಆಡ್ಮಿನ್‌ಗೆ ಟಿಪ್ಪಣಿ", hi: "एडमिन के लिए नोट" })}</span>
+                  <textarea
+                    value={requestNote}
+                    onChange={(e) => setRequestNote(e.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                    placeholder={tr({
+                      en: "What do you need changed or verified?",
+                      kn: "ಏನು ಬದಲಾಯಿಸಬೇಕು ಅಥವಾ ಪರಿಶೀಲಿಸಬೇಕು?",
+                      hi: "क्या बदलना या सत्यापित करना है?",
+                    })}
+                  />
+                </label>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setRequestTask(null)}
+                  >
+                    {tr({ en: "Back", kn: "ಹಿಂದೆ", hi: "वापस" })}
+                  </button>
+                  <button type="submit" className="button" disabled={pending}>
+                    {tr({ en: "Send request", kn: "ವಿನಂತಿ ಕಳುಹಿಸಿ", hi: "अनुरोध भेजें" })}
+                  </button>
+                </div>
+              </form>
             </div>,
             document.body,
           )

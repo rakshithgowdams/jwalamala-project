@@ -29,8 +29,12 @@ export function AdminTopBar({ name, email, role }: { name: string; email: string
   return (
     <header className="admin-topbar">
       <span className="admin-topbar-brand">
-        <ShieldCheck size={18} aria-hidden="true" />
-        {site.englishName} {tr({ en: "Admin", kn: "ನಿರ್ವಹಣೆ", hi: "एडमिन" })}
+        <span className="admin-topbar-action">
+          <ShieldCheck size={18} aria-hidden="true" />
+          <span className="admin-topbar-label">
+            {site.englishName} {tr({ en: "Admin", kn: "ನಿರ್ವಹಣೆ", hi: "एडमिन" })}
+          </span>
+        </span>
       </span>
       <div className="admin-topbar-user">
         <span className="admin-topbar-person" title={email}>
@@ -39,17 +43,21 @@ export function AdminTopBar({ name, email, role }: { name: string; email: string
         </span>
         <LanguageSwitch className="admin-language" />
         <a href={site.url} target="_blank" rel="noreferrer">
-          <ExternalLink size={16} aria-hidden="true" />
-          <span className="admin-topbar-label">
-            {tr({ en: "View site", kn: "ತಾಣ ನೋಡಿ", hi: "साइट देखें" })}
+          <span className="admin-topbar-action">
+            <ExternalLink size={16} aria-hidden="true" />
+            <span className="admin-topbar-label">
+              {tr({ en: "View site", kn: "ತಾಣ ನೋಡಿ", hi: "साइट देखें" })}
+            </span>
           </span>
         </a>
         <button type="button" onClick={signOut} disabled={busy}>
-          <LogOut size={16} aria-hidden="true" />
-          <span className="admin-topbar-label">
-            {busy
-              ? tr({ en: "Signing out…", kn: "ಹೊರಹೋಗುತ್ತಿದೆ…", hi: "साइन आउट हो रहा है…" })
-              : tr({ en: "Sign out", kn: "ಲಾಗ್ ಔಟ್", hi: "साइन आउट" })}
+          <span className="admin-topbar-action">
+            <LogOut size={16} aria-hidden="true" />
+            <span className="admin-topbar-label">
+              {busy
+                ? tr({ en: "Signing out…", kn: "ಹೊರಹೋಗುತ್ತಿದೆ…", hi: "साइन आउट हो रहा है…" })
+                : tr({ en: "Sign out", kn: "ಲಾಗ್ ಔಟ್", hi: "साइन आउट" })}
+            </span>
           </span>
         </button>
       </div>

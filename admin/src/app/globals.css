@@ -5249,12 +5249,18 @@ a.admin-auth-submit {
 .admin-topbar-brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
+  max-width: min(42vw, 320px);
   overflow: hidden;
   font-weight: 700;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.admin-topbar-brand .admin-topbar-action {
+  max-width: 100%;
+}
+.admin-topbar-brand .admin-topbar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .admin-topbar-user {
   display: flex;
@@ -5266,38 +5272,53 @@ a.admin-auth-submit {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
+  justify-content: center;
   max-width: 220px;
-  line-height: 1.3;
+  line-height: 1.25;
   text-align: right;
 }
 .admin-topbar-person strong {
   overflow: hidden;
   font-weight: 700;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .admin-topbar-person small {
   color: #a6aacb;
+  line-height: 1.2;
   text-transform: capitalize;
 }
-.admin-topbar a,
-.admin-topbar button {
+.admin-topbar-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-width: 0;
+  line-height: 1;
+}
+.admin-topbar a,
+.admin-topbar button {
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
   min-height: 36px;
-  padding: 0 10px;
+  margin: 0;
+  padding: 0 12px;
   border: 1px solid rgb(236 237 244 / 0.25);
   border-radius: 6px;
   background: none;
   color: inherit;
   font: inherit;
+  font-size: 13px;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  vertical-align: middle;
 }
+.admin-topbar-action svg,
 .admin-topbar a svg,
 .admin-topbar button svg {
   display: block;
@@ -5305,29 +5326,45 @@ a.admin-auth-submit {
   width: 16px;
   height: 16px;
   margin: 0;
-  align-self: center;
+  padding: 0;
+  /* Lucide strokes sit slightly low next to UI text; nudge for optical center. */
+  translate: 0 -0.5px;
+}
+.admin-topbar-brand .admin-topbar-action svg {
+  width: 18px;
+  height: 18px;
 }
 .admin-topbar-label {
   display: inline-flex;
   align-items: center;
-  align-self: center;
+  flex: 0 1 auto;
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
+  min-width: 0;
+  height: auto;
   line-height: 1;
-  height: 1em;
+  font-size: 13px;
 }
 .admin-topbar a:hover,
 .admin-topbar button:hover:not(:disabled) {
   background: rgb(255 255 255 / 0.08);
 }
 .admin-language {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
   min-height: 36px;
+  margin: 0;
   padding: 0 28px 0 10px;
   border: 1px solid rgb(236 237 244 / 0.25);
   border-radius: 6px;
   background-color: transparent;
   color: inherit;
   font: inherit;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
 }
 .admin-language option {
@@ -5358,11 +5395,8 @@ a.admin-auth-submit {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #3a406b transparent;
+  scrollbar-color: rgb(236 237 244 / 0.1) transparent;
   scrollbar-gutter: stable;
-}
-.admin-nav:hover {
-  scrollbar-color: #5f6590 transparent;
 }
 .admin-nav::-webkit-scrollbar {
   width: 8px;
@@ -5372,19 +5406,28 @@ a.admin-auth-submit {
   background: transparent;
 }
 .admin-nav::-webkit-scrollbar-thumb {
-  border: 2px solid var(--header);
-  border-radius: 99px;
-  background: #3a406b;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: rgb(236 237 244 / 0.1);
 }
-.admin-nav:hover::-webkit-scrollbar-thumb {
-  background: #5f6590;
-}
-.admin-nav::-webkit-scrollbar-thumb:hover,
-.admin-nav::-webkit-scrollbar-thumb:active {
-  background: var(--accent);
+.admin-nav::-webkit-scrollbar-corner {
+  background: transparent;
 }
 .admin-nav-toggle {
   display: none;
+}
+.admin-nav-toggle-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+.admin-nav-toggle-action svg {
+  display: block;
+  flex: 0 0 auto;
+  translate: 0 -0.5px;
 }
 .admin-nav-group + .admin-nav-group {
   margin-top: 10px;
@@ -5401,11 +5444,56 @@ a.admin-auth-submit {
   text-transform: uppercase;
 }
 .admin-nav a {
-  display: block;
-  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
   border-radius: 6px;
   font-size: 14px;
-  line-height: 1.35;
+  line-height: 1;
+}
+.admin-nav-link-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 36px;
+  overflow: hidden;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-nav-chat-badge,
+.admin-nav .chat-unread-badge {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e53935;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--header);
+}
+.admin-nav .chat-unread-badge-value {
+  display: block;
+  line-height: 1;
+  /* Digits sit optically high in bold caps; nudge into true center. */
+  translate: 0 0.5px;
+}
+.admin-nav a[aria-current="page"] .admin-nav-chat-badge,
+.admin-nav a[aria-current="page"] .chat-unread-badge {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: none;
 }
 .admin-nav a:hover {
   background: rgb(255 255 255 / 0.08);
@@ -5446,8 +5534,21 @@ a.admin-auth-submit {
 }
 .dash-hero-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+.dash-hero-actions :is(a, button, .button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+.dash-hero-actions :is(a, button, .button) svg {
+  display: block;
+  flex: 0 0 auto;
+  translate: 0 -0.5px;
 }
 .dash-hero-secondary {
   border: 1px solid rgb(255 255 255 / 0.4);
@@ -5714,13 +5815,16 @@ a.admin-auth-submit {
   .admin-nav-toggle {
     display: inline-flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 8px;
     min-height: 40px;
+    padding: 0;
     border: 0;
     background: none;
     color: #fff;
     font: inherit;
     font-weight: 700;
+    line-height: 1;
     cursor: pointer;
   }
   .admin-nav-groups {
@@ -5760,10 +5864,18 @@ a.admin-auth-submit {
   .admin-topbar button {
     justify-content: center;
     min-width: 36px;
-    padding: 0 9px;
+    width: 36px;
+    padding: 0;
+  }
+  .admin-topbar-brand .admin-topbar-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+    clip-path: none;
   }
   /* Icon-only on phones; the label stays available to screen readers. */
-  .admin-topbar-label {
+  .admin-topbar-user .admin-topbar-label {
     position: absolute;
     width: 1px;
     height: 1px;

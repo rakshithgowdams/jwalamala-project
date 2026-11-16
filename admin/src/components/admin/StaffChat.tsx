@@ -15,9 +15,17 @@ import {
 } from "@/lib/chat/notify";
 import { getBrowserClient } from "@/lib/supabase/client";
 import {
+  bumpChatUnread,
+  clearChatUnread,
+  getChatUnreadMap,
+  subscribeChatUnread,
+} from "@/lib/chat/unread";
+import { ChatUnreadBadge } from "@/components/admin/ChatUnreadBadge";
+import {
   createChatRoom,
   deleteChatMessage,
   deleteChatRoom,
+  fetchChatRoom,
   loadChatMessages,
   sendChatMessage,
   setChatMembers,
@@ -41,6 +49,50 @@ function mapDbMessage(row: {
     kind: row.kind === "url" || row.kind === "system" ? row.kind : "text",
     createdAt: row.created_at,
   };
+}
+
+const CHAT_TZ = "Asia/Kolkata";
+
+function chatDayKey(iso: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CHAT_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+function chatMessageTime(iso: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: CHAT_TZ,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+function shiftDayKey(key: string, days: number) {
+  const [year, month, day] = key.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+function chatDayLabel(
+  iso: string,
+  tr: (value: { en: string; kn: string; hi: string }) => string,
+) {
+  const key = chatDayKey(iso);
+  const today = chatDayKey(new Date().toISOString());
+  const yesterday = shiftDayKey(today, -1);
+
+  if (key === today) return tr({ en: "Today", kn: "ಇಂದು", hi: "आज" });
+  if (key === yesterday) return tr({ en: "Yesterday", kn: "ನಿನ್ನೆ", hi: "कल" });
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: CHAT_TZ,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
 }
 
 export type ChatRoom = {
@@ -226,10 +278,71 @@ export function StaffChat({
 
   useEffect(() => {
     setNotifyPerm(chatNotificationPermission());
+    setUnread(getChatUnreadMap());
+    return subscribeChatUnread(setUnread);
   }, []);
 
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
+
+  function applyRoomSync(payload: {
+    roomId: string;
+    name: string;
+    description?: string;
+    memberIds: string[];
+    updatedAt: string;
+    removed?: boolean;
+  }) {
+    if (!payload?.roomId) return;
+    if (payload.removed) {
+      setRooms((current) => current.filter((r) => r.id !== payload.roomId));
+      setUnread(clearChatUnread(payload.roomId));
+      if (activeIdRef.current === payload.roomId) {
+        setActiveId("");
+        setMessages([]);
+        setSettingsOpen(false);
+      }
+      return;
+    }
+
+    const canSee = isAdmin || payload.memberIds.includes(userId);
+    if (!canSee) {
+      setRooms((current) => current.filter((r) => r.id !== payload.roomId));
+      setUnread(clearChatUnread(payload.roomId));
+      if (activeIdRef.current === payload.roomId) {
+        setActiveId("");
+        setMessages([]);
+        setSettingsOpen(false);
+      }
+      return;
+    }
+
+    const nextRoom: ChatRoom = {
+      id: payload.roomId,
+      name: payload.name,
+      description: payload.description || "",
+      memberIds: [...payload.memberIds],
+      updatedAt: payload.updatedAt,
+    };
+    setRooms((current) => {
+      const without = current.filter((r) => r.id !== payload.roomId);
+      return [nextRoom, ...without];
+    });
+    if (activeIdRef.current === payload.roomId) {
+      setMemberIds([...payload.memberIds]);
+    }
+    socketRef.current?.emit("room:join", payload.roomId);
+  }
+
+  async function ensureRoomInList(roomId: string) {
+    if (roomsRef.current.some((room) => room.id === roomId)) return;
+    const result = await fetchChatRoom(roomId);
+    if (!result.room) return;
+    setRooms((current) =>
+      current.some((room) => room.id === result.room!.id) ? current : [result.room!, ...current],
+    );
+    socketRef.current?.emit("room:join", roomId);
+  }
 
   function ingestMessage(payload: ChatMessage, opts?: { silentSelf?: boolean }) {
     if (!payload?.id || !payload.roomId) return;
@@ -239,8 +352,13 @@ export function StaffChat({
       seenIdsRef.current = new Set([...seenIdsRef.current].slice(-200));
     }
 
+    if (!roomsRef.current.some((room) => room.id === payload.roomId)) {
+      void ensureRoomInList(payload.roomId);
+    }
+
     const fromSelf = payload.senderId === userId;
     const viewing = payload.roomId === activeIdRef.current;
+    const isSystem = payload.kind === "system";
 
     if (viewing) {
       setTypers((current) => {
@@ -252,14 +370,11 @@ export function StaffChat({
       setMessages((current) =>
         current.some((m) => m.id === payload.id) ? current : [...current, payload],
       );
-    } else if (!fromSelf) {
-      setUnread((current) => ({
-        ...current,
-        [payload.roomId]: (current[payload.roomId] || 0) + 1,
-      }));
+    } else if (!fromSelf && !isSystem) {
+      setUnread(bumpChatUnread(payload.roomId));
     }
 
-    if (!fromSelf) {
+    if (!fromSelf && !isSystem) {
       const roomName = roomsRef.current.find((r) => r.id === payload.roomId)?.name || "Chat";
       const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
       const away = hidden || !viewing;
@@ -274,18 +389,13 @@ export function StaffChat({
         });
       }
     } else if (!opts?.silentSelf) {
-      /* no-op for self echoes */
+      /* no-op for self echoes / system activity */
     }
   }
 
   useEffect(() => {
     setTypers({});
-    setUnread((current) => {
-      if (!activeId || !current[activeId]) return current;
-      const next = { ...current };
-      delete next[activeId];
-      return next;
-    });
+    if (activeId) setUnread(clearChatUnread(activeId));
   }, [activeId]);
 
   useEffect(() => {
@@ -383,20 +493,47 @@ export function StaffChat({
         setMessages((current) => current.filter((m) => m.id !== payload.messageId));
       }
     });
+    socket.on(
+      "room:sync",
+      (payload: {
+        roomId?: string;
+        name?: string;
+        description?: string;
+        memberIds?: string[];
+        updatedAt?: string;
+        removed?: boolean;
+      }) => {
+        if (!payload?.roomId || !payload.name || !Array.isArray(payload.memberIds)) {
+          if (payload?.removed && payload.roomId) {
+            applyRoomSync({
+              roomId: payload.roomId,
+              name: "",
+              memberIds: [],
+              updatedAt: payload.updatedAt || new Date().toISOString(),
+              removed: true,
+            });
+          }
+          return;
+        }
+        applyRoomSync({
+          roomId: payload.roomId,
+          name: payload.name,
+          description: payload.description || "",
+          memberIds: payload.memberIds,
+          updatedAt: payload.updatedAt || new Date().toISOString(),
+          removed: payload.removed,
+        });
+      },
+    );
     socket.on("room:removed", (payload: { roomId?: string }) => {
       if (!payload?.roomId) return;
-      setRooms((current) => current.filter((r) => r.id !== payload.roomId));
-      setUnread((current) => {
-        if (!current[payload.roomId!]) return current;
-        const next = { ...current };
-        delete next[payload.roomId!];
-        return next;
+      applyRoomSync({
+        roomId: payload.roomId,
+        name: "",
+        memberIds: [],
+        updatedAt: new Date().toISOString(),
+        removed: true,
       });
-      if (activeIdRef.current === payload.roomId) {
-        setActiveId("");
-        setMessages([]);
-        setSettingsOpen(false);
-      }
     });
     socket.on(
       "typing:start",
@@ -414,7 +551,7 @@ export function StaffChat({
       socketRef.current = null;
       setSocketLive(false);
     };
-  }, [socketUrl, userId, userName, userRole]);
+  }, [socketUrl, userId, userName, userRole, isAdmin]);
 
   // Supabase broadcast typing — works on Vercel even when Socket.IO is offline.
   useEffect(() => {
@@ -567,17 +704,13 @@ export function StaffChat({
                   }
                   onClick={() => setActiveId(room.id)}
                 >
+                  <ChatUnreadBadge count={count} className="staff-chat-room-badge" />
                   <span className="staff-chat-room-avatar" aria-hidden="true">
                     {room.name.trim().charAt(0).toUpperCase() || "G"}
                   </span>
                   <span className="staff-chat-room-meta">
                     <span className="staff-chat-room-title">
                       <strong>{room.name}</strong>
-                      {count ? (
-                        <span className="staff-chat-unread" aria-label={`${count} unread messages`}>
-                          {count > 99 ? "99+" : count}
-                        </span>
-                      ) : null}
                     </span>
                     <small>
                       {room.memberIds.length}{" "}
@@ -648,61 +781,79 @@ export function StaffChat({
               {status.error ? <p role="alert">{status.error}</p> : null}
               {status.ok ? <p role="status">{status.ok}</p> : null}
               <div className="staff-chat-thread" ref={threadRef} aria-live="polite">
-                {messages.map((msg) => {
+                {messages.map((msg, index) => {
                   const canDelete = isAdmin || msg.senderId === userId;
+                  const dayKey = chatDayKey(msg.createdAt);
+                  const prevDayKey = index > 0 ? chatDayKey(messages[index - 1].createdAt) : "";
+                  const showDayDivider = dayKey !== prevDayKey;
                   return (
-                  <article
-                    key={msg.id}
-                    className={
-                      "staff-chat-bubble is-enter" +
-                      (msg.senderId === userId ? " is-mine" : "") +
-                      (msg.kind === "system" ? " is-system" : "")
-                    }
-                  >
-                    <header>
-                      <strong>{msg.senderName}</strong>
-                      <span className="staff-chat-bubble-meta">
-                        <time dateTime={msg.createdAt}>
-                          {new Intl.DateTimeFormat("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "numeric",
-                            minute: "2-digit",
-                            timeZone: "Asia/Kolkata",
-                          }).format(new Date(msg.createdAt))}
-                        </time>
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            className="staff-chat-msg-delete"
-                            title={tr({ en: "Delete message", kn: "ಸಂದೇಶ ಅಳಿಸಿ", hi: "संदेश हटाएँ" })}
-                            aria-label={tr({ en: "Delete message", kn: "ಸಂದೇಶ ಅಳಿಸಿ", hi: "संदेश हटाएँ" })}
-                            disabled={pending}
-                            onClick={() => setPendingDelete(msg)}
-                          >
-                            <Trash2 size={13} aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </span>
-                    </header>
-                    <p>
-                      {msg.kind === "url" ? (
-                        <a href={msg.body} target="_blank" rel="noopener noreferrer">
-                          {msg.body}
-                        </a>
-                      ) : (
-                        linkify(msg.body).map((part, i) =>
-                          part.type === "link" ? (
-                            <a key={i} href={part.value} target="_blank" rel="noopener noreferrer">
-                              {part.value}
-                            </a>
-                          ) : (
-                            <span key={i}>{part.value}</span>
-                          ),
-                        )
-                      )}
-                    </p>
-                  </article>
+                    <div key={msg.id} className="staff-chat-thread-item">
+                      {showDayDivider ? (
+                        <div className="staff-chat-day-divider" role="separator">
+                          <span>{chatDayLabel(msg.createdAt, tr)}</span>
+                        </div>
+                      ) : null}
+                      <article
+                        className={
+                          "staff-chat-bubble is-enter" +
+                          (msg.senderId === userId && msg.kind !== "system" ? " is-mine" : "") +
+                          (msg.kind === "system" ? " is-system" : "")
+                        }
+                      >
+                        {msg.kind === "system" ? (
+                          <p>
+                            <span>{msg.body}</span>
+                            <time dateTime={msg.createdAt}>{chatMessageTime(msg.createdAt)}</time>
+                          </p>
+                        ) : (
+                          <>
+                            <header>
+                              <strong>{msg.senderName}</strong>
+                              <span className="staff-chat-bubble-meta">
+                                <time dateTime={msg.createdAt}>{chatMessageTime(msg.createdAt)}</time>
+                                {canDelete ? (
+                                  <button
+                                    type="button"
+                                    className="staff-chat-msg-delete"
+                                    title={tr({
+                                      en: "Delete message",
+                                      kn: "ಸಂದೇಶ ಅಳಿಸಿ",
+                                      hi: "संदेश हटाएँ",
+                                    })}
+                                    aria-label={tr({
+                                      en: "Delete message",
+                                      kn: "ಸಂದೇಶ ಅಳಿಸಿ",
+                                      hi: "संदेश हटाएँ",
+                                    })}
+                                    disabled={pending}
+                                    onClick={() => setPendingDelete(msg)}
+                                  >
+                                    <Trash2 size={13} aria-hidden="true" />
+                                  </button>
+                                ) : null}
+                              </span>
+                            </header>
+                            <p>
+                              {msg.kind === "url" ? (
+                                <a href={msg.body} target="_blank" rel="noopener noreferrer">
+                                  {msg.body}
+                                </a>
+                              ) : (
+                                linkify(msg.body).map((part, i) =>
+                                  part.type === "link" ? (
+                                    <a key={i} href={part.value} target="_blank" rel="noopener noreferrer">
+                                      {part.value}
+                                    </a>
+                                  ) : (
+                                    <span key={i}>{part.value}</span>
+                                  ),
+                                )
+                              )}
+                            </p>
+                          </>
+                        )}
+                      </article>
+                    </div>
                   );
                 })}
                 {typingLabel ? (

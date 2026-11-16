@@ -5,7 +5,7 @@ import { requireStaff } from "@/lib/auth/require-user";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getUiStrings } from "@/lib/i18n/server";
 import { validateChatBody } from "@/lib/chat/message";
-import { broadcastChatMessage } from "@/lib/chat/broadcast";
+import { broadcastChatMessage, broadcastChatRoomSync } from "@/lib/chat/broadcast";
 import {
   CHAT_WEBHOOK_SETTINGS_KEY,
   createChatWebhookSecret,
@@ -14,6 +14,59 @@ import {
 } from "@/lib/chat/webhook-secret";
 
 type Result = { ok?: true; error?: string; id?: string };
+type AdminClient = NonNullable<ReturnType<typeof getAdminClient>>;
+
+function formatPeopleList(names: string[]) {
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+async function loadProfileNames(server: AdminClient, ids: string[]) {
+  if (!ids.length) return new Map<string, string>();
+  const { data } = await server.from("profiles").select("id,full_name").in("id", ids);
+  const map = new Map<string, string>();
+  for (const row of data || []) {
+    map.set(row.id as string, ((row.full_name as string) || "").trim() || "Staff");
+  }
+  return map;
+}
+
+async function postSystemMessage(
+  server: AdminClient,
+  roomId: string,
+  body: string,
+  actor: { id: string; name: string },
+) {
+  const { data } = await server
+    .from("chat_messages")
+    .insert({
+      room_id: roomId,
+      sender_id: actor.id,
+      sender_label: actor.name,
+      body,
+      kind: "system",
+    })
+    .select("id,room_id,sender_id,sender_label,body,kind,created_at")
+    .single();
+  if (!data) return null;
+
+  const updatedAt = new Date().toISOString();
+  await server.from("chat_rooms").update({ updated_at: updatedAt }).eq("id", roomId);
+
+  const message = {
+    id: data.id as string,
+    roomId: data.room_id as string,
+    senderId: (data.sender_id as string) || null,
+    senderName: (data.sender_label as string) || "System",
+    body: data.body as string,
+    kind: "system" as const,
+    createdAt: data.created_at as string,
+  };
+  await broadcastChatMessage(message);
+  return { message, updatedAt };
+}
 
 async function gate() {
   const [{ user, profile }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
@@ -37,7 +90,7 @@ const uuid = z.uuid();
 export async function createChatRoom(input: unknown): Promise<Result> {
   const access = await gate();
   if ("denied" in access) return access.denied;
-  const { server, user, fail, isAdmin } = access;
+  const { server, user, profile, fail, isAdmin } = access;
   if (!isAdmin)
     return fail("Only administrators can create groups.", "ಗುಂಪುಗಳನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ರಚಿಸಬಹುದು.", "केवल एडमिन समूह बना सकते हैं।");
   const parsed = z.object({ name: nameSchema, description: descSchema }).safeParse(input);
@@ -55,6 +108,22 @@ export async function createChatRoom(input: unknown): Promise<Result> {
   if (error || !data)
     return fail(error?.message || "Could not create the group.", "ಗುಂಪು ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "समूह नहीं बन सका।");
   await server.from("chat_room_members").upsert({ room_id: data.id, user_id: user.id });
+
+  const actorName = (profile.full_name || "").trim() || "Admin";
+  const posted = await postSystemMessage(server, data.id as string, `${actorName} created this group`, {
+    id: user.id,
+    name: actorName,
+  });
+  const updatedAt = posted?.updatedAt || new Date().toISOString();
+  await broadcastChatRoomSync({
+    event: "room:sync",
+    roomId: data.id as string,
+    name: parsed.data.name,
+    description: parsed.data.description || "",
+    memberIds: [user.id],
+    updatedAt,
+  });
+
   revalidatePath("/admin/chat");
   return { ok: true, id: data.id as string };
 }
@@ -62,7 +131,7 @@ export async function createChatRoom(input: unknown): Promise<Result> {
 export async function setChatMembers(input: unknown): Promise<Result> {
   const access = await gate();
   if ("denied" in access) return access.denied;
-  const { server, fail, isAdmin } = access;
+  const { server, user, profile, fail, isAdmin } = access;
   if (!isAdmin)
     return fail("Only administrators can change members.", "ಸದಸ್ಯರನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಬದಲಾಯಿಸಬಹುದು.", "केवल एडमिन सदस्य बदल सकते हैं।");
   const parsed = z
@@ -71,7 +140,11 @@ export async function setChatMembers(input: unknown): Promise<Result> {
   if (!parsed.success)
     return fail("Pick a group and staff members.", "ಗುಂಪು ಮತ್ತು ಸಿಬ್ಬಂದಿ ಆಯ್ಕೆಮಾಡಿ.", "समूह और स्टाफ़ चुनें।");
   const { roomId, memberIds } = parsed.data;
-  const { data: room } = await server.from("chat_rooms").select("id").eq("id", roomId).maybeSingle();
+  const { data: room } = await server
+    .from("chat_rooms")
+    .select("id,name,description")
+    .eq("id", roomId)
+    .maybeSingle();
   if (!room) return fail("Group not found.", "ಗುಂಪು ಸಿಗಲಿಲ್ಲ.", "समूह नहीं मिला।");
 
   const unique = [...new Set(memberIds)];
@@ -91,6 +164,15 @@ export async function setChatMembers(input: unknown): Promise<Result> {
     }
   }
 
+  const { data: existingMembers } = await server
+    .from("chat_room_members")
+    .select("user_id")
+    .eq("room_id", roomId);
+  const before = new Set((existingMembers || []).map((row) => row.user_id as string));
+  const after = new Set(unique);
+  const addedIds = unique.filter((id) => !before.has(id));
+  const removedIds = [...before].filter((id) => !after.has(id));
+
   await server.from("chat_room_members").delete().eq("room_id", roomId);
   if (unique.length) {
     const { error } = await server
@@ -99,6 +181,41 @@ export async function setChatMembers(input: unknown): Promise<Result> {
     if (error)
       return fail(error.message || "Could not update members.", "ಸದಸ್ಯರನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "सदस्य अपडेट नहीं हो सके।");
   }
+
+  const actorName = (profile.full_name || "").trim() || "Admin";
+  const nameIds = [...new Set([user.id, ...addedIds, ...removedIds])];
+  const names = await loadProfileNames(server, nameIds);
+  names.set(user.id, actorName);
+
+  let updatedAt = new Date().toISOString();
+  if (addedIds.length) {
+    const posted = await postSystemMessage(
+      server,
+      roomId,
+      `${actorName} added ${formatPeopleList(addedIds.map((id) => names.get(id) || "Staff"))}`,
+      { id: user.id, name: actorName },
+    );
+    if (posted) updatedAt = posted.updatedAt;
+  }
+  if (removedIds.length) {
+    const posted = await postSystemMessage(
+      server,
+      roomId,
+      `${actorName} removed ${formatPeopleList(removedIds.map((id) => names.get(id) || "Staff"))}`,
+      { id: user.id, name: actorName },
+    );
+    if (posted) updatedAt = posted.updatedAt;
+  }
+
+  await broadcastChatRoomSync({
+    event: "room:sync",
+    roomId,
+    name: room.name as string,
+    description: (room.description as string) || "",
+    memberIds: unique,
+    updatedAt,
+  });
+
   revalidatePath("/admin/chat");
   return { ok: true };
 }
@@ -214,11 +331,68 @@ export async function deleteChatRoom(input: unknown): Promise<Result> {
   const parsed = z.object({ roomId: uuid }).safeParse(input);
   if (!parsed.success) return fail("Group not found.", "ಗುಂಪು ಸಿಗಲಿಲ್ಲ.", "समूह नहीं मिला।");
 
+  const { data: room } = await server
+    .from("chat_rooms")
+    .select("id,name,description")
+    .eq("id", parsed.data.roomId)
+    .maybeSingle();
+  if (!room) return fail("Group not found.", "ಗುಂಪು ಸಿಗಲಿಲ್ಲ.", "समूह नहीं मिला।");
+
+  await broadcastChatRoomSync({
+    event: "room:sync",
+    roomId: parsed.data.roomId,
+    name: room.name as string,
+    description: (room.description as string) || "",
+    memberIds: [],
+    updatedAt: new Date().toISOString(),
+    removed: true,
+  });
+
   const { error } = await server.from("chat_rooms").delete().eq("id", parsed.data.roomId);
   if (error)
     return fail(error.message || "Could not delete the group.", "ಗುಂಪು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "समूह नहीं हटाया जा सका।");
   revalidatePath("/admin/chat");
   return { ok: true };
+}
+
+export async function fetchChatRoom(roomId: string) {
+  const access = await gate();
+  if ("denied" in access) return { error: access.denied.error, room: null as null };
+  const { server, user, isAdmin, fail } = access;
+  const id = uuid.safeParse(roomId);
+  if (!id.success) return { error: fail("Invalid group.", "ಅಮಾನ್ಯ ಗುಂಪು.", "अमान्य समूह।").error, room: null };
+
+  if (!isAdmin) {
+    const { data: membership } = await server
+      .from("chat_room_members")
+      .select("user_id")
+      .eq("room_id", id.data)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!membership) return { room: null };
+  }
+
+  const { data: room } = await server
+    .from("chat_rooms")
+    .select("id,name,description,updated_at")
+    .eq("id", id.data)
+    .maybeSingle();
+  if (!room) return { room: null };
+
+  const { data: members } = await server
+    .from("chat_room_members")
+    .select("user_id")
+    .eq("room_id", id.data);
+
+  return {
+    room: {
+      id: room.id as string,
+      name: room.name as string,
+      description: (room.description as string) || "",
+      memberIds: (members || []).map((row) => row.user_id as string),
+      updatedAt: room.updated_at as string,
+    },
+  };
 }
 
 export async function fetchChatWebhookSecretStatus(): Promise<

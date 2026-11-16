@@ -38,6 +38,12 @@ export const sectionGroups: SectionGroup[] = [
         grants: ["content.read", "content.edit"],
       },
       {
+        key: "task-requests",
+        label: { en: "Task requests", kn: "ಕಾರ್ಯ ವಿನಂತಿಗಳು", hi: "कार्य अनुरोध" },
+        view: "content.read",
+        grants: ["content.read", "content.edit"],
+      },
+      {
         key: "chat",
         label: { en: "Chat", kn: "ಚಾಟ್", hi: "चैट" },
         view: "admin.access",

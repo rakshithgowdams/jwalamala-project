@@ -1,8 +1,10 @@
 import { SponsorReview } from "@/components/admin/v4/SponsorReview";
 import { editorChoices } from "@/lib/v4/editor-choices";
 import { ReviewPanel } from "@/components/admin/v4/ReviewPanel";
+import { TaskRequestBanner } from "@/components/admin/TaskRequestBanner";
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/require-user";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { LazyPostEditor as PostEditor } from "@/components/ui/LazyComponents";
 import type { Post } from "@/lib/types";
 export default async function EditPost({
@@ -13,6 +15,7 @@ export default async function EditPost({
   const { db, profile, user } = await requireStaff();
   const options = await editorChoices(db);
   const { id } = await params;
+  const isAdmin = profile.role === "admin";
   if (profile.role === "staff") {
     const { data: task } = await db
       .from("article_tasks")
@@ -23,7 +26,8 @@ export default async function EditPost({
       .maybeSingle();
     if (!task) notFound();
   }
-  const [{ data: p }, { data: categories }] = await Promise.all([
+  const server = getAdminClient() || db;
+  const [{ data: p }, { data: categories }, requestRes] = await Promise.all([
     db
       .from("posts")
       .select(
@@ -32,6 +36,17 @@ export default async function EditPost({
       .eq("id", id)
       .maybeSingle(),
     db.from("categories").select("*").order("sort_order"),
+    (() => {
+      let q = server
+        .from("article_task_requests")
+        .select("id,status,drive_url,staff_note,admin_note")
+        .eq("post_id", id)
+        .in("status", ["requested", "processing", "ready"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (!isAdmin) q = q.eq("requester_id", user.id);
+      return q.maybeSingle();
+    })(),
   ]);
   if (!p) notFound();
   const post = {
@@ -58,8 +73,18 @@ export default async function EditPost({
       .order("created_at")
       .limit(100),
   ]);
+  const activeRequest = requestRes.data
+    ? {
+        id: requestRes.data.id as string,
+        status: requestRes.data.status as string,
+        driveUrl: (requestRes.data.drive_url as string) || "",
+        staffNote: (requestRes.data.staff_note as string) || "",
+        adminNote: (requestRes.data.admin_note as string) || "",
+      }
+    : null;
   return (
     <>
+      {activeRequest ? <TaskRequestBanner isAdmin={isAdmin} request={activeRequest} /> : null}
       <PostEditor
         post={post}
         categories={categories || []}

@@ -8,6 +8,7 @@ import {
   showChatDesktopNotification,
   unlockChatSound,
 } from "@/lib/chat/notify";
+import { bumpChatUnread } from "@/lib/chat/unread";
 
 /**
  * Lives in the admin shell so staff/admins still hear chat alerts when they
@@ -40,12 +41,19 @@ export function StaffChatNotifier({ userId }: { userId: string }) {
             sender_id?: string | null;
             sender_label?: string | null;
             body?: string;
+            kind?: string;
           };
           if (!row?.id || !row.room_id) return;
           if (row.sender_id && row.sender_id === userId) return;
+          // Live membership/create notices stay silent outside the open thread.
+          if (row.kind === "system") return;
+
+          const onChatPage = pathnameRef.current.startsWith("/admin/chat");
+          // Keep unread badges alive across the admin shell.
+          if (!onChatPage) bumpChatUnread(row.room_id);
 
           // Chat page owns in-room alerts; this covers every other admin screen.
-          if (pathnameRef.current.startsWith("/admin/chat")) return;
+          if (onChatPage) return;
 
           void playChatNotifySound();
           const title = `${row.sender_label || "Staff"} · Chat`;
