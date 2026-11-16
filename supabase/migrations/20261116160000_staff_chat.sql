@@ -89,3 +89,11 @@ grant select, insert on public.chat_messages to authenticated;
 grant all on public.chat_rooms to service_role;
 grant all on public.chat_room_members to service_role;
 grant all on public.chat_messages to service_role;
+
+-- Live fan-out for Admin > Chat (browser clients subscribe via Supabase Realtime).
+do $$
+begin
+  alter publication supabase_realtime add table public.chat_messages;
+exception
+  when duplicate_object then null;
+end $$;

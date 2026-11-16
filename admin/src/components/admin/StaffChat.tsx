@@ -5,12 +5,33 @@ import { Link2, MessageSquarePlus, Send, Users } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { linkify } from "@/lib/chat/message";
 import { playChatNotifySound, unlockChatSound } from "@/lib/chat/notify";
+import { getBrowserClient } from "@/lib/supabase/client";
 import {
   createChatRoom,
   loadChatMessages,
   sendChatMessage,
   setChatMembers,
 } from "@/app/admin/chat/actions";
+
+function mapDbMessage(row: {
+  id: string;
+  room_id: string;
+  sender_id: string | null;
+  sender_label: string | null;
+  body: string;
+  kind: string;
+  created_at: string;
+}): ChatMessage {
+  return {
+    id: row.id,
+    roomId: row.room_id,
+    senderId: row.sender_id,
+    senderName: row.sender_label || "Staff",
+    body: row.body,
+    kind: row.kind === "url" || row.kind === "system" ? row.kind : "text",
+    createdAt: row.created_at,
+  };
+}
 
 export type ChatRoom = {
   id: string;
@@ -61,7 +82,9 @@ export function StaffChat({
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [pending, start] = useTransition();
   const [status, setStatus] = useState<{ error?: string; ok?: string }>({});
-  const [live, setLive] = useState(false);
+  const [socketLive, setSocketLive] = useState(false);
+  const [dbLive, setDbLive] = useState(false);
+  const live = socketLive || dbLive;
   const [typers, setTypers] = useState<Record<string, { name: string; at: number }>>({});
   const [unread, setUnread] = useState<Record<string, number>>({});
   const threadRef = useRef<HTMLDivElement>(null);
@@ -119,7 +142,10 @@ export function StaffChat({
       const result = await loadChatMessages(activeId);
       if (cancelled) return;
       if (result.error) setStatus({ error: result.error });
-      else setMessages(result.messages);
+      else {
+        for (const msg of result.messages) seenIdsRef.current.add(msg.id);
+        setMessages(result.messages);
+      }
     });
     return () => {
       cancelled = true;
@@ -134,6 +160,39 @@ export function StaffChat({
 
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
+
+  function ingestMessage(payload: ChatMessage, opts?: { silentSelf?: boolean }) {
+    if (!payload?.id || !payload.roomId) return;
+    if (seenIdsRef.current.has(payload.id)) return;
+    seenIdsRef.current.add(payload.id);
+    if (seenIdsRef.current.size > 400) {
+      seenIdsRef.current = new Set([...seenIdsRef.current].slice(-200));
+    }
+
+    const fromSelf = payload.senderId === userId;
+    const viewing = payload.roomId === activeIdRef.current;
+
+    if (viewing) {
+      setTypers((current) => {
+        if (!payload.senderId || !current[payload.senderId]) return current;
+        const next = { ...current };
+        delete next[payload.senderId];
+        return next;
+      });
+      setMessages((current) =>
+        current.some((m) => m.id === payload.id) ? current : [...current, payload],
+      );
+    } else if (!fromSelf) {
+      setUnread((current) => ({
+        ...current,
+        [payload.roomId]: (current[payload.roomId] || 0) + 1,
+      }));
+    }
+
+    if (!fromSelf || !opts?.silentSelf) {
+      if (!fromSelf) playChatNotifySound();
+    }
+  }
 
   useEffect(() => {
     setTypers({});
@@ -154,6 +213,57 @@ export function StaffChat({
     };
   }, [unread]);
 
+  // Supabase Realtime — works across users even when Socket.IO is down (e.g. Vercel).
+  useEffect(() => {
+    if (!userId) return;
+    const supabase = getBrowserClient();
+    if (!supabase) return;
+    const channel = supabase
+      .channel(`staff-chat:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            room_id: string;
+            sender_id: string | null;
+            sender_label: string | null;
+            body: string;
+            kind: string;
+            created_at: string;
+          };
+          if (!row?.id || !row.room_id) return;
+          ingestMessage(mapDbMessage(row), { silentSelf: true });
+        },
+      )
+      .subscribe((status) => {
+        setDbLive(status === "SUBSCRIBED");
+      });
+    return () => {
+      setDbLive(false);
+      void supabase.removeChannel(channel);
+    };
+    // ingestMessage closes over userId; remount when identity changes.
+  }, [userId]);
+
+  // Safety net: merge the open thread from the DB so the other user still sees new
+  // messages if Socket.IO / Realtime miss an event (common on Vercel).
+  useEffect(() => {
+    if (!activeId) return;
+    let cancelled = false;
+    const pull = async () => {
+      const result = await loadChatMessages(activeId);
+      if (cancelled || result.error) return;
+      for (const msg of result.messages) ingestMessage(msg, { silentSelf: true });
+    };
+    const timer = window.setInterval(pull, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeId]);
+
   useEffect(() => {
     if (!socketUrl || !userId) return;
     const socket = io(socketUrl, {
@@ -171,39 +281,12 @@ export function StaffChat({
     }
 
     socket.on("connect", () => {
-      setLive(true);
+      setSocketLive(true);
       joinAllRooms();
     });
-    socket.on("disconnect", () => setLive(false));
+    socket.on("disconnect", () => setSocketLive(false));
     socket.on("message:new", (payload: ChatMessage) => {
-      if (!payload?.id || !payload.roomId) return;
-      if (seenIdsRef.current.has(payload.id)) return;
-      seenIdsRef.current.add(payload.id);
-      if (seenIdsRef.current.size > 400) {
-        seenIdsRef.current = new Set([...seenIdsRef.current].slice(-200));
-      }
-
-      const fromSelf = payload.senderId === userId;
-      const viewing = payload.roomId === activeIdRef.current;
-
-      if (viewing) {
-        setTypers((current) => {
-          if (!payload.senderId || !current[payload.senderId]) return current;
-          const next = { ...current };
-          delete next[payload.senderId];
-          return next;
-        });
-        setMessages((current) =>
-          current.some((m) => m.id === payload.id) ? current : [...current, payload],
-        );
-      } else if (!fromSelf) {
-        setUnread((current) => ({
-          ...current,
-          [payload.roomId]: (current[payload.roomId] || 0) + 1,
-        }));
-      }
-
-      if (!fromSelf) playChatNotifySound();
+      ingestMessage(payload);
     });
     socket.on("typing:start", (payload: { roomId?: string; userId?: string; name?: string }) => {
       if (!payload?.userId || payload.userId === userId) return;
@@ -226,7 +309,7 @@ export function StaffChat({
     return () => {
       socket.disconnect();
       socketRef.current = null;
-      setLive(false);
+      setSocketLive(false);
     };
   }, [socketUrl, userId, userName]);
 

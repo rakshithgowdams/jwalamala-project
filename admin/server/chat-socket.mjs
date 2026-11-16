@@ -7,7 +7,14 @@ import { createServer } from "node:http";
 import { Server } from "socket.io";
 
 const port = Number(process.env.CHAT_SOCKET_PORT || 3002);
-const origin = process.env.CHAT_SOCKET_CORS_ORIGIN || "http://localhost:3001";
+const host = process.env.CHAT_SOCKET_HOST || "0.0.0.0";
+const origins = String(
+  process.env.CHAT_SOCKET_CORS_ORIGIN ||
+    "http://localhost:3001,http://127.0.0.1:3001",
+)
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const internalSecret = process.env.CHAT_INTERNAL_SECRET || process.env.CHAT_WEBHOOK_SECRET || "";
 
 const httpServer = createServer(async (req, res) => {
@@ -45,7 +52,10 @@ const httpServer = createServer(async (req, res) => {
 });
 
 const io = new Server(httpServer, {
-  cors: { origin, methods: ["GET", "POST"] },
+  cors: {
+    origin: origins.length <= 1 ? origins[0] || true : origins,
+    methods: ["GET", "POST"],
+  },
   transports: ["websocket", "polling"],
 });
 
@@ -129,6 +139,7 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(port, "127.0.0.1", () => {
-  console.log(`Jwalamala chat socket on http://127.0.0.1:${port}`);
+httpServer.listen(port, host, () => {
+  console.log(`Jwalamala chat socket on http://${host}:${port}`);
+  console.log(`CORS origins: ${origins.join(", ") || "(any)"}`);
 });
