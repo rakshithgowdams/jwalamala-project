@@ -66,9 +66,12 @@ const io = new Server(httpServer, {
 io.use((socket, next) => {
   const userId = String(socket.handshake.auth?.userId || "").trim();
   const name = String(socket.handshake.auth?.name || "Staff").trim().slice(0, 80);
+  const roleRaw = String(socket.handshake.auth?.role || "staff").trim().toLowerCase();
+  const role = roleRaw === "admin" ? "admin" : "staff";
   if (!userId) return next(new Error("Authentication required"));
   socket.data.userId = userId;
   socket.data.name = name || "Staff";
+  socket.data.role = role;
   next();
 });
 
@@ -101,6 +104,7 @@ io.on("connection", (socket) => {
       roomId: id,
       userId: socket.data.userId,
       name: socket.data.name,
+      role: socket.data.role || "staff",
     });
   });
 
@@ -110,6 +114,7 @@ io.on("connection", (socket) => {
     socket.to(`room:${id}`).emit("typing:stop", {
       roomId: id,
       userId: socket.data.userId,
+      role: socket.data.role || "staff",
     });
   });
 

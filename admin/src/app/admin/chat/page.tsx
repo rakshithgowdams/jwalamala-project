@@ -75,6 +75,7 @@ export default async function ChatPage() {
         isAdmin={isAdmin}
         userId={user.id}
         userName={profile.full_name || "Staff"}
+        userRole={profile.role === "admin" ? "admin" : "staff"}
         rooms={rooms}
         staff={(staffRes.data || []).map((row) => ({
           id: row.id as string,

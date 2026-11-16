@@ -70,10 +70,13 @@ type WebhookStatus = {
   rotatedAt: string | null;
 };
 
+type TyperInfo = { name: string; role: "admin" | "staff"; at: number };
+
 type Props = {
   isAdmin: boolean;
   userId: string;
   userName: string;
+  userRole: "admin" | "staff";
   rooms: ChatRoom[];
   staff: ChatStaff[];
   socketUrl: string;
@@ -85,6 +88,7 @@ export function StaffChat({
   isAdmin,
   userId,
   userName,
+  userRole,
   rooms: initialRooms,
   staff,
   socketUrl,
@@ -108,11 +112,13 @@ export function StaffChat({
   const [dbLive, setDbLive] = useState(false);
   const live = socketLive || dbLive;
   const [notifyPerm, setNotifyPerm] = useState<NotificationPermission | "unsupported">("default");
-  const [typers, setTypers] = useState<Record<string, { name: string; at: number }>>({});
+  const [typers, setTypers] = useState<Record<string, TyperInfo>>({});
   const [unread, setUnread] = useState<Record<string, number>>({});
   const threadRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const typingChannelRef = useRef<any>(null);
   const typingIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEmitRef = useRef(0);
   const seenIdsRef = useRef(new Set<string>());
@@ -120,29 +126,64 @@ export function StaffChat({
   roomsRef.current = rooms;
   const socketLiveRef = useRef(socketLive);
   socketLiveRef.current = socketLive;
+  const staffByIdRef = useRef(new Map(staff.map((person) => [person.id, person])));
+  staffByIdRef.current = new Map(staff.map((person) => [person.id, person]));
 
   const active = useMemo(() => rooms.find((r) => r.id === activeId) || null, [rooms, activeId]);
+  const roleLabel = (role: "admin" | "staff") =>
+    role === "admin"
+      ? tr({ en: "Super Admin", kn: "ಸೂಪರ್ ಅಡ್ಮಿನ್", hi: "सुपर एडमिन" })
+      : tr({ en: "Staff", kn: "ಸಿಬ್ಬಂದಿ", hi: "स्टाफ़" });
+  const typingPeople = useMemo(() => Object.values(typers), [typers]);
   const typingLabel = useMemo(() => {
-    const names = Object.values(typers).map((t) => t.name);
-    if (!names.length) return "";
-    if (names.length === 1)
+    if (!typingPeople.length) return "";
+    const formatPerson = (person: TyperInfo) => `${person.name} · ${roleLabel(person.role)}`;
+    if (typingPeople.length === 1)
       return tr({
-        en: `${names[0]} is typing`,
-        kn: `${names[0]} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ`,
-        hi: `${names[0]} टाइप कर रहे हैं`,
+        en: `${formatPerson(typingPeople[0])} is typing`,
+        kn: `${formatPerson(typingPeople[0])} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ`,
+        hi: `${formatPerson(typingPeople[0])} टाइप कर रहे हैं`,
       });
-    if (names.length === 2)
+    if (typingPeople.length === 2)
       return tr({
-        en: `${names[0]} and ${names[1]} are typing`,
-        kn: `${names[0]} ಮತ್ತು ${names[1]} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ`,
-        hi: `${names[0]} और ${names[1]} टाइप कर रहे हैं`,
+        en: `${formatPerson(typingPeople[0])} and ${formatPerson(typingPeople[1])} are typing`,
+        kn: `${formatPerson(typingPeople[0])} ಮತ್ತು ${formatPerson(typingPeople[1])} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ`,
+        hi: `${formatPerson(typingPeople[0])} और ${formatPerson(typingPeople[1])} टाइप कर रहे हैं`,
       });
     return tr({
-      en: `${names[0]} and ${names.length - 1} others are typing`,
-      kn: `${names[0]} ಮತ್ತು ಇನ್ನೂ ${names.length - 1} ಜನ ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ`,
-      hi: `${names[0]} और ${names.length - 1} अन्य टाइप कर रहे हैं`,
+      en: `${formatPerson(typingPeople[0])} and ${typingPeople.length - 1} others are typing`,
+      kn: `${formatPerson(typingPeople[0])} ಮತ್ತು ಇನ್ನೂ ${typingPeople.length - 1} ಜನ ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ`,
+      hi: `${formatPerson(typingPeople[0])} और ${typingPeople.length - 1} अन्य टाइप कर रहे हैं`,
     });
-  }, [typers, tr]);
+  }, [typingPeople, tr]);
+
+  function resolveRole(userKey: string, role?: string): "admin" | "staff" {
+    if (role === "admin" || role === "staff") return role;
+    return staffByIdRef.current.get(userKey)?.role === "admin" ? "admin" : "staff";
+  }
+
+  function noteTyping(payload: { userId?: string; name?: string; role?: string }) {
+    if (!payload?.userId || payload.userId === userId) return;
+    const known = staffByIdRef.current.get(payload.userId);
+    setTypers((current) => ({
+      ...current,
+      [payload.userId!]: {
+        name: payload.name || known?.name || "Staff",
+        role: resolveRole(payload.userId!, payload.role || known?.role),
+        at: Date.now(),
+      },
+    }));
+  }
+
+  function clearTyping(userKey?: string) {
+    if (!userKey) return;
+    setTypers((current) => {
+      if (!current[userKey]) return current;
+      const next = { ...current };
+      delete next[userKey];
+      return next;
+    });
+  }
 
   useEffect(() => {
     setRooms(initialRooms);
@@ -311,7 +352,7 @@ export function StaffChat({
       // WebSocket first for lowest latency; polling only as fallback.
       transports: ["websocket", "polling"],
       upgrade: true,
-      auth: { userId, name: userName },
+      auth: { userId, name: userName, role: userRole },
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -355,30 +396,50 @@ export function StaffChat({
         setSettingsOpen(false);
       }
     });
-    socket.on("typing:start", (payload: { roomId?: string; userId?: string; name?: string }) => {
-      if (!payload?.userId || payload.userId === userId) return;
-      if (payload.roomId !== activeIdRef.current) return;
-      setTypers((current) => ({
-        ...current,
-        [payload.userId!]: { name: payload.name || "Staff", at: Date.now() },
-      }));
-    });
+    socket.on(
+      "typing:start",
+      (payload: { roomId?: string; userId?: string; name?: string; role?: string }) => {
+        if (payload.roomId !== activeIdRef.current) return;
+        noteTyping(payload);
+      },
+    );
     socket.on("typing:stop", (payload: { roomId?: string; userId?: string }) => {
-      if (!payload?.userId) return;
       if (payload.roomId && payload.roomId !== activeIdRef.current) return;
-      setTypers((current) => {
-        if (!current[payload.userId!]) return current;
-        const next = { ...current };
-        delete next[payload.userId!];
-        return next;
-      });
+      clearTyping(payload.userId);
     });
     return () => {
       socket.disconnect();
       socketRef.current = null;
       setSocketLive(false);
     };
-  }, [socketUrl, userId, userName]);
+  }, [socketUrl, userId, userName, userRole]);
+
+  // Supabase broadcast typing — works on Vercel even when Socket.IO is offline.
+  useEffect(() => {
+    if (!activeId || !userId) {
+      typingChannelRef.current = null;
+      return;
+    }
+    const supabase = getBrowserClient();
+    if (!supabase) return;
+    const channel = supabase
+      .channel(`chat-typing:${activeId}`, { config: { broadcast: { self: false } } })
+      .on(
+        "broadcast",
+        { event: "typing" },
+        ({ payload }: { payload: { userId?: string; name?: string; role?: string; state?: string } }) => {
+          if (!payload?.userId || payload.userId === userId) return;
+          if (payload.state === "stop") clearTyping(payload.userId);
+          else noteTyping(payload);
+        },
+      )
+      .subscribe();
+    typingChannelRef.current = channel;
+    return () => {
+      typingChannelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [activeId, userId]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -412,17 +473,36 @@ export function StaffChat({
     return () => window.clearInterval(timer);
   }, []);
 
-  function emitTyping(roomId: string) {
+  function broadcastTyping(roomId: string, state: "start" | "stop") {
     const socket = socketRef.current;
-    if (!socket || !socketLiveRef.current) return;
+    if (socket && socketLiveRef.current) {
+      socket.emit(state === "start" ? "typing:start" : "typing:stop", roomId);
+    }
+    const channel = typingChannelRef.current;
+    if (channel) {
+      void channel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: {
+          roomId,
+          userId,
+          name: userName,
+          role: userRole,
+          state,
+        },
+      });
+    }
+  }
+
+  function emitTyping(roomId: string) {
     const now = Date.now();
     if (now - lastTypingEmitRef.current > 250) {
       lastTypingEmitRef.current = now;
-      socket.emit("typing:start", roomId);
+      broadcastTyping(roomId, "start");
     }
     if (typingIdleRef.current) clearTimeout(typingIdleRef.current);
     typingIdleRef.current = setTimeout(() => {
-      socket.emit("typing:stop", roomId);
+      broadcastTyping(roomId, "stop");
     }, 900);
   }
 
@@ -431,7 +511,7 @@ export function StaffChat({
       clearTimeout(typingIdleRef.current);
       typingIdleRef.current = null;
     }
-    socketRef.current?.emit("typing:stop", roomId);
+    broadcastTyping(roomId, "stop");
   }
 
   function run(action: () => Promise<{ ok?: true; error?: string; id?: string; message?: ChatMessage }>, done: string) {
@@ -643,13 +723,30 @@ export function StaffChat({
                   );
                 })}
                 {typingLabel ? (
-                  <div className="staff-chat-typing" aria-live="polite">
-                    <span className="staff-chat-typing-dots" aria-hidden="true">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    <span>{typingLabel}</span>
+                  <div className="staff-chat-typing is-live" aria-live="polite">
+                    <div className="staff-chat-typing-bubble" aria-hidden="true">
+                      <span className="staff-chat-typing-dots">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    </div>
+                    <div className="staff-chat-typing-copy">
+                      {typingPeople.length === 1 ? (
+                        <>
+                          <strong>{typingPeople[0].name}</strong>
+                          <small className={"is-" + typingPeople[0].role}>
+                            {roleLabel(typingPeople[0].role)}
+                          </small>
+                          <span className="staff-chat-typing-words">
+                            {tr({ en: "is typing", kn: "ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ", hi: "टाइप कर रहे हैं" })}
+                            <em>…</em>
+                          </span>
+                        </>
+                      ) : (
+                        <span className="staff-chat-typing-words">{typingLabel}<em>…</em></span>
+                      )}
+                    </div>
                   </div>
                 ) : null}
                 <div ref={bottomRef} />
