@@ -5254,6 +5254,21 @@ a.admin-auth-submit {
   overflow: hidden;
   font-weight: 700;
   white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+a.admin-topbar-brand {
+  box-sizing: border-box;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+a.admin-topbar-brand:hover {
+  background: none;
 }
 .admin-topbar-brand .admin-topbar-action {
   max-width: 100%;

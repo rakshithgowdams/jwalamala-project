@@ -9,7 +9,7 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { PasswordField } from "./PasswordField";
 import { isAuthRateLimited, submitEmailAuth } from "@/lib/auth/email";
 import type { AuthMethods } from "@/lib/auth/settings";
-import { adminReturnPath, resolvePostLoginPath } from "@/lib/auth/paths";
+import { deskReturnPath, resolvePostLoginPath } from "@/lib/auth/paths";
 
 export function AdminLoginForm({ next = "/admin", authError, methods, problems = [] }: {
   next?: string;
@@ -23,10 +23,11 @@ export function AdminLoginForm({ next = "/admin", authError, methods, problems =
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(authError === "access"
-    ? "This account does not have administrator access. Contact your site administrator."
+    ? "This account does not have desk access. Contact your site administrator."
     : authError ? "This sign-in link could not be verified. Please try again." : "");
   const [success, setSuccess] = useState(false);
   const configured = methods.available && methods.email;
+  const returnTo = deskReturnPath(next) || "/admin";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,7 +39,7 @@ export function AdminLoginForm({ next = "/admin", authError, methods, problems =
       const db = getBrowserClient();
       if (!db) throw new Error("Unavailable");
       const result = await submitEmailAuth(db.auth, {
-        mode, email, password, next: adminReturnPath(next),
+        mode, email, password, next: returnTo,
         // Password resets finish on the news site, which owns /auth/callback and /account/password.
         origin: mode === "reset" ? site.url : window.location.origin,
       });
@@ -48,17 +49,34 @@ export function AdminLoginForm({ next = "/admin", authError, methods, problems =
         setMessage("If an account exists with that email, a password reset link has been sent.");
         return;
       }
+      const {
+        data: { user },
+      } = await db.auth.getUser();
+      if (!user) {
+        setMessage("Unable to sign in. Check your email and password and confirm your email address.");
+        return;
+      }
       const { data: allowed, error } = await db.rpc("has_permission", { requested: "admin.access" });
       if (error) {
         setMessage("We could not check your access. Please try again.");
         return;
       }
       if (allowed !== true) {
-        setMessage("This account does not have admin access. Contact your site administrator.");
+        setMessage("This account does not have desk access. Contact your site administrator.");
         return;
       }
-      const { data: profile } = await db.from("profiles").select("role,admin_sections").maybeSingle();
-      router.replace(resolvePostLoginPath(next, profile || {}));
+      // Must filter by id: desk accounts can read every profile via RLS, and
+      // maybeSingle() throws when more than one row comes back.
+      const { data: profile, error: profileError } = await db
+        .from("profiles")
+        .select("role,admin_sections")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profileError) {
+        setMessage("We could not load your account. Please try again.");
+        return;
+      }
+      router.replace(resolvePostLoginPath(returnTo, profile || {}));
       router.refresh();
     } catch (error) {
       setMessage(isAuthRateLimited(error)

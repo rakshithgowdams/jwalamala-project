@@ -14,8 +14,10 @@ export const getSectionAccess = cache(async (): Promise<string[] | null> => {
   const role = String(profile.role);
   if (role === "admin") return null;
   if (role === "staff") {
-    const { data } = await db.from("profiles").select("admin_sections").eq("id", profile.id).single();
-    const granted = ((data?.admin_sections as string[] | null) || []).filter((key) => grantableKeys.includes(key));
+    // requireStaff() already loaded admin_sections — avoid a second round-trip.
+    const granted = ((profile.admin_sections as string[] | null) || []).filter((key) =>
+      grantableKeys.includes(key),
+    );
     return ["", ...granted];
   }
   const server = getAdminClient();

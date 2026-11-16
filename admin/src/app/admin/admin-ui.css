@@ -2151,13 +2151,38 @@
   color: var(--muted);
   font-size: 13px;
 }
+.admin-main .admin-route-loading {
+  display: grid;
+  place-items: start;
+  gap: 8px;
+  min-height: 120px;
+  color: var(--muted);
+  font-size: 14px;
+}
 .admin-main .no-access {
   display: grid;
   justify-items: start;
   gap: 12px;
 }
+.admin-main .no-access h2 {
+  margin: 0;
+  font-size: 18px;
+}
 .admin-main .no-access svg {
   color: var(--accent);
+}
+.admin-main .no-access-request {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 420px);
+}
+.admin-nav a.is-locked {
+  opacity: 0.72;
+  color: var(--muted);
+}
+.admin-nav a.is-locked .admin-nav-lock {
+  flex: 0 0 auto;
+  opacity: 0.85;
 }
 @media (max-width: 760px) {
   .admin-main .staff-fields {
@@ -3237,11 +3262,80 @@ body:has(.admin-main .staff-chat) {
   align-items: center;
   gap: 8px;
 }
+.admin-main .task-request-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--surface, #fff) 88%, var(--muted));
+}
+.admin-main .task-request-section-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: calc(var(--ui-radius) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-main .task-request-section-tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface, #fff) 70%, transparent);
+}
+.admin-main .task-request-section-tab.is-active {
+  color: var(--text);
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 8%, transparent);
+}
+.admin-main .task-request-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+.admin-main .task-request-section-tab.is-active .task-request-section-count {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.admin-main .task-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  min-height: 36px;
+}
+.admin-main .task-refresh-btn svg {
+  display: block;
+  flex: 0 0 auto;
+}
 .admin-main .task-request-lead {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
+}
+@media (max-width: 640px) {
+  .admin-main .task-request-sections {
+    grid-template-columns: 1fr;
+  }
 }
 .admin-main .task-request-admin-note,
 .admin-main .task-request-drive {

@@ -1,31 +1,65 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Menu, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { KeyRound, Menu, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { sectionGroups } from "@/lib/admin/sections";
 import { ChatUnreadBadge } from "@/components/admin/ChatUnreadBadge";
 import { getChatUnreadTotal, subscribeChatUnread } from "@/lib/chat/unread";
+import { deskHref } from "@/lib/auth/paths";
+import { useDeskPathname } from "@/components/admin/DeskPathProvider";
 
-/** Null shows every feature (administrators); otherwise only the granted ones. */
-export function AdminNav({ allowed }: { allowed: string[] | null }) {
-  const pathname = usePathname();
+/**
+ * Administrators see every feature. Staff only see what they can open —
+ * locked features live on the Request access page so the sidebar stays light.
+ */
+export function AdminNav({
+  allowed,
+  basePath = "/admin",
+}: {
+  allowed: string[] | null;
+  basePath?: string;
+}) {
+  const pathname = useDeskPathname();
   const router = useRouter();
   const { tr } = useUiStrings();
   const [open, setOpen] = useState(false);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
   const [chatUnread, setChatUnread] = useState(0);
   const navRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (!pending) setPendingHref(null);
-  }, [pending, pathname]);
+  const isStaffDesk = allowed !== null;
+
+  const groups = useMemo(
+    () =>
+      sectionGroups
+        .map((group) => ({
+          title: group.title,
+          links: group.sections
+            .filter((s) => !allowed || allowed.includes(s.key))
+            .map((s) => [s.key, s.label] as const),
+        }))
+        .filter((group) => group.links.length),
+    [allowed],
+  );
+
+  const prefetchHrefs = useMemo(() => {
+    const hrefs = groups.flatMap((group) =>
+      group.links.map(([path]) => deskHref(basePath, path)),
+    );
+    if (isStaffDesk) hrefs.push(`${basePath}/no-access`);
+    return hrefs;
+  }, [groups, basePath, isStaffDesk]);
+
   useEffect(() => {
     setChatUnread(getChatUnreadTotal());
     return subscribeChatUnread((map) => setChatUnread(getChatUnreadTotal(map)));
   }, []);
-  // Scroll only the sidebar, never the page, so the current section stays visible.
+
+  // Warm RSC payloads for every sidebar target so clicks feel instant.
+  useEffect(() => {
+    for (const href of prefetchHrefs) router.prefetch(href);
+  }, [prefetchHrefs, router]);
+
   useEffect(() => {
     const nav = navRef.current;
     const link = nav?.querySelector<HTMLElement>('a[aria-current="page"]');
@@ -34,32 +68,20 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
     if (top < nav.scrollTop || top + link.offsetHeight > nav.scrollTop + nav.clientHeight)
       nav.scrollTop = top - nav.clientHeight / 2 + link.offsetHeight / 2;
   }, [pathname]);
-  const groups = sectionGroups
-    .map((group) => ({
-      title: group.title,
-      links: group.sections
-        .filter((s) => !allowed || allowed.includes(s.key))
-        .map((s) => [s.key, s.label] as const),
-    }))
-    .filter((group) => group.links.length);
+
   const isCurrent = (path: string) =>
     path
-      ? pathname === "/admin/" + path || pathname.startsWith("/admin/" + path + "/")
-      : pathname === "/admin";
-  function go(href: string) {
-    setOpen(false);
-    if (href === pathname || pending) return;
-    setPendingHref(href);
-    startTransition(() => {
-      router.push(href);
-    });
-  }
+      ? pathname === `${basePath}/${path}` || pathname.startsWith(`${basePath}/${path}/`)
+      : pathname === basePath;
+
+  const requestHref = `${basePath}/no-access`;
+  const onRequestPage = pathname.startsWith(`${basePath}/no-access`);
+
   return (
     <nav
       ref={navRef}
-      className={"admin-nav" + (open ? " is-open" : "") + (pending ? " is-loading" : "")}
+      className={"admin-nav" + (open ? " is-open" : "")}
       aria-label={tr({ en: "Admin sections", kn: "ನಿರ್ವಹಣಾ ವಿಭಾಗಗಳು", hi: "एडमिन अनुभाग" })}
-      aria-busy={pending || undefined}
     >
       <button
         type="button"
@@ -77,29 +99,15 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
           <div className="admin-nav-group" key={group.title.en}>
             <p>{tr(group.title)}</p>
             {group.links.map(([path, title]) => {
-              const href = "/admin" + (path ? "/" + path : "");
+              const href = deskHref(basePath, path);
               return (
                 <Link
                   href={href}
-                  key={path}
-                  prefetch={false}
+                  key={path || "home"}
+                  prefetch
                   aria-current={isCurrent(path) ? "page" : undefined}
-                  className={
-                    [
-                      pendingHref === href ? "is-pending" : "",
-                      path === "chat" && chatUnread ? "has-chat-unread" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ") || undefined
-                  }
-                  onClick={(event) => {
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
-                      setOpen(false);
-                      return;
-                    }
-                    event.preventDefault();
-                    go(href);
-                  }}
+                  className={path === "chat" && chatUnread ? "has-chat-unread" : undefined}
+                  onClick={() => setOpen(false)}
                 >
                   <span className="admin-nav-link-label">{tr(title)}</span>
                   {path === "chat" ? (
@@ -110,6 +118,22 @@ export function AdminNav({ allowed }: { allowed: string[] | null }) {
             })}
           </div>
         ))}
+        {isStaffDesk ? (
+          <div className="admin-nav-group">
+            <p>{tr({ en: "Access", kn: "ಪ್ರವೇಶ", hi: "पहुँच" })}</p>
+            <Link
+              href={requestHref}
+              prefetch
+              aria-current={onRequestPage ? "page" : undefined}
+              onClick={() => setOpen(false)}
+            >
+              <span className="admin-nav-link-label">
+                {tr({ en: "Request access", kn: "ಪ್ರವೇಶ ವಿನಂತಿಸಿ", hi: "पहुँच अनुरोध" })}
+              </span>
+              <KeyRound size={14} aria-hidden="true" className="admin-nav-lock" />
+            </Link>
+          </div>
+        ) : null}
       </div>
     </nav>
   );

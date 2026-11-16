@@ -22,6 +22,14 @@ const config: NextConfig = {
     config.parallelism = 1;
     return config;
   },
+  // Keep the browser on /staff/… while serving the existing /admin app tree.
+  // Middleware must not rewrite these, or the client URL flips to /admin.
+  async rewrites() {
+    return [
+      { source: "/staff", destination: "/admin" },
+      { source: "/staff/:path*", destination: "/admin/:path*" },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "i.ytimg.com" },

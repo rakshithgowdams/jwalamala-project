@@ -45,7 +45,11 @@ export function TaskRequestBanner({ isAdmin, request }: Props) {
           {request.status === "processing"
             ? tr({ en: "Verification in processing", kn: "ಪರಿಶೀಲನೆ ಸಂಸ್ಕರಣೆಯಲ್ಲಿದೆ", hi: "सत्यापन प्रोसेसिंग में" })
             : request.status === "ready"
-              ? tr({ en: "Ready for publish", kn: "ಪ್ರಕಟಣೆಗೆ ಸಿದ್ಧ", hi: "प्रकाशन के लिए तैयार" })
+              ? tr({
+                  en: "Ready for publish — publishing moves this to Completed",
+                  kn: "ಪ್ರಕಟಣೆಗೆ ಸಿದ್ಧ — ಪ್ರಕಟಿಸಿದಾಗ ಪೂರ್ಣ ವಿಭಾಗಕ್ಕೆ ಹೋಗುತ್ತದೆ",
+                  hi: "प्रकाशन के लिए तैयार — प्रकाशित होते ही पूर्ण में जाएगा",
+                })
               : tr({ en: "Request waiting for review", kn: "ವಿನಂತಿ ಪರಿಶೀಲನೆಗಾಗಿ ಕಾಯುತ್ತಿದೆ", hi: "अनुरोध समीक्षा की प्रतीक्षा में" })}
         </strong>
         {request.adminNote ? <p>{request.adminNote}</p> : null}
@@ -82,12 +86,12 @@ export function TaskRequestBanner({ isAdmin, request }: Props) {
         {isAdmin && request.status === "ready" ? (
           <button
             type="button"
-            className="button is-compact"
+            className="button button-outline is-compact"
             disabled={pending}
             onClick={() => run(() => completeTaskRequest({ id: request.id }))}
           >
             <Check size={15} aria-hidden="true" />
-            {tr({ en: "Mark request done", kn: "ವಿನಂತಿ ಮುಗಿಸಿ", hi: "अनुरोध पूर्ण करें" })}
+            {tr({ en: "Mark done without publish", kn: "ಪ್ರಕಟಿಸದೆ ಮುಗಿಸಿ", hi: "बिना प्रकाशन पूर्ण" })}
           </button>
         ) : null}
       </div>

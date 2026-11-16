@@ -141,6 +141,7 @@ export async function assignSingleArticle(input: unknown): Promise<Result> {
       "यह लेख पहले से इस व्यक्ति को असाइन है।",
     );
   revalidatePath("/admin/tasks");
+  revalidatePath("/staff/tasks");
   return { ok: true, assigned: count };
 }
 
@@ -207,6 +208,7 @@ export async function assignBulkRange(input: unknown): Promise<Result> {
   if (error)
     return fail(error.message || "Could not assign the batch.", "ಬ್ಯಾಚ್ ನಿಯೋಜಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "बैच असाइन नहीं हो सका।");
   revalidatePath("/admin/tasks");
+  revalidatePath("/staff/tasks");
   return { ok: true, assigned: count };
 }
 
@@ -242,6 +244,7 @@ export async function setTaskStatus(input: unknown): Promise<Result> {
     .eq("id", parsed.data.id);
   if (error) return fail(error.message || "Could not update the task.", "ಕಾರ್ಯ ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "कार्य अपडेट नहीं हो सका।");
   revalidatePath("/admin/tasks");
+  revalidatePath("/staff/tasks");
   return { ok: true };
 }
 

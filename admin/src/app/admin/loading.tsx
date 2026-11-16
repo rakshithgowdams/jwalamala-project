@@ -1,8 +1,7 @@
-import { LoadingState } from "@/components/ui/LoadingState";
 export default function Loading() {
   return (
-    <div className="container page-shell">
-      <LoadingState kind="editor" />
+    <div className="admin-route-loading" aria-busy="true">
+      <p>Loading…</p>
     </div>
   );
 }

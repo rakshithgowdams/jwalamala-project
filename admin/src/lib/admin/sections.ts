@@ -120,6 +120,13 @@ export const sectionGroups: SectionGroup[] = [
     title: { en: "Settings", kn: "ಸೆಟ್ಟಿಂಗ್ಸ್", hi: "सेटिंग्स" },
     sections: [
       { key: "staff", label: { en: "Staff & access", kn: "ಸಿಬ್ಬಂದಿ ಮತ್ತು ಪ್ರವೇಶ", hi: "स्टाफ़ और पहुँच" }, view: "users.manage", grants: [], adminOnly: true },
+      {
+        key: "access-requests",
+        label: { en: "Access requests", kn: "ಪ್ರವೇಶ ವಿನಂತಿಗಳು", hi: "पहुँच अनुरोध" },
+        view: "users.manage",
+        grants: [],
+        adminOnly: true,
+      },
       { key: "users", label: { en: "Users", kn: "ಬಳಕೆದಾರರು", hi: "उपयोगकर्ता" }, view: "users.manage", grants: [], adminOnly: true },
       { key: "roles", label: { en: "Roles & permissions", kn: "ಪಾತ್ರಗಳು ಮತ್ತು ಅನುಮತಿಗಳು", hi: "भूमिकाएँ और अनुमतियाँ" }, view: "users.manage", grants: [], adminOnly: true },
       { key: "providers", label: { en: "Service providers", kn: "ಸೇವಾ ಸೆಟ್ಟಿಂಗ್‌ಗಳು", hi: "सेवा प्रदाता" }, view: "settings.manage", grants: ["settings.manage"] },
@@ -158,9 +165,13 @@ const aliases: Record<string, string> = {
   market_rates: "rates",
 };
 
-/** The sidebar feature an /admin path belongs to, or null for an unknown page. */
+/** The sidebar feature an /admin or /staff path belongs to, or null for an unknown page. */
 export function sectionForPath(pathname: string): string | null {
-  const parts = pathname.replace(/^\/admin\/?/, "").split("/").filter(Boolean);
+  const parts = pathname
+    .replace(/^\/admin\/?/, "")
+    .replace(/^\/staff\/?/, "")
+    .split("/")
+    .filter(Boolean);
   if (!parts.length) return "";
   const raw = parts[0] === "v4" ? parts[1] || "" : parts[0];
   const key = aliases[raw] ?? raw;

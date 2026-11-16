@@ -1,6 +1,6 @@
 import { AdminLoginForm } from "@/components/auth/AdminLoginForm";
 import { getAuthMethods } from "@/lib/auth/settings";
-import { adminReturnPath } from "@/lib/auth/paths";
+import { deskReturnPath } from "@/lib/auth/paths";
 import { signupSetupProblems } from "@/lib/auth/admin-signup";
 export const metadata = {
   title: "Admin Login",
@@ -16,7 +16,7 @@ export default async function AdminLoginPage({ searchParams }: {
     : [];
   return (
     <div className="admin-auth-shell">
-      <AdminLoginForm next={adminReturnPath(next)} authError={error} methods={methods} problems={problems} />
+      <AdminLoginForm next={deskReturnPath(next)} authError={error} methods={methods} problems={problems} />
     </div>
   );
 }

@@ -36,7 +36,10 @@ export default async function TasksPage() {
   const server = getAdminClient() || db;
 
   const [{ count: totalArticles }, staffRes, tasksRes] = await Promise.all([
-    server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived"),
+    // Staff never see the assign UI — skip the expensive full-library count.
+    isAdmin
+      ? server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived")
+      : Promise.resolve({ count: 0 }),
     isAdmin
       ? server.from("profiles").select("id,full_name").eq("role", "staff").order("full_name")
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),

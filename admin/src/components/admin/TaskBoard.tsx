@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CircleAlert, ExternalLink, Pencil, SendHorizontal } from "lucide-react";
+import { CircleAlert, ExternalLink, Pencil, RefreshCw, SendHorizontal } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { ArticleCardSearch } from "@/components/admin/ArticleCardSearch";
 import { PostThumb } from "@/components/admin/PostThumb";
@@ -16,6 +16,7 @@ import {
   setTaskStatus,
 } from "@/app/admin/tasks/actions";
 import { createTaskRequest } from "@/app/admin/task-requests/actions";
+import { useDeskPath } from "@/components/admin/DeskPathProvider";
 
 export type TaskRow = {
   id: string;
@@ -83,6 +84,7 @@ type Props = {
 export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests = {} }: Props) {
   const { tr } = useUiStrings();
   const router = useRouter();
+  const basePath = useDeskPath();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
   const [assigneeId, setAssigneeId] = useState(staff[0]?.id || "");
@@ -294,7 +296,7 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
           <h2 style={{ margin: 0 }}>
             {tr({ en: "Assignments", kn: "ನಿಯೋಜನೆಗಳು", hi: "असाइनमेंट" })}
           </h2>
-          <div className="page-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <div className="page-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             {isAdmin ? (
               <label className="field" style={{ margin: 0 }}>
                 <span className="sr-only">{tr({ en: "Staff filter", kn: "ಸಿಬ್ಬಂದಿ ಫಿಲ್ಟರ್", hi: "स्टाफ़ फ़िल्टर" })}</span>
@@ -308,6 +310,20 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                 </select>
               </label>
             ) : null}
+            <button
+              type="button"
+              className="button button-outline is-compact task-refresh-btn"
+              disabled={pending}
+              onClick={() => {
+                setMessage({});
+                start(() => {
+                  router.refresh();
+                });
+              }}
+            >
+              <RefreshCw size={15} aria-hidden="true" />
+              {tr({ en: "Refresh", kn: "ರಿಫ್ರೆಶ್", hi: "रिफ़्रेश" })}
+            </button>
             <label className="field" style={{ margin: 0 }}>
               <span className="sr-only">{tr({ en: "Status filter", kn: "ಸ್ಥಿತಿ ಫಿಲ್ಟರ್", hi: "स्थिति फ़िल्टर" })}</span>
               <select
@@ -377,7 +393,7 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                 </div>
                 <div className="post-card-body">
                   <h2>
-                    <Link href={"/admin/posts/" + task.postId} prefetch={false}>
+                    <Link href={`${basePath}/posts/${task.postId}`} prefetch={false}>
                       {task.title || task.postId}
                     </Link>
                   </h2>
@@ -394,7 +410,7 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                   </p>
                   <div className="post-actions">
                     <Link
-                      href={"/admin/posts/" + task.postId}
+                      href={`${basePath}/posts/${task.postId}`}
                       prefetch={false}
                       className="button button-outline is-compact"
                     >
@@ -428,7 +444,7 @@ export function TaskBoard({ isAdmin, totalArticles, staff, tasks, activeRequests
                     ) : null}
                     {!isAdmin && task.status === "open" && activeRequests[task.id] ? (
                       <Link
-                        href="/admin/task-requests"
+                        href={`${basePath}/task-requests`}
                         prefetch={false}
                         className="button button-outline is-compact"
                       >

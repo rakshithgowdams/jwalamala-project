@@ -14,8 +14,10 @@ describe("staff sidebar access", () => {
     expect(sectionForPath("/admin/v4/business_ads")).toBe("business-ads");
     expect(sectionForPath("/admin/live-blogs/abc")).toBe("live-blogs");
     expect(sectionForPath("/admin/staff")).toBe("staff");
+    expect(sectionForPath("/admin/access-requests")).toBe("access-requests");
     expect(sectionForPath("/admin/tasks")).toBe("tasks");
     expect(sectionForPath("/admin/chat")).toBe("chat");
+    expect(sectionForPath("/staff/chat")).toBe("chat");
   });
 
   it("treats unknown admin pages as no feature, so staff are kept out", () => {
@@ -24,7 +26,7 @@ describe("staff sidebar access", () => {
   });
 
   it("never lets staff be given administrator-only features", () => {
-    for (const key of ["staff", "users", "roles", "redirects", "settings"]) {
+    for (const key of ["staff", "access-requests", "users", "roles", "redirects", "settings"]) {
       expect(grantableKeys).not.toContain(key);
     }
     expect(permissionsFor(["staff", "users", "roles"])).toEqual(["admin.access"]);
@@ -50,13 +52,16 @@ describe("staff sidebar access", () => {
     }
   });
 
-  it("sends staff away from admin-only URLs like /admin/staff after login", () => {
+  it("sends staff onto /staff and away from admin-only URLs after login", () => {
     expect(
       resolvePostLoginPath("/admin/staff", { role: "staff", admin_sections: ["tasks", "posts"] }),
-    ).toBe("/admin/tasks");
+    ).toBe("/staff/tasks");
     expect(
       resolvePostLoginPath("/admin/posts", { role: "staff", admin_sections: ["posts"] }),
-    ).toBe("/admin/posts");
+    ).toBe("/staff/posts");
+    expect(
+      resolvePostLoginPath("/staff/tasks", { role: "staff", admin_sections: ["tasks", "posts"] }),
+    ).toBe("/staff/tasks");
     expect(resolvePostLoginPath("/admin/staff", { role: "admin", admin_sections: null })).toBe("/admin/staff");
   });
 });

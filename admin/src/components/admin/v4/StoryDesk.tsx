@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveAssignment, moveAssignment } from "@/app/admin/desk/actions";
 import { storyStates } from "@/lib/v4/workflow";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { useDeskPath } from "@/components/admin/DeskPathProvider";
 import type { Tri } from "@/lib/i18n/strings";
 export type Assignment = {
   id: string;
@@ -42,6 +43,7 @@ export function StoryDesk({
   posts: { id: string; title_kn: string }[];
 }) {
   const { kn, v4: t, tr, locale } = useUiStrings();
+  const basePath = useDeskPath();
   const [selected, setSelected] = useState<Assignment | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
@@ -107,7 +109,7 @@ export function StoryDesk({
                     {t.edit}
                   </button>
                   {row.post_id && (
-                    <Link className="chip" href={"/admin/posts/" + row.post_id}>
+                    <Link className="chip" href={`${basePath}/posts/` + row.post_id}>
                       {kn.posts}
                     </Link>
                   )}

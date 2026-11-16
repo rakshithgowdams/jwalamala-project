@@ -40,8 +40,13 @@ async function gate() {
 
 function touchPaths(postId?: string) {
   revalidatePath("/admin/tasks");
+  revalidatePath("/staff/tasks");
   revalidatePath("/admin/task-requests");
-  if (postId) revalidatePath(`/admin/posts/${postId}`);
+  revalidatePath("/staff/task-requests");
+  if (postId) {
+    revalidatePath(`/admin/posts/${postId}`);
+    revalidatePath(`/staff/posts/${postId}`);
+  }
 }
 
 /** Staff: open an assigned task → submit verification request. */
@@ -209,7 +214,7 @@ export async function submitTaskRequestReady(input: unknown): Promise<Result> {
   return { ok: true };
 }
 
-/** Admin: ready → done after publish. */
+/** Admin: ready → done after publish (manual fallback). */
 export async function completeTaskRequest(input: unknown): Promise<Result> {
   const access = await gate();
   if ("denied" in access) return access.denied;
@@ -243,6 +248,27 @@ export async function completeTaskRequest(input: unknown): Promise<Result> {
 
   touchPaths(row.post_id as string);
   return { ok: true };
+}
+
+/**
+ * When an article is published, move its in-process / ready verification
+ * requests into Completed automatically.
+ */
+export async function completeTaskRequestsOnPublish(postId: string): Promise<void> {
+  if (!z.uuid().safeParse(postId).success) return;
+  const server = getAdminClient();
+  if (!server) return;
+  const now = new Date().toISOString();
+  const { error } = await server
+    .from("article_task_requests")
+    .update({ status: "done", done_at: now, updated_at: now })
+    .eq("post_id", postId)
+    .in("status", ["processing", "ready"]);
+  if (error) {
+    console.error("[task-requests] auto-complete on publish failed:", error.message);
+    return;
+  }
+  touchPaths(postId);
 }
 
 /** Admin, or requester while still requested. */

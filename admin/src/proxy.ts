@@ -2,7 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { site } from "@/config/site";
 import { supabaseFetch } from "@/lib/supabase/fetch";
-import { isAdminPath, loginPath } from "@/lib/auth/paths";
+import {
+  isAdminPath,
+  isDeskPath,
+  isStaffPath,
+  loginPath,
+  toDeskPath,
+} from "@/lib/auth/paths";
 import { sectionForPath } from "@/lib/admin/sections";
 
 function authCookieValue(request: NextRequest) {
@@ -72,7 +78,7 @@ async function staffSections(request: NextRequest, url: string, key: string) {
   const sub = token ? jwtPayload(token).sub : undefined;
   if (!token || !sub) return null;
   const hit = staffCache.get(sub);
-  if (hit && Date.now() - hit.at < 30_000) return hit.sections;
+  if (hit && Date.now() - hit.at < 120_000) return hit.sections;
   try {
     const result = await fetch(
       `${url}/rest/v1/profiles?select=role,admin_sections&id=eq.${encodeURIComponent(sub)}`,
@@ -92,11 +98,28 @@ async function staffSections(request: NextRequest, url: string, key: string) {
   }
 }
 
-/** Every admin screen needs a signed-in account holding admin.access. */
+function adminEquivalent(path: string, search: string) {
+  return toDeskPath(path, "admin") + search;
+}
+
+function staffEquivalent(path: string, search: string) {
+  return toDeskPath(path, "staff") + search;
+}
+
+function deskRequestHeaders(request: NextRequest, path: string) {
+  const headers = new Headers(request.headers);
+  if (isStaffPath(path)) headers.set("x-desk-base", "/staff");
+  else if (isAdminPath(path)) headers.set("x-desk-base", "/admin");
+  return headers;
+}
+
+/** Every desk screen needs a signed-in account holding admin.access. */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
   const path = request.nextUrl.pathname;
-  const restricted = isAdminPath(path);
+  const search = request.nextUrl.search;
+  const restricted = isDeskPath(path);
+  const requestHeaders = deskRequestHeaders(request, path);
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
   const finish = (result: NextResponse) => {
     if (result !== response)
       for (const cookie of response.cookies.getAll()) result.cookies.set(cookie);
@@ -107,8 +130,7 @@ export async function proxy(request: NextRequest) {
     finish(
       NextResponse.redirect(
         new URL(
-          loginPath(path + request.nextUrl.search) +
-            (error ? "&error=" + error : ""),
+          loginPath(path + search) + (error ? "&error=" + error : ""),
           request.url,
         ),
       ),
@@ -116,30 +138,50 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (site.demo || !url || !key) return restricted ? toLogin() : finish(response);
-  // Login and other public admin routes must not wait on Auth.
+  // Login and other public routes must not wait on Auth.
   if (!restricted) return finish(response);
   const hasCookie = Boolean(authCookieValue(request));
   if (!hasCookie) return toLogin();
-  // Staff accounts only open the sidebar features an administrator granted;
-  // any other admin page shows "No access" instead.
+
   const gate = async () => {
-    if (path === "/admin/no-access") return finish(response);
     const sections = await staffSections(request, url, key);
-    const section = sectionForPath(path);
-    // Tasks staff may open the article editor for posts assigned to them.
+    const isStaff = sections !== null;
+
+    // Roles stay on their own root (/staff/tasks vs /admin/tasks).
+    if (isStaff && isAdminPath(path)) {
+      return finish(NextResponse.redirect(new URL(staffEquivalent(path, search), request.url)));
+    }
+    if (!isStaff && isStaffPath(path)) {
+      return finish(NextResponse.redirect(new URL(adminEquivalent(path, search), request.url)));
+    }
+
+    // /staff/* is mapped to /admin/* in next.config rewrites so the address
+    // bar stays on /staff. Only auth + section checks happen here.
+    const internalPath = isStaffPath(path) ? toDeskPath(path, "admin") : path;
+
+    if (internalPath === "/admin/no-access" || path === "/staff/no-access") {
+      return finish(response);
+    }
+
+    const section = sectionForPath(internalPath);
     const tasksMayEditPost =
       section === "posts" &&
       Boolean(sections?.includes("tasks")) &&
-      /^\/admin\/posts\/[^/]+\/?$/.test(path) &&
-      !path.endsWith("/new") &&
-      !path.includes("/bin");
+      /^\/admin\/posts\/[^/]+\/?$/.test(internalPath) &&
+      !internalPath.endsWith("/new") &&
+      !internalPath.includes("/bin");
     if (
-      sections &&
-      (section === null || (!sections.includes(section) && !tasksMayEditPost))
-    )
-      return finish(NextResponse.rewrite(new URL("/admin/no-access", request.url)));
+      isStaff &&
+      (section === null || (!sections!.includes(section) && !tasksMayEditPost))
+    ) {
+      const denied = new URL("/staff/no-access", request.url);
+      if (section) denied.searchParams.set("section", section);
+      denied.searchParams.set("from", path);
+      return finish(NextResponse.redirect(denied));
+    }
     return finish(response);
   };
+
   // A still-valid access token does not need getUser() here. The layout
   // still verifies the account. This keeps page clicks off an 8s Auth wait.
   if (accessTokenIsFresh(request)) return gate();
@@ -150,7 +192,7 @@ export async function proxy(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll(values) {
           values.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           values.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );

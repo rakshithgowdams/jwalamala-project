@@ -22,6 +22,7 @@ import { PlacePicker } from "./PlacePicker";
 import { FacebookLogo, InstagramLogo, YouTubeLogo } from "./BrandIcons";
 import { DeletePostButton } from "./DeletePostButton";
 import { RestorePostButton } from "./RestorePostButton";
+import { useDeskPath } from "@/components/admin/DeskPathProvider";
 import { videoFromInput } from "@/lib/utils/video";
 
 /** datetime-local inputs are entered in India time. */
@@ -228,6 +229,7 @@ export function PostEditor({
   const recoveryKey = "jwalamala-draft-" + (post?.id || "new");
 
   const router = useRouter();
+  const basePath = useDeskPath();
   const editor = useEditor({
     extensions: [StarterKit, TiptapImage, TableKit],
     immediatelyRender: false,
@@ -410,7 +412,7 @@ export function PostEditor({
             void clearRecovery(recoveryKey).catch(() => {});
             // A new article moves to its own address so the next Save updates it
             // instead of creating a copy; an existing one is already there.
-            if (!post?.id) router.replace("/admin/posts/" + result.id);
+            if (!post?.id) router.replace(`${basePath}/posts/` + result.id);
           }
         } catch {
           setMessage(kn.unavailable);

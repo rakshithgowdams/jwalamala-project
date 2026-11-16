@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function AdminHome() {
-  redirect("/admin");
+/** Unauthenticated entry: send people to the shared sign-in screen. */
+export default function Home() {
+  redirect("/auth/admin");
 }

@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { useDeskPath } from "@/components/admin/DeskPathProvider";
 import { deletePost, trashPost } from "@/app/admin/actions";
 
 /** Moves an article to the recycle bin, or permanently deletes one that is already there. */
@@ -24,6 +25,7 @@ export function DeletePostButton({
 }) {
   const { tr, kn, l } = useUiStrings();
   const router = useRouter();
+  const basePath = useDeskPath();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -38,8 +40,8 @@ export function DeletePostButton({
   }, [confirming, busy]);
 
   function finish() {
-    if (afterDelete === "list") router.replace("/admin/posts");
-    else if (afterDelete === "bin") router.replace("/admin/posts/bin");
+    if (afterDelete === "list") router.replace(`${basePath}/posts`);
+    else if (afterDelete === "bin") router.replace(`${basePath}/posts/bin`);
     else router.refresh();
   }
 

@@ -1,25 +1,38 @@
-import Link from "next/link";
-import { ShieldAlert } from "lucide-react";
-import { getUiStrings } from "@/lib/i18n/server";
+import { requireStaff } from "@/lib/auth/require-user";
+import { allSections, grantableKeys } from "@/lib/admin/sections";
+import { NoAccessPanel } from "@/components/admin/NoAccessPanel";
 
-export default async function NoAccess() {
-  const { tr } = await getUiStrings();
+/** Restricted desk page — keep the server work minimal so staff see it immediately. */
+export default async function NoAccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ section?: string; from?: string }>;
+}) {
+  const [{ section, from }, { profile }] = await Promise.all([searchParams, requireStaff()]);
+  const key = (section || "").trim();
+  const grantable = grantableKeys.includes(key);
+  const label = allSections.find((s) => s.key === key)?.label || null;
+  const held = new Set((profile.admin_sections as string[] | null) || []);
+  const alreadyHas = grantable && held.has(key);
+  const canRequest = profile.role === "staff" && grantable && !alreadyHas;
+  const lockedFeatures =
+    profile.role === "staff"
+      ? grantableKeys
+          .filter((k) => !held.has(k))
+          .map((k) => {
+            const meta = allSections.find((s) => s.key === k);
+            return { key: k, label: meta?.label || { en: k, kn: k, hi: k } };
+          })
+      : [];
+
   return (
-    <>
-      <h1>{tr({ en: "No access", kn: "ಪ್ರವೇಶವಿಲ್ಲ", hi: "पहुँच नहीं" })}</h1>
-      <section className="utility-panel no-access">
-        <ShieldAlert size={28} aria-hidden="true" />
-        <p>
-          {tr({
-            en: "Your account does not have access to this part of the admin panel. Ask an administrator to add it under Staff & access.",
-            kn: "ನಿಮ್ಮ ಖಾತೆಗೆ ನಿರ್ವಹಣಾ ಫಲಕದ ಈ ಭಾಗಕ್ಕೆ ಪ್ರವೇಶವಿಲ್ಲ. ಸಿಬ್ಬಂದಿ ಮತ್ತು ಪ್ರವೇಶದಲ್ಲಿ ಇದನ್ನು ಸೇರಿಸಲು ನಿರ್ವಾಹಕರಿಗೆ ತಿಳಿಸಿ.",
-            hi: "आपके खाते को एडमिन पैनल के इस हिस्से की पहुँच नहीं है। स्टाफ़ और पहुँच में इसे जोड़ने के लिए एडमिन से कहें।",
-          })}
-        </p>
-        <Link href="/admin" className="button button-outline">
-          {tr({ en: "Back to dashboard", kn: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹಿಂತಿರುಗಿ", hi: "डैशबोर्ड पर वापस जाएँ" })}
-        </Link>
-      </section>
-    </>
+    <NoAccessPanel
+      sectionKey={grantable ? key : ""}
+      sectionLabel={label}
+      fromPath={from || ""}
+      alreadyHas={alreadyHas}
+      canRequest={canRequest}
+      lockedFeatures={lockedFeatures}
+    />
   );
 }

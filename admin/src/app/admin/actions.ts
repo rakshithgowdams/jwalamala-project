@@ -305,6 +305,12 @@ export async function savePost(input: unknown): Promise<{ id?: string; error?: s
       await autoTranslatePost(id, "short");
       await autoTranslatePost(id, "body");
     });
+  // Publishing finishes the verification loop: staff "In process" / ready
+  // requests move to Completed in the Task requests panel.
+  if (p.status === "published") {
+    const { completeTaskRequestsOnPublish } = await import("@/app/admin/task-requests/actions");
+    await completeTaskRequestsOnPublish(id);
+  }
   // Only the pages that list articles; refreshing the whole layout would make
   // this response re-render the editor the admin is looking at.
   revalidatePath("/admin/posts");

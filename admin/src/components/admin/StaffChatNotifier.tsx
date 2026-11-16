@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import {
   playChatNotifySound,
@@ -9,16 +9,24 @@ import {
   unlockChatSound,
 } from "@/lib/chat/notify";
 import { bumpChatUnread } from "@/lib/chat/unread";
+import { useDeskPathname } from "@/components/admin/DeskPathProvider";
 
 /**
- * Lives in the admin shell so staff/admins still hear chat alerts when they
- * leave /admin/chat for another feature or switch browser tabs.
+ * Lives in the desk shell so staff/admins still hear chat alerts when they
+ * leave chat for another feature or switch browser tabs.
  */
-export function StaffChatNotifier({ userId }: { userId: string }) {
-  const pathname = usePathname();
+export function StaffChatNotifier({
+  userId,
+  basePath = "/admin",
+}: {
+  userId: string;
+  basePath?: string;
+}) {
+  const pathname = useDeskPathname();
   const router = useRouter();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
+  const chatPath = `${basePath}/chat`;
 
   useEffect(() => {
     if (!userId) return;
@@ -48,11 +56,12 @@ export function StaffChatNotifier({ userId }: { userId: string }) {
           // Live membership/create notices stay silent outside the open thread.
           if (row.kind === "system") return;
 
-          const onChatPage = pathnameRef.current.startsWith("/admin/chat");
-          // Keep unread badges alive across the admin shell.
+          const onChatPage =
+            pathnameRef.current === chatPath || pathnameRef.current.startsWith(chatPath + "/");
+          // Keep unread badges alive across the desk shell.
           if (!onChatPage) bumpChatUnread(row.room_id);
 
-          // Chat page owns in-room alerts; this covers every other admin screen.
+          // Chat page owns in-room alerts; this covers every other desk screen.
           if (onChatPage) return;
 
           void playChatNotifySound();
@@ -61,7 +70,7 @@ export function StaffChatNotifier({ userId }: { userId: string }) {
             title,
             body: row.body || "New message",
             tag: `chat-${row.room_id}`,
-            onClick: () => router.push("/admin/chat"),
+            onClick: () => router.push(chatPath),
           });
         },
       )
@@ -74,7 +83,7 @@ export function StaffChatNotifier({ userId }: { userId: string }) {
       window.removeEventListener("keydown", onFirstGesture);
       void supabase.removeChannel(channel);
     };
-  }, [userId, router]);
+  }, [userId, router, chatPath]);
 
   return null;
 }

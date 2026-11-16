@@ -2,6 +2,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import Link from "next/link";
 import { Suspense } from "react";
 import { requireStaff } from "@/lib/auth/require-user";
+import { deskBase } from "@/lib/auth/paths";
 import { getUiStrings } from "@/lib/i18n/server";
 import type { Tri } from "@/lib/i18n/strings";
 import { ExternalLink, Pencil } from "lucide-react";
@@ -49,19 +50,25 @@ export default async function Posts({
   searchParams: Promise<PostFiltersQuery>;
 }) {
   const filters = await searchParams;
-  const { kn, tr } = await getUiStrings();
+  const [{ profile }, { kn, tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+  const basePath = deskBase(profile.role);
+  const isAdmin = profile.role === "admin";
   return (
     <>
       <div className="list-sticky-head">
         <div className="section-title">
           <h1>{kn.posts}</h1>
           <div className="page-actions">
-            <Link href="/admin/posts/bin" className="button button-outline">
-              {tr({ en: "Recycle bin", kn: "ಮರುಬಳಕೆ ಡಬ್ಬಿ", hi: "रीसायकल बिन" })}
-            </Link>
-            <Link href="/admin/posts/new" className="button button-ember">
-              {kn.newPost}
-            </Link>
+            {isAdmin ? (
+              <Link href={`${basePath}/posts/bin`} className="button button-outline">
+                {tr({ en: "Recycle bin", kn: "ಮರುಬಳಕೆ ಡಬ್ಬಿ", hi: "रीसायकल बिन" })}
+              </Link>
+            ) : null}
+            {isAdmin ? (
+              <Link href={`${basePath}/posts/new`} className="button button-ember">
+                {kn.newPost}
+              </Link>
+            ) : null}
           </div>
         </div>
         <PostFilters q={filters.q} status={filters.status} type={filters.type} sort={filters.sort} />
@@ -70,13 +77,19 @@ export default async function Posts({
         key={[filters.page, filters.q, filters.status, filters.type, filters.sort].join("|")}
         fallback={<PostGridFallback />}
       >
-        <PostResults filters={filters} />
+        <PostResults filters={filters} basePath={basePath} />
       </Suspense>
     </>
   );
 }
 
-async function PostResults({ filters }: { filters: PostFiltersQuery }) {
+async function PostResults({
+  filters,
+  basePath,
+}: {
+  filters: PostFiltersQuery;
+  basePath: string;
+}) {
   const page = Math.max(1, Math.min(10000, Math.floor(Number(filters.page)) || 1));
   const [{ db, profile, user }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const canDelete = profile.role === "admin";
@@ -198,10 +211,10 @@ async function PostResults({ filters }: { filters: PostFiltersQuery }) {
             </div>
             <div className="post-card-body">
             <h2>
-              <Link href={"/admin/posts/" + p.id} prefetch={false}>{p.title_kn}</Link>
+              <Link href={`${basePath}/posts/${p.id}`} prefetch={false}>{p.title_kn}</Link>
             </h2>
             <div className="post-actions">
-              <Link href={"/admin/posts/" + p.id} prefetch={false} className="button button-outline is-compact">
+              <Link href={`${basePath}/posts/${p.id}`} prefetch={false} className="button button-outline is-compact">
                 <Pencil size={15} aria-hidden="true" />
                 {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
               </Link>

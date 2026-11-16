@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireStaff } from "@/lib/auth/require-user";
+import { invalidateDeskProfile, requireStaff } from "@/lib/auth/require-user";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/email";
 import { grantableKeys, permissionsFor } from "@/lib/admin/sections";
@@ -146,6 +146,7 @@ export async function updateStaff(input: unknown): Promise<Result> {
   const permissionError = profileError ? null : await writePermissions(server, id, disabled ? null : sections);
   if (profileError || permissionError)
     return fail("Staff access could not be saved.", "ಸಿಬ್ಬಂದಿ ಪ್ರವೇಶ ಉಳಿಸಲು ಆಗಲಿಲ್ಲ.", "स्टाफ़ पहुँच सहेजी नहीं जा सकी।");
+  invalidateDeskProfile(id);
   revalidatePath("/admin/staff");
   return { ok: true };
 }
@@ -165,6 +166,7 @@ export async function setStaffActive(id: unknown, active: unknown): Promise<Resu
   const permissionError = error ? null : await writePermissions(server, target.id, active ? target.admin_sections || [] : null);
   if (error || permissionError)
     return fail("The account could not be updated.", "ಖಾತೆಯನ್ನು ನವೀಕರಿಸಲು ಆಗಲಿಲ್ಲ.", "खाता अपडेट नहीं हो सका।");
+  invalidateDeskProfile(target.id);
   revalidatePath("/admin/staff");
   return { ok: true };
 }
@@ -184,6 +186,7 @@ export async function deleteStaff(id: unknown): Promise<Result> {
       "ಈ ಖಾತೆ ವಿಷಯವನ್ನು ಬರೆದಿದೆ ಅಥವಾ ಸಂಪಾದಿಸಿದೆ, ಆದ್ದರಿಂದ ಅಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಬದಲಿಗೆ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿ.",
       "इस खाते ने सामग्री लिखी या बदली है, इसलिए इसे हटाया नहीं जा सकता। इसके बजाय निष्क्रिय करें।",
     );
+  invalidateDeskProfile(target.id);
   revalidatePath("/admin/staff");
   return { ok: true };
 }

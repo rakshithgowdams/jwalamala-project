@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, Pencil, Send, X } from "lucide-react";
+import { Check, ExternalLink, Pencil, RefreshCw, Send, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { PostThumb } from "@/components/admin/PostThumb";
 import { site } from "@/config/site";
@@ -15,6 +15,7 @@ import {
   submitTaskRequestReady,
   type TaskRequestRow,
 } from "@/app/admin/task-requests/actions";
+import { useDeskPath } from "@/components/admin/DeskPathProvider";
 
 const requestStatusNames: Record<string, Tri> = {
   requested: { en: "Requested", kn: "ವಿನಂತಿಸಲಾಗಿದೆ", hi: "अनुरोधित" },
@@ -23,6 +24,14 @@ const requestStatusNames: Record<string, Tri> = {
   rejected: { en: "Rejected", kn: "ತಿರಸ್ಕೃತ", hi: "अस्वीकृत" },
   done: { en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" },
   cancelled: { en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" },
+};
+
+type SectionKey = "request" | "process" | "completed";
+
+const SECTION_STATUSES: Record<SectionKey, string[]> = {
+  request: ["requested", "rejected"],
+  process: ["processing", "ready"],
+  completed: ["done"],
 };
 
 function cardThumbnail(thumbnail: string | null, video: string | null) {
@@ -52,23 +61,36 @@ type Props = {
 export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
   const { tr } = useUiStrings();
   const router = useRouter();
+  const basePath = useDeskPath();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
-  const [filterStatus, setFilterStatus] = useState<string>("active");
+  const [section, setSection] = useState<SectionKey>(() => {
+    if (isAdmin) return "request";
+    if (requests.some((row) => SECTION_STATUSES.process.includes(row.status))) return "process";
+    return "request";
+  });
   const [filterStaff, setFilterStaff] = useState("all");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [driveUrl, setDriveUrl] = useState("");
   const [adminNote, setAdminNote] = useState("");
 
+  const counts = useMemo(() => {
+    const byStaff = (row: TaskRequestRow) =>
+      filterStaff === "all" || row.requesterId === filterStaff;
+    return {
+      request: requests.filter((r) => byStaff(r) && SECTION_STATUSES.request.includes(r.status)).length,
+      process: requests.filter((r) => byStaff(r) && SECTION_STATUSES.process.includes(r.status)).length,
+      completed: requests.filter((r) => byStaff(r) && SECTION_STATUSES.completed.includes(r.status)).length,
+    };
+  }, [requests, filterStaff]);
+
   const visible = useMemo(() => {
+    const allowed = SECTION_STATUSES[section];
     return requests.filter((row) => {
       if (filterStaff !== "all" && row.requesterId !== filterStaff) return false;
-      if (filterStatus === "active")
-        return ["requested", "processing", "ready"].includes(row.status);
-      if (filterStatus === "all") return true;
-      return row.status === filterStatus;
+      return allowed.includes(row.status);
     });
-  }, [requests, filterStatus, filterStaff]);
+  }, [requests, section, filterStaff]);
 
   function run(action: () => Promise<{ ok?: true; error?: string }>, okMsg: string) {
     setMessage({});
@@ -87,6 +109,43 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
 
   const reviewing = reviewId ? requests.find((r) => r.id === reviewId) : null;
 
+  const sectionLead =
+    section === "request"
+      ? isAdmin
+        ? tr({
+            en: "New staff verification requests waiting for a Drive link and approval.",
+            kn: "Drive ಲಿಂಕ್ ಮತ್ತು ಅನುಮೋದನೆಗಾಗಿ ಕಾಯುತ್ತಿರುವ ಹೊಸ ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನಾ ವಿನಂತಿಗಳು.",
+            hi: "Drive लिंक और स्वीकृति की प्रतीक्षा में नए स्टाफ़ सत्यापन अनुरोध।",
+          })
+        : tr({
+            en: "Your requests waiting for admin review. Rejected items can be requested again from Tasks.",
+            kn: "ಆಡ್ಮಿನ್ ಪರಿಶೀಲನೆಗಾಗಿ ಕಾಯುತ್ತಿರುವ ನಿಮ್ಮ ವಿನಂತಿಗಳು. ತಿರಸ್ಕೃತವನ್ನು Tasks ನಿಂದ ಮತ್ತೆ ವಿನಂತಿಸಬಹುದು.",
+            hi: "एडमिन समीक्षा की प्रतीक्षा में आपके अनुरोध। अस्वीकृत को Tasks से फिर अनुरोध करें।",
+          })
+      : section === "process"
+        ? isAdmin
+          ? tr({
+              en: "Approved work in progress. When staff marks ready, publish the article to complete the request.",
+              kn: "ಅನುಮೋದಿತ ಕೆಲಸ ನಡೆಯುತ್ತಿದೆ. ಸಿಬ್ಬಂದಿ ಸಿದ್ಧ ಎಂದಾಗ ಲೇಖನ ಪ್ರಕಟಿಸಿ ವಿನಂತಿ ಪೂರ್ಣಗೊಳ್ಳುತ್ತದೆ.",
+              hi: "स्वीकृत कार्य जारी है। स्टाफ़ तैयार चिह्नित करे तो लेख प्रकाशित कर अनुरोध पूरा होता है।",
+            })
+          : tr({
+              en: "Admin approved — open Drive, finish the article, then send it back for publish.",
+              kn: "ಆಡ್ಮಿನ್ ಅನುಮೋದಿಸಿದ್ದಾರೆ — Drive ತೆರೆಯಿರಿ, ಲೇಖನ ಮುಗಿಸಿ, ಪ್ರಕಟಣೆಗೆ ಕಳುಹಿಸಿ.",
+              hi: "एडमिन ने स्वीकृत किया — Drive खोलें, लेख पूरा करें, प्रकाशन के लिए भेजें।",
+            })
+        : tr({
+            en: "Published articles whose verification request is finished.",
+            kn: "ಪ್ರಕಟಿತ ಲೇಖನಗಳು — ಪರಿಶೀಲನಾ ವಿನಂತಿ ಮುಗಿದಿದೆ.",
+            hi: "प्रकाशित लेख जिनका सत्यापन अनुरोध पूरा हो चुका है।",
+          });
+
+  const sections: { key: SectionKey; label: Tri }[] = [
+    { key: "request", label: { en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" } },
+    { key: "process", label: { en: "In process", kn: "ಪ್ರಕ್ರಿಯೆಯಲ್ಲಿ", hi: "प्रक्रिया में" } },
+    { key: "completed", label: { en: "Completed", kn: "ಪೂರ್ಣ", hi: "पूर्ण" } },
+  ];
+
   return (
     <div className="task-request-board">
       {message.error ? <p role="alert">{message.error}</p> : null}
@@ -94,7 +153,7 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
 
       <section className="panel task-request-panel">
         <div className="task-request-toolbar">
-          <h2>{tr({ en: "Requests", kn: "ವಿನಂತಿಗಳು", hi: "अनुरोध" })}</h2>
+          <h2>{tr({ en: "Task requests", kn: "ಕಾರ್ಯ ವಿನಂತಿಗಳು", hi: "कार्य अनुरोध" })}</h2>
           <div className="task-request-filters">
             {isAdmin && staff.length ? (
               <label className="field" style={{ margin: 0 }}>
@@ -111,46 +170,47 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                 </select>
               </label>
             ) : null}
-            <label className="field" style={{ margin: 0 }}>
-              <span className="sr-only">
-                {tr({ en: "Status filter", kn: "ಸ್ಥಿತಿ ಫಿಲ್ಟರ್", hi: "स्थिति फ़िल्टर" })}
-              </span>
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="active">
-                  {tr({ en: "Active", kn: "ಸಕ್ರಿಯ", hi: "सक्रिय" })}
-                </option>
-                <option value="requested">{tr(requestStatusNames.requested)}</option>
-                <option value="processing">{tr(requestStatusNames.processing)}</option>
-                <option value="ready">{tr(requestStatusNames.ready)}</option>
-                <option value="rejected">{tr(requestStatusNames.rejected)}</option>
-                <option value="done">{tr(requestStatusNames.done)}</option>
-                <option value="cancelled">{tr(requestStatusNames.cancelled)}</option>
-                <option value="all">{tr({ en: "All statuses", kn: "ಎಲ್ಲಾ ಸ್ಥಿತಿಗಳು", hi: "सभी स्थितियाँ" })}</option>
-              </select>
-            </label>
+            <button
+              type="button"
+              className="button button-outline is-compact task-refresh-btn"
+              disabled={pending}
+              onClick={() => {
+                setMessage({});
+                start(() => {
+                  router.refresh();
+                });
+              }}
+            >
+              <RefreshCw size={15} aria-hidden="true" />
+              {tr({ en: "Refresh", kn: "ರಿಫ್ರೆಶ್", hi: "रिफ़्रेश" })}
+            </button>
           </div>
         </div>
 
-        <p className="task-request-lead">
-          {isAdmin
-            ? tr({
-                en: "Review staff requests, paste a Google Drive link to approve, then publish when the article is marked ready.",
-                kn: "ಸಿಬ್ಬಂದಿ ವಿನಂತಿಗಳನ್ನು ಪರಿಶೀಲಿಸಿ, ಅನುಮೋದಿಸಲು Google Drive ಲಿಂಕ್ ಅಂಟಿಸಿ, ಲೇಖನ ಸಿದ್ಧವಾದಾಗ ಪ್ರಕಟಿಸಿ.",
-                hi: "स्टाफ़ अनुरोधों की समीक्षा करें, स्वीकृति के लिए Google Drive लिंक चिपकाएँ, लेख तैयार होने पर प्रकाशित करें।",
-              })
-            : tr({
-                en: "Track your verification requests. When processing, open the Drive link, finish the article, then send it to admin.",
-                kn: "ನಿಮ್ಮ ಪರಿಶೀಲನಾ ವಿನಂತಿಗಳನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ. ಸಂಸ್ಕರಣೆಯಲ್ಲಿ Drive ತೆರೆಯಿರಿ, ಲೇಖನ ಮುಗಿಸಿ, ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ.",
-                hi: "अपने सत्यापन अनुरोध ट्रैक करें। प्रोसेसिंग में Drive खोलें, लेख पूरा करें, फिर एडमिन को भेजें।",
-              })}
-        </p>
+        <div className="task-request-sections" role="tablist" aria-label={tr({ en: "Request stages", kn: "ವಿನಂತಿ ಹಂತಗಳು", hi: "अनुरोध चरण" })}>
+          {sections.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              aria-selected={section === item.key}
+              className={"task-request-section-tab" + (section === item.key ? " is-active" : "")}
+              onClick={() => setSection(item.key)}
+            >
+              <span>{tr(item.label)}</span>
+              <span className="task-request-section-count">{counts[item.key]}</span>
+            </button>
+          ))}
+        </div>
+
+        <p className="task-request-lead">{sectionLead}</p>
 
         {!visible.length ? (
           <p>
             {tr({
-              en: "No requests in this view yet. Open Tasks and use Request on an assigned article.",
-              kn: "ಈ ನೋಟದಲ್ಲಿ ಇನ್ನೂ ವಿನಂತಿಗಳಿಲ್ಲ. ಕಾರ್ಯಗಳಲ್ಲಿ ನಿಯೋಜಿತ ಲೇಖನದ ಮೇಲೆ ವಿನಂತಿ ಬಳಸಿ.",
-              hi: "इस दृश्य में अभी अनुरोध नहीं। Tasks में असाइन लेख पर Request दबाएँ।",
+              en: "Nothing in this section yet.",
+              kn: "ಈ ವಿಭಾಗದಲ್ಲಿ ಇನ್ನೂ ಏನೂ ಇಲ್ಲ.",
+              hi: "इस अनुभाग में अभी कुछ नहीं।",
             })}
           </p>
         ) : (
@@ -173,7 +233,7 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                 </div>
                 <div className="post-card-body">
                   <h2>
-                    <Link href={"/admin/posts/" + row.postId} prefetch={false}>
+                    <Link href={`${basePath}/posts/${row.postId}`} prefetch={false}>
                       {row.title || row.postId}
                     </Link>
                   </h2>
@@ -204,7 +264,7 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
 
                   <div className="post-actions">
                     <Link
-                      href={"/admin/posts/" + row.postId}
+                      href={`${basePath}/posts/${row.postId}`}
                       prefetch={false}
                       className="button button-outline is-compact"
                     >
@@ -248,9 +308,9 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                           run(
                             () => submitTaskRequestReady({ id: row.id }),
                             tr({
-                              en: "Sent to admin.",
-                              kn: "ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
-                              hi: "एडमिन को भेजा।",
+                              en: "Sent to admin for publish.",
+                              kn: "ಪ್ರಕಟಣೆಗಾಗಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
+                              hi: "प्रकाशन के लिए एडमिन को भेजा।",
                             }),
                           )
                         }
@@ -269,9 +329,9 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                           run(
                             () => completeTaskRequest({ id: row.id }),
                             tr({
-                              en: "Request marked done.",
-                              kn: "ವಿನಂತಿ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಲಾಯಿತು.",
-                              hi: "अनुरोध पूर्ण चिह्नित।",
+                              en: "Moved to Completed.",
+                              kn: "ಪೂರ್ಣ ವಿಭಾಗಕ್ಕೆ ಸರಿಸಲಾಯಿತು.",
+                              hi: "पूर्ण अनुभाग में भेजा।",
                             }),
                           )
                         }
@@ -333,57 +393,30 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                 {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
               </button>
             </header>
-            <div className="staff-chat-modal-body" style={{ display: "grid", gap: 12 }}>
-              {reviewing.staffNote ? (
-                <p>
-                  <strong>{tr({ en: "Staff note", kn: "ಸಿಬ್ಬಂದಿ ಟಿಪ್ಪಣಿ", hi: "स्टाफ़ नोट" })}:</strong>{" "}
-                  {reviewing.staffNote}
-                </p>
-              ) : null}
-              <label className="field">
-                <span>{tr({ en: "Google Drive link", kn: "Google Drive ಲಿಂಕ್", hi: "Google Drive लिंक" })}</span>
-                <input
-                  type="url"
-                  value={driveUrl}
-                  onChange={(e) => setDriveUrl(e.target.value)}
-                  placeholder="https://drive.google.com/..."
-                  autoComplete="off"
-                />
-              </label>
-              <label className="field">
-                <span>{tr({ en: "Admin note", kn: "ಆಡ್ಮಿನ್ ಟಿಪ್ಪಣಿ", hi: "एडमिन नोट" })}</span>
-                <textarea
-                  value={adminNote}
-                  onChange={(e) => setAdminNote(e.target.value)}
-                  rows={3}
-                  maxLength={1000}
-                />
-              </label>
-            </div>
-            <footer className="staff-chat-modal-foot" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="button"
-                disabled={pending}
-                onClick={() =>
-                  run(
-                    () =>
-                      reviewTaskRequest({
-                        id: reviewing.id,
-                        decision: "approve",
-                        driveUrl,
-                        adminNote,
-                      }),
-                    tr({
-                      en: "Approved — processing.",
-                      kn: "ಅನುಮೋದಿಸಲಾಯಿತು — ಸಂಸ್ಕರಣೆ.",
-                      hi: "स्वीकृत — प्रोसेसिंग।",
-                    }),
-                  )
-                }
-              >
-                {tr({ en: "Approve", kn: "ಅನುಮೋದಿಸಿ", hi: "स्वीकृत करें" })}
-              </button>
+            <label className="field">
+              <span>{tr({ en: "Google Drive link", kn: "Google Drive ಲಿಂಕ್", hi: "Google Drive लिंक" })}</span>
+              <input
+                type="url"
+                value={driveUrl}
+                onChange={(e) => setDriveUrl(e.target.value)}
+                placeholder="https://drive.google.com/..."
+                required
+              />
+            </label>
+            <label className="field">
+              <span>{tr({ en: "Admin note", kn: "ಆಡ್ಮಿನ್ ಟಿಪ್ಪಣಿ", hi: "एडमिन नोट" })}</span>
+              <textarea
+                rows={3}
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+                placeholder={tr({
+                  en: "Optional note for staff",
+                  kn: "ಸಿಬ್ಬಂದಿಗೆ ಐಚ್ಛಿಕ ಟಿಪ್ಪಣಿ",
+                  hi: "स्टाफ़ के लिए वैकल्पिक नोट",
+                })}
+              />
+            </label>
+            <div className="staff-chat-modal-actions">
               <button
                 type="button"
                 className="button button-outline"
@@ -394,8 +427,8 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                       reviewTaskRequest({
                         id: reviewing.id,
                         decision: "reject",
-                        driveUrl: "",
                         adminNote,
+                        driveUrl: "",
                       }),
                     tr({
                       en: "Request rejected.",
@@ -407,7 +440,30 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
               >
                 {tr({ en: "Reject", kn: "ತಿರಸ್ಕರಿಸಿ", hi: "अस्वीकार" })}
               </button>
-            </footer>
+              <button
+                type="button"
+                className="button"
+                disabled={pending || !driveUrl.trim()}
+                onClick={() =>
+                  run(
+                    () =>
+                      reviewTaskRequest({
+                        id: reviewing.id,
+                        decision: "approve",
+                        adminNote,
+                        driveUrl,
+                      }),
+                    tr({
+                      en: "Approved — moved to In process.",
+                      kn: "ಅನುಮೋದಿಸಲಾಯಿತು — ಪ್ರಕ್ರಿಯೆಗೆ ಸರಿಸಲಾಯಿತು.",
+                      hi: "स्वीकृत — प्रक्रिया में भेजा।",
+                    }),
+                  )
+                }
+              >
+                {tr({ en: "Approve", kn: "ಅನುಮೋದಿಸಿ", hi: "स्वीकृत" })}
+              </button>
+            </div>
           </form>
         </div>
       ) : null}

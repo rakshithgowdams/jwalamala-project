@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { useDeskPathname } from "@/components/admin/DeskPathProvider";
 
 const statuses = ["draft", "scheduled", "published"] as const;
 const types = ["article", "video", "short"] as const;
@@ -20,7 +21,7 @@ export function PostFilters({
 }) {
   const { tr, kn } = useUiStrings();
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = useDeskPathname();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState(q);
   const current = useRef({ q, status, type, sort, search });

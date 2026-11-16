@@ -1,7 +1,8 @@
 "use client";
 import { useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { useDeskPathname } from "@/components/admin/DeskPathProvider";
 
 /** Build 1 2 3 4 … N (or a sliding window around the current page). */
 function pageItems(page: number, pages: number): number[] {
@@ -30,7 +31,7 @@ export function Pagination({
 }) {
   const { kn, tr } = useUiStrings();
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = useDeskPathname();
   const [pending, startTransition] = useTransition();
   if (pages <= 1) return null;
   const numbers = pageItems(page, pages);
