@@ -213,9 +213,18 @@ img {
   align-items: center;
   gap: 19px;
 }
-.brand img {
+.brand img,
+.brand-mark {
   object-fit: contain;
   border-radius: 50%;
+  flex-shrink: 0;
+  background: #fff;
+  /* Keep the emblem above any nearby cards so a post thumb cannot cover it. */
+  position: relative;
+  z-index: 2;
+}
+.footer-brand .brand-mark {
+  z-index: 1;
 }
 .wordmark {
   font-size: 53px;

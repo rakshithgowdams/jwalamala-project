@@ -4,13 +4,12 @@ import { LanguageSwitch } from "@/components/i18n/LanguageProvider";
 import { WeatherChip } from "@/components/widgets/WeatherChip";
 import { Suspense } from "react";
 import { TrendingBar } from "@/components/discovery/TrendingBar";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Search, UserRound, Radio } from "lucide-react";
-import { site } from "@/config/site";
 
 import { formatDate, isoToday } from "@/lib/utils/dates";
 import { BrandRibbon } from "./FlameGarland";
+import { BrandMark } from "./BrandMark";
 import { CategoryNav, ThemeToggle } from "./Navigation";
 import { ScrollHeader } from "./ScrollHeader";
 import { AccountLink } from "./AccountLink";
@@ -73,7 +72,7 @@ export async function Header() {
       </div>
       <div className="container masthead">
         <Link href="/" className="brand" aria-label={brand.full}>
-          <Image src={site.logo} alt="" width={92} height={92} priority />
+          <BrandMark size={92} alt={brand.full} priority className="brand-mark" />
           <div className="brand-text">
             <div className="wordmark">
               {brand.mark.slice(0, ribbonAt)}

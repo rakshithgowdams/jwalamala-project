@@ -22,7 +22,9 @@ export const site = {
     (process.env.NODE_ENV === "production"
       ? "https://jwalamala-project.vercel.app"
       : "http://localhost:3000"),
-  logo: process.env.NEXT_PUBLIC_SITE_LOGO || "/images/jwalamala-logo.jpg",
+  // Masthead always uses /images/jwalamala-logo.jpg via BrandMark. This value
+  // is for metadata/OG/share cards only — never point it at a post cover URL.
+  logo: "/images/jwalamala-logo.jpg",
   locale: "kn_IN",
   timeZone: "Asia/Kolkata",
   demo: process.env.NEXT_PUBLIC_DEMO_MODE === "true",
