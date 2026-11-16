@@ -2,6 +2,7 @@ import { requireStaff } from "@/lib/auth/require-user";
 import { getSectionAccess } from "@/lib/auth/section-access";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { AdminTopBar } from "@/components/admin/AdminTopBar";
+import { StaffChatNotifier } from "@/components/admin/StaffChatNotifier";
 import { site } from "@/config/site";
 import "./admin-ui.css";
 import "./dashboard.css";
@@ -22,6 +23,7 @@ export default async function AdminLayout({
         email={user.email || ""}
         role={String(profile.role)}
       />
+      <StaffChatNotifier userId={user.id} />
       <div className="container page-shell admin-layout">
         <AdminNav allowed={allowed} />
         <section className="admin-main">{children}</section>

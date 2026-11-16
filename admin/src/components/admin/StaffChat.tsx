@@ -260,10 +260,12 @@ export function StaffChat({
     }
 
     if (!fromSelf) {
-      playChatNotifySound();
       const roomName = roomsRef.current.find((r) => r.id === payload.roomId)?.name || "Chat";
       const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
-      if (hidden || !viewing) {
+      const away = hidden || !viewing;
+      // Alert when the desk is on another room/tab; stay quiet if already reading this thread.
+      if (away) {
+        playChatNotifySound();
         showChatDesktopNotification({
           title: `${payload.senderName} · ${roomName}`,
           body: payload.body,
@@ -551,23 +553,6 @@ export function StaffChat({
               : tr({ en: "Offline", kn: "ಆಫ್‌ಲೈನ್", hi: "ऑफ़लाइन" })}
           </span>
         </div>
-        {notifyPerm === "default" ? (
-          <button
-            type="button"
-            className="button button-ghost staff-chat-notify-btn"
-            onClick={() => {
-              void ensureChatNotificationPermission().then((ok) => {
-                setNotifyPerm(ok ? "granted" : chatNotificationPermission());
-              });
-            }}
-          >
-            {tr({
-              en: "Enable message notifications",
-              kn: "ಸಂದೇಶ ಅಧಿಸೂಚನೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
-              hi: "संदेश सूचनाएँ चालू करें",
-            })}
-          </button>
-        ) : null}
         <ul className="staff-chat-room-list">
           {rooms.map((room) => {
             const count = unread[room.id] || 0;
@@ -648,16 +633,14 @@ export function StaffChat({
                 </p>
               </div>
               <div className="staff-chat-main-head-actions">
-                {isAdmin ? (
-                  <button
-                    type="button"
-                    className="button button-ghost staff-chat-settings-btn"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    <Settings2 size={16} aria-hidden="true" />
-                    {tr({ en: "Settings", kn: "ಸೆಟ್ಟಿಂಗ್", hi: "सेटिंग" })}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="button button-ghost staff-chat-settings-btn"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings2 size={16} aria-hidden="true" />
+                  {tr({ en: "Settings", kn: "ಸೆಟ್ಟಿಂಗ್", hi: "सेटिंग" })}
+                </button>
               </div>
             </header>
 
@@ -912,11 +895,12 @@ export function StaffChat({
           )
         : null}
 
-      {isAdmin && active ? (
+      {active ? (
         <ChatGroupSettingsModal
           open={settingsOpen}
           room={active}
           staff={staff}
+          isAdmin={isAdmin}
           webhookPath={webhookPath}
           webhookStatus={webhookStatus}
           pending={pending}

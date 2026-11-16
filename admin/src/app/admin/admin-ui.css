@@ -2238,11 +2238,63 @@ body:has(.admin-main .staff-chat) {
 .admin-main .staff-chat-live.is-on {
   color: #1b7a3d;
 }
+.admin-main .staff-chat-notify-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface, #fff) 94%, var(--bg));
+}
+.admin-main .staff-chat-notify-panel.is-settings {
+  padding: 14px;
+  gap: 12px;
+}
 .admin-main .staff-chat-notify-btn {
   width: 100%;
   justify-content: center;
   font-size: 12px;
   padding: 6px 10px;
+}
+.admin-main .staff-chat-notify-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.admin-main .staff-chat-notify-hint.is-on {
+  color: #1b7a3d;
+}
+.admin-main .staff-chat-volume {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+}
+.admin-main .staff-chat-volume > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+  color: inherit;
+}
+.admin-main .staff-chat-volume > span em {
+  margin-left: auto;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 700;
+}
+.admin-main .staff-chat-volume input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent, #c62828);
+  cursor: pointer;
+}
+.admin-main .staff-chat-volume-test {
+  justify-self: start;
+  font-size: 11px;
+  padding: 4px 8px;
+  min-height: 28px;
 }
 .admin-main .staff-chat-room-list {
   list-style: none;

@@ -1,6 +1,20 @@
 "use client";
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
-import { Check, Copy, Eye, EyeOff, KeyRound, RefreshCw, ShieldOff, Trash2, Users, Webhook, X } from "lucide-react";
+import {
+  Bell,
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  RefreshCw,
+  ShieldOff,
+  Trash2,
+  Users,
+  Volume2,
+  Webhook,
+  X,
+} from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import type { ChatRoom, ChatStaff } from "@/components/admin/StaffChat";
 import {
@@ -8,13 +22,22 @@ import {
   rotateChatWebhookSecret,
 } from "@/app/admin/chat/actions";
 import type { ChatWebhookSecretStatus } from "@/lib/chat/webhook-secret";
+import {
+  chatNotificationPermission,
+  ensureChatNotificationPermission,
+  getChatNotifyVolume,
+  playChatNotifySound,
+  setChatNotifyVolume,
+  unlockChatSound,
+} from "@/lib/chat/notify";
 
-type Tab = "members" | "api" | "danger";
+type Tab = "notifications" | "members" | "api" | "danger";
 
 type Props = {
   open: boolean;
   room: ChatRoom;
   staff: ChatStaff[];
+  isAdmin?: boolean;
   webhookPath: string;
   webhookStatus?: ChatWebhookSecretStatus;
   pending?: boolean;
@@ -27,6 +50,7 @@ export function ChatGroupSettingsModal({
   open,
   room,
   staff,
+  isAdmin = false,
   webhookPath,
   webhookStatus,
   pending,
@@ -36,7 +60,7 @@ export function ChatGroupSettingsModal({
 }: Props) {
   const { tr } = useUiStrings();
   const titleId = useId();
-  const [tab, setTab] = useState<Tab>("members");
+  const [tab, setTab] = useState<Tab>("notifications");
   const [memberIds, setMemberIds] = useState(room.memberIds);
   const [copied, setCopied] = useState("");
   const [confirmName, setConfirmName] = useState("");
@@ -45,10 +69,12 @@ export function ChatGroupSettingsModal({
   const [revealSecret, setRevealSecret] = useState(false);
   const [secretError, setSecretError] = useState("");
   const [secretBusy, startSecretTransition] = useTransition();
+  const [notifyPerm, setNotifyPerm] = useState<NotificationPermission | "unsupported">("default");
+  const [notifyVolume, setNotifyVolume] = useState(82);
 
   useEffect(() => {
     if (!open) return;
-    setTab("members");
+    setTab("notifications");
     setMemberIds(room.memberIds);
     setConfirmName("");
     setCopied("");
@@ -56,6 +82,8 @@ export function ChatGroupSettingsModal({
     setRevealSecret(false);
     setSecretError("");
     setSecretStatus(webhookStatus);
+    setNotifyPerm(chatNotificationPermission());
+    setNotifyVolume(getChatNotifyVolume());
   }, [open, room.id, room.memberIds, webhookStatus]);
 
   useEffect(() => {
@@ -166,28 +194,142 @@ export function ChatGroupSettingsModal({
         <nav className="staff-chat-modal-tabs" aria-label="Settings sections">
           <button
             type="button"
-            className={tab === "members" ? "is-active" : undefined}
-            onClick={() => setTab("members")}
+            className={tab === "notifications" ? "is-active" : undefined}
+            onClick={() => setTab("notifications")}
           >
-            <Users size={14} aria-hidden="true" />
-            {tr({ en: "Members", kn: "ಸದಸ್ಯರು", hi: "सदस्य" })}
+            <Bell size={14} aria-hidden="true" />
+            {tr({ en: "Notifications", kn: "ಅಧಿಸೂಚನೆಗಳು", hi: "सूचनाएँ" })}
           </button>
-          <button type="button" className={tab === "api" ? "is-active" : undefined} onClick={() => setTab("api")}>
-            <Webhook size={14} aria-hidden="true" />
-            {tr({ en: "Webhook & API", kn: "ವೆಬ್‌ಹುಕ್ & API", hi: "वेबहुक और API" })}
-          </button>
-          <button
-            type="button"
-            className={tab === "danger" ? "is-active" : undefined}
-            onClick={() => setTab("danger")}
-          >
-            <Trash2 size={14} aria-hidden="true" />
-            {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
-          </button>
+          {isAdmin ? (
+            <>
+              <button
+                type="button"
+                className={tab === "members" ? "is-active" : undefined}
+                onClick={() => setTab("members")}
+              >
+                <Users size={14} aria-hidden="true" />
+                {tr({ en: "Members", kn: "ಸದಸ್ಯರು", hi: "सदस्य" })}
+              </button>
+              <button
+                type="button"
+                className={tab === "api" ? "is-active" : undefined}
+                onClick={() => setTab("api")}
+              >
+                <Webhook size={14} aria-hidden="true" />
+                {tr({ en: "Webhook & API", kn: "ವೆಬ್‌ಹುಕ್ & API", hi: "वेबहुक और API" })}
+              </button>
+              <button
+                type="button"
+                className={tab === "danger" ? "is-active" : undefined}
+                onClick={() => setTab("danger")}
+              >
+                <Trash2 size={14} aria-hidden="true" />
+                {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+              </button>
+            </>
+          ) : null}
         </nav>
 
         <div className="staff-chat-modal-body">
-          {tab === "members" ? (
+          {tab === "notifications" ? (
+            <div className="staff-chat-modal-pane">
+              <p className="staff-chat-modal-lead">
+                {tr({
+                  en: "Control chat alerts for other browser tabs and admin pages. Available to Staff and Super Admin.",
+                  kn: "ಇತರ ಬ್ರೌಸರ್ ಟ್ಯಾಬ್ ಮತ್ತು ಅಡ್ಮಿನ್ ಪುಟಗಳಿಗೆ ಚಾಟ್ ಅಧಿಸೂಚನೆಗಳನ್ನು ನಿಯಂತ್ರಿಸಿ. ಸಿಬ್ಬಂದಿ ಮತ್ತು ಸೂಪರ್ ಅಡ್ಮಿನ್‌ಗೆ ಲಭ್ಯ.",
+                  hi: "अन्य ब्राउज़र टैब और एडमिन पेजों के लिए चैट अलर्ट नियंत्रित करें। स्टाफ़ और सुपर एडमिन के लिए उपलब्ध।",
+                })}
+              </p>
+
+              <div className="staff-chat-notify-panel is-settings">
+                {notifyPerm === "default" ? (
+                  <button
+                    type="button"
+                    className="button button-ghost staff-chat-notify-btn"
+                    onClick={() => {
+                      unlockChatSound();
+                      void ensureChatNotificationPermission().then((ok) => {
+                        setNotifyPerm(ok ? "granted" : chatNotificationPermission());
+                      });
+                    }}
+                  >
+                    {tr({
+                      en: "Enable desktop notifications",
+                      kn: "ಡೆಸ್ಕ್‌ಟಾಪ್ ಅಧಿಸೂಚನೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
+                      hi: "डेस्कटॉप सूचनाएँ चालू करें",
+                    })}
+                  </button>
+                ) : notifyPerm === "denied" ? (
+                  <p className="staff-chat-notify-hint">
+                    {tr({
+                      en: "Desktop alerts are blocked in this browser. Sound still works.",
+                      kn: "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಡೆಸ್ಕ್‌ಟಾಪ್ ಅಧಿಸೂಚನೆ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ. ಧ್ವನಿ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
+                      hi: "इस ब्राउज़र में डेस्कटॉप अलर्ट बंद हैं। ध्वनि काम करेगी।",
+                    })}
+                  </p>
+                ) : notifyPerm === "granted" ? (
+                  <p className="staff-chat-notify-hint is-on">
+                    {tr({
+                      en: "Alerts on for other tabs and admin pages.",
+                      kn: "ಇತರ ಟ್ಯಾಬ್/ಅಡ್ಮಿನ್ ಪುಟಗಳಿಗೆ ಅಧಿಸೂಚನೆ ಸಕ್ರಿಯ.",
+                      hi: "अन्य टैब और एडमिन पेजों पर अलर्ट चालू।",
+                    })}
+                  </p>
+                ) : null}
+
+                <label className="staff-chat-volume">
+                  <span>
+                    <Volume2 size={14} aria-hidden="true" />
+                    {tr({ en: "Alert volume", kn: "ಅಧಿಸೂಚನೆ ಧ್ವನಿ", hi: "अलर्ट वॉल्यूम" })}
+                    <em>{notifyVolume}%</em>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={notifyVolume}
+                    aria-label={tr({
+                      en: "Chat alert volume",
+                      kn: "ಚಾಟ್ ಅಧಿಸೂಚನೆ ಧ್ವನಿ",
+                      hi: "चैट अलर्ट वॉल्यूम",
+                    })}
+                    onChange={(e) => {
+                      const next = setChatNotifyVolume(Number(e.target.value));
+                      setNotifyVolume(next);
+                    }}
+                    onPointerUp={() => {
+                      unlockChatSound();
+                      playChatNotifySound({ preview: true });
+                    }}
+                    onKeyUp={(e) => {
+                      if (
+                        e.key === "ArrowLeft" ||
+                        e.key === "ArrowRight" ||
+                        e.key === "Home" ||
+                        e.key === "End"
+                      ) {
+                        unlockChatSound();
+                        playChatNotifySound({ preview: true });
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="button button-ghost staff-chat-volume-test"
+                    onClick={() => {
+                      unlockChatSound();
+                      playChatNotifySound({ preview: true });
+                    }}
+                  >
+                    {tr({ en: "Test sound", kn: "ಧ್ವನಿ ಪರೀಕ್ಷಿಸಿ", hi: "ध्वनि जाँच" })}
+                  </button>
+                </label>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === "members" && isAdmin ? (
             <div className="staff-chat-modal-pane staff-chat-members-pane">
               <div className="staff-chat-members-toolbar">
                 <p className="staff-chat-modal-lead">
@@ -299,7 +441,7 @@ export function ChatGroupSettingsModal({
             </div>
           ) : null}
 
-          {tab === "api" ? (
+          {tab === "api" && isAdmin ? (
             <div className="staff-chat-modal-pane">
               <p className="staff-chat-modal-lead">
                 {tr({
@@ -525,7 +667,7 @@ export function ChatGroupSettingsModal({
             </div>
           ) : null}
 
-          {tab === "danger" ? (
+          {tab === "danger" && isAdmin ? (
             <div className="staff-chat-modal-pane">
               <p className="staff-chat-modal-lead is-danger">
                 {tr({
