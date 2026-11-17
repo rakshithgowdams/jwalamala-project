@@ -132,6 +132,13 @@ export const sectionGroups: SectionGroup[] = [
       { key: "providers", label: { en: "Service providers", kn: "ಸೇವಾ ಸೆಟ್ಟಿಂಗ್‌ಗಳು", hi: "सेवा प्रदाता" }, view: "settings.manage", grants: ["settings.manage"] },
       { key: "jobs", label: { en: "Background jobs", kn: "ಹಿನ್ನೆಲೆ ಕಾರ್ಯಗಳು", hi: "बैकग्राउंड जॉब्स" }, view: "settings.manage", grants: ["settings.manage"] },
       { key: "redirects", label: { en: "301 redirects", kn: "301 ಮರುನಿರ್ದೇಶನಗಳು", hi: "301 रीडायरेक्ट" }, view: "settings.manage", grants: [], adminOnly: true },
+      {
+        key: "password-vault",
+        label: { en: "Password vault", kn: "ಪಾಸ್‌ವರ್ಡ್ ವಾಲ್ಟ್", hi: "पासवर्ड वॉल्ट" },
+        view: "users.manage",
+        grants: [],
+        adminOnly: true,
+      },
       { key: "settings", label: { en: "Site settings", kn: "ತಾಣದ ಸೆಟ್ಟಿಂಗ್ಸ್", hi: "साइट सेटिंग्स" }, view: "settings.manage", grants: ["settings.manage"], adminOnly: true },
     ],
   },

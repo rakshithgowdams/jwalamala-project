@@ -3342,6 +3342,34 @@ body:has(.admin-main .staff-chat) {
   margin: 0;
   font-size: 13px;
 }
+.admin-main .password-vault {
+  display: grid;
+  gap: 1rem;
+}
+.admin-main .password-vault-form {
+  display: grid;
+  gap: 0.75rem;
+}
+.admin-main .password-vault-form h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.admin-main .password-vault-card .password-vault-favicon {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--surface, #fff) 88%, var(--muted));
+}
+.admin-main .password-vault-card .password-vault-favicon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+}
+.admin-main .password-vault-secret {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
 .admin-main .task-batch-card .task-batch-thumb {
   display: grid;
   place-items: center;
