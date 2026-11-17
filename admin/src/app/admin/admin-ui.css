@@ -3370,6 +3370,22 @@ body:has(.admin-main .staff-chat) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: 0.02em;
 }
+.admin-main .password-vault-share-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface, #fff));
+  font-size: 13px;
+  word-break: break-all;
+}
+.admin-main .password-vault-share-banner a {
+  color: inherit;
+}
 .admin-main .task-batch-card .task-batch-thumb {
   display: grid;
   place-items: center;

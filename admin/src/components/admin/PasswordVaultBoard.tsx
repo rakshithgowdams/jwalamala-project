@@ -1,9 +1,10 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, EyeOff, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff, KeyRound, Link2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import {
+  createVaultShareLink,
   deleteVaultEntry,
   revealVaultPassword,
   saveVaultEntry,
@@ -37,6 +38,7 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [query, setQuery] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -105,14 +107,34 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
 
       <p className="task-request-lead">
         {tr({
-          en: "Admin only. Site link, email and password are saved with encryption. Favicons load from the site domain after save.",
-          kn: "ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ಸೈಟ್ ಲಿಂಕ್, ಇಮೇಲ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಎನ್‌ಕ್ರಿಪ್ಟ್ ಆಗಿ ಉಳಿಯುತ್ತವೆ. ಉಳಿಸಿದ ನಂತರ ಫ್ಯಾವಿಕಾನ್ ಸೈಟ್‌ನಿಂದ ಬರುತ್ತದೆ.",
-          hi: "केवल एडमिन। साइट लिंक, ईमेल और पासवर्ड एन्क्रिप्टेड सहेजे जाते हैं। सेव के बाद फ़ेविकॉन साइट डोमेन से आता है।",
+          en: "Admin only. Credentials are encrypted. Use Share link to send a 24-hour view link for site, email, and password.",
+          kn: "ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ರಹಸ್ಯಗಳು ಎನ್‌ಕ್ರಿಪ್ಟ್. Share link ನಿಂದ 24 ಗಂಟೆ ವೀಕ್ಷಣೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ.",
+          hi: "केवल एडमिन। क्रेडेंशियल एन्क्रिप्टेड हैं। Share link से 24 घंटे का व्यू लिंक भेजें।",
         })}
       </p>
 
       {message.error ? <p role="alert">{message.error}</p> : null}
       {message.ok ? <p role="status">{message.ok}</p> : null}
+      {shareUrl ? (
+        <p className="password-vault-share-banner" role="status">
+          <strong>{tr({ en: "Share link", kn: "ಹಂಚಿಕೆ ಲಿಂಕ್", hi: "शेयर लिंक" })}:</strong>{" "}
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer">
+            {shareUrl}
+          </a>{" "}
+          <button
+            type="button"
+            className="button button-outline is-compact"
+            onClick={() =>
+              copyText(
+                shareUrl,
+                tr({ en: "Share link copied.", kn: "ಹಂಚಿಕೆ ಲಿಂಕ್ ನಕಲಿಸಲಾಯಿತು.", hi: "शेयर लिंक कॉपी हुआ।" }),
+              )
+            }
+          >
+            <Copy size={14} /> {tr({ en: "Copy link", kn: "ಲಿಂಕ್ ನಕಲಿಸಿ", hi: "लिंक कॉपी" })}
+          </button>
+        </p>
+      ) : null}
 
       {editing ? (
         <form
@@ -347,6 +369,39 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                     >
                       <Copy size={15} />
                       {tr({ en: "Copy password", kn: "ಪಾಸ್‌ವರ್ಡ್ ನಕಲಿಸಿ", hi: "पासवर्ड कॉपी" })}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-outline is-compact"
+                      disabled={pending}
+                      onClick={() =>
+                        start(async () => {
+                          const result = await createVaultShareLink({ id: row.id, hours: 24 });
+                          if (result.error) {
+                            setMessage({ error: result.error });
+                            setShareUrl("");
+                            return;
+                          }
+                          setShareUrl(result.shareUrl || "");
+                          setMessage({
+                            ok: tr({
+                              en: "Share link ready for 24 hours. Copy and send it.",
+                              kn: "24 ಗಂಟೆಗಳ ಹಂಚಿಕೆ ಲಿಂಕ್ ಸಿದ್ಧ. ನಕಲಿಸಿ ಕಳುಹಿಸಿ.",
+                              hi: "24 घंटे का शेयर लिंक तैयार। कॉपी कर भेजें।",
+                            }),
+                          });
+                          if (result.shareUrl) {
+                            try {
+                              await navigator.clipboard.writeText(result.shareUrl);
+                            } catch {
+                              /* banner still shows the link */
+                            }
+                          }
+                        })
+                      }
+                    >
+                      <Link2 size={15} />
+                      {tr({ en: "Share link", kn: "ಹಂಚಿಕೆ ಲಿಂಕ್", hi: "शेयर लिंक" })}
                     </button>
                     <button
                       type="button"

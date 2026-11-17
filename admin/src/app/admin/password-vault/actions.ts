@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { requireStaff } from "@/lib/auth/require-user";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -10,8 +12,27 @@ import {
   faviconForSite,
 } from "@/lib/vault/crypto";
 
-type Result = { ok?: true; error?: string; password?: string; id?: string };
+type Result = {
+  ok?: true;
+  error?: string;
+  password?: string;
+  id?: string;
+  shareUrl?: string;
+  expiresAt?: string;
+};
 type Fail = (en: string, kn: string, hi: string) => Result;
+
+async function appOrigin() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host");
+  const proto = h.get("x-forwarded-proto") || (host?.includes("localhost") ? "http" : "https");
+  if (host) return `${proto}://${host}`;
+  return (
+    process.env.NEXT_PUBLIC_ADMIN_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "http://localhost:3001"
+  ).replace(/\/$/, "");
+}
 
 async function gate() {
   const [{ user, profile }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
@@ -190,4 +211,121 @@ export async function deleteVaultEntry(input: unknown): Promise<Result> {
     return fail(error.message || "Could not delete the entry.", "ನಮೂದು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "प्रविष्टि हटाई नहीं जा सकी।");
   touch();
   return { ok: true };
+}
+
+const shareSchema = z.object({
+  id: z.uuid(),
+  /** Hours until the share link expires (1–168). Default 24. */
+  hours: z.coerce.number().int().min(1).max(168).default(24),
+});
+
+/**
+ * Create a time-limited share link for one vault entry (admin only).
+ * The link snapshots the encrypted password; recipients open /vault-share/[token].
+ */
+export async function createVaultShareLink(input: unknown): Promise<Result> {
+  const access = await gate();
+  if ("denied" in access) return access.denied;
+  const { server, user, fail } = access;
+  const parsed = shareSchema.safeParse(input);
+  if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
+
+  const { data: row, error } = await server
+    .from("admin_password_vault")
+    .select("id,title,site_url,email,password_encrypted,favicon_url,notes")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+  if (error || !row)
+    return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
+
+  const token = randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + parsed.data.hours * 60 * 60 * 1000).toISOString();
+  const { error: insertError } = await server.from("admin_password_vault_shares").insert({
+    vault_id: row.id,
+    token,
+    title: row.title || "",
+    site_url: row.site_url,
+    email: row.email || "",
+    password_encrypted: row.password_encrypted,
+    favicon_url: row.favicon_url || "",
+    notes: row.notes || "",
+    created_by: user.id,
+    expires_at: expiresAt,
+  });
+  if (insertError)
+    return fail(
+      insertError.message || "Could not create the share link.",
+      "ಹಂಚಿಕೆ ಲಿಂಕ್ ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "शेयर लिंक नहीं बन सका।",
+    );
+
+  const origin = await appOrigin();
+  return {
+    ok: true,
+    shareUrl: `${origin}/vault-share/${token}`,
+    expiresAt,
+  };
+}
+
+export type SharedVaultView = {
+  title: string;
+  siteUrl: string;
+  email: string;
+  password: string;
+  faviconUrl: string;
+  notes: string;
+  expiresAt: string;
+};
+
+/** Load a public share by token (no login). Marks a view. */
+export async function loadVaultShare(token: string): Promise<
+  | { ok: true; data: SharedVaultView }
+  | { ok: false; error: string }
+> {
+  const clean = String(token || "").trim();
+  if (!/^[a-f0-9]{32,128}$/i.test(clean))
+    return { ok: false, error: "Invalid share link." };
+
+  const server = getAdminClient();
+  if (!server) return { ok: false, error: "Service unavailable." };
+
+  const { data, error } = await server
+    .from("admin_password_vault_shares")
+    .select(
+      "id,title,site_url,email,password_encrypted,favicon_url,notes,expires_at,revoked_at,view_count",
+    )
+    .eq("token", clean)
+    .maybeSingle();
+  if (error || !data) return { ok: false, error: "Share link not found." };
+  if (data.revoked_at) return { ok: false, error: "This share link was revoked." };
+  if (new Date(data.expires_at as string).getTime() <= Date.now())
+    return { ok: false, error: "This share link has expired." };
+
+  let password: string;
+  try {
+    password = decryptVaultSecret(data.password_encrypted as string);
+  } catch {
+    return { ok: false, error: "Could not decrypt shared password." };
+  }
+
+  await server
+    .from("admin_password_vault_shares")
+    .update({
+      view_count: Number(data.view_count || 0) + 1,
+      last_viewed_at: new Date().toISOString(),
+    })
+    .eq("id", data.id as string);
+
+  return {
+    ok: true,
+    data: {
+      title: (data.title as string) || "",
+      siteUrl: (data.site_url as string) || "",
+      email: (data.email as string) || "",
+      password,
+      faviconUrl: (data.favicon_url as string) || "",
+      notes: (data.notes as string) || "",
+      expiresAt: (data.expires_at as string) || "",
+    },
+  };
 }
