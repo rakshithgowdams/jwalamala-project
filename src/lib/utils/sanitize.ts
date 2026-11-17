@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { isArticleImage } from "@/lib/utils/images";
 export function cleanHtml(html: string, sponsored = false) {
   return sanitizeHtml(html, {
     allowedTags: [
@@ -46,10 +47,7 @@ export function cleanHtml(html: string, sponsored = false) {
     exclusiveFilter: (frame) =>
       frame.tag === "img" &&
       !(
-        /^\/images\/[^?#]*$/.test(frame.attribs.src || "") ||
-        /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\//.test(
-          frame.attribs.src || "",
-        )
+        isArticleImage(frame.attribs.src || "")
       ),
   });
 }

@@ -2,6 +2,7 @@
 export const supabaseFetch: typeof fetch = (input, init) =>
   fetch(input, {
     ...init,
+    cache: "no-store",
     signal: init?.signal
       ? AbortSignal.any([init.signal, AbortSignal.timeout(8000)])
       : AbortSignal.timeout(8000),

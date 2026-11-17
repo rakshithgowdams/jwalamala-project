@@ -5,7 +5,7 @@ test("homepage, logo and responsive layout", async ({ page }, testInfo) => {
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "ಶ್ರವಣಬೆಳಗೊಳ",
   );
-  await expect(page.locator(".sample-notice")).toBeVisible();
+  await expect(page.locator(".sample-notice")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
   const wordmark = await page.locator(".wordmark").boundingBox();
   const live = await page.locator(".masthead-actions .button").boundingBox();
@@ -79,8 +79,10 @@ test("private routes redirect and API denies unauthenticated calls", async ({
   page,
   request,
 }) => {
+  // The admin lives in its own app; here /admin is just an unknown page.
   await page.goto("/admin");
-  await expect(page).toHaveURL(/\/login/);
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.locator(".not-found-title")).toBeVisible();
   await page.goto("/account");
   await expect(page).toHaveURL(/\/login/);
   expect((await request.post("/api/revalidate")).status()).toBe(401);

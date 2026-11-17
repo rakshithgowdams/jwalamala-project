@@ -6,6 +6,7 @@ import { pickText } from "@/lib/i18n/content";
 import { getV4Rows } from "@/lib/v4/queries";
 import { getWeather } from "@/lib/weather/queries";
 import { PlacePicker } from "./PlacePicker";
+import type { Place } from "@/lib/v4/types";
 export async function WeatherChip() {
   const { v4: t, locale } = await getUiStrings();
   const places = await getV4Rows("places");
@@ -13,6 +14,19 @@ export async function WeatherChip() {
   const place =
     places.find((p) => p.slug === saved) ||
     places.find((p) => p.slug === "bengaluru-urban");
+  // The picker runs in the browser; send only what it uses for 278 places.
+  const pickerPlaces = places.map(
+    (p) =>
+      ({
+        id: p.id,
+        slug: p.slug,
+        name_kn: p.name_kn,
+        name_en: p.name_en,
+        name_hi: p.name_hi,
+        lat: p.lat,
+        lng: p.lng,
+      }) as Place,
+  );
   const { weather, stale } = place
     ? await getWeather(place.id, place.lat, place.lng)
     : { weather: null, stale: false };
@@ -37,7 +51,7 @@ export async function WeatherChip() {
             : t.noWeather}
           {stale ? " · " + t.stale : ""}
         </p>
-        {place && <PlacePicker places={places} selected={place.slug} />}
+        {place && <PlacePicker places={pickerPlaces} selected={place.slug} />}
         <Link className="chip" href={"/weather?place=" + (place?.slug || "")}>
           {t.forecast}
         </Link>

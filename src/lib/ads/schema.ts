@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CreativeShape } from "./posters";
 export const adSettingsSchema = z.object({
   enabled: z.boolean().default(true),
   adsense_enabled: z.boolean().default(false),
@@ -36,6 +37,9 @@ export type AdCreative = {
   alt_en?: string;
   alt_hi?: string;
   token: string;
+  shape: CreativeShape;
+  /** A poster may be awareness-only; without a link it is shown but not clickable. */
+  linked: boolean;
 };
 export type AdPick =
   | { mode: "manual"; creative: AdCreative }
@@ -62,10 +66,19 @@ export const slotKeys = [
   "video_sidebar",
   "search_inline",
   "events_sidebar",
+  "district_top",
+  "district_sidebar",
+  "district_bottom",
   "global_mobile_sticky",
 ] as const;
 export function canonicalSlot(placement: string) {
   if ((slotKeys as readonly string[]).includes(placement)) return placement;
+  if (/^districts?-/.test(placement))
+    return placement.includes("sidebar")
+      ? "district_sidebar"
+      : placement.includes("bottom")
+        ? "district_bottom"
+        : "district_top";
   if (placement.includes("sidebar"))
     return placement.startsWith("home")
       ? "home_hero_sidebar"
@@ -91,7 +104,7 @@ export function canonicalSlot(placement: string) {
 export function routeAllowsAds(path: string) {
   return (
     path === "/" ||
-    (/^\/(news|video|videos|category|tag|topic|topics|place|author|archive|events|series|gallery|live|stories|shorts|basadis|notices|opportunities|polls|quizzes|weather|jain-calendar|reservoirs|rates)(\/|$)/.test(
+    (/^\/(news|video|videos|category|tag|topic|topics|place|author|archive|events|series|gallery|live|stories|shorts|basadis|notices|opportunities|polls|quizzes|weather|jain-calendar|reservoirs|rates|districts)(\/|$)/.test(
       path,
     ) &&
       !path.endsWith("/submit"))

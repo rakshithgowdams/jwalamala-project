@@ -21,6 +21,7 @@
     "db:content": "node scripts/build-content-import.mjs",
     "db:translations": "tsx scripts/generate-translation-updates.ts",
     "db:backfill": "tsx --tsconfig scripts/tsconfig.json scripts/backfill-translations.ts",
+    "db:import-social": "tsx --tsconfig scripts/tsconfig.json scripts/import-social.ts",
     "db:connect": "node scripts/connect-supabase.mjs --apply --activate",
     "test:content": "node scripts/check-content-import.mjs"
   },

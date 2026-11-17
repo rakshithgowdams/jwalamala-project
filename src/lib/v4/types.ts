@@ -19,6 +19,12 @@ export type Place = {
   lng: number | null;
   show_in_weather: boolean;
   is_district?: boolean;
+  sort_order?: number;
+  show_in_district_news?: boolean;
+  cover_url?: string | null;
+  description_kn?: string;
+  description_en?: string;
+  description_hi?: string;
 };
 export type Author = {
   id: string;
@@ -319,9 +325,20 @@ export type Correction = {
   note_hi?: string;
   created_at: string;
 };
+export type Matha = {
+  id: string;
+  slug: string;
+  name_kn: string;
+  name_en: string;
+  name_hi?: string;
+  district_id?: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
 export type DataTables = {
   tags: Tag;
   places: Place;
+  mathas: Matha;
   authors: Author;
   topics: Topic;
   trending_items: TrendingItem;

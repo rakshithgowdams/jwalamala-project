@@ -13,5 +13,6 @@ export default defineConfig([
     "public/sw.js",
     "supabase/functions/**",
     "next-env.d.ts",
+    "admin/**",
   ]),
 ]);

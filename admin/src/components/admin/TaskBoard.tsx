@@ -1,0 +1,1686 @@
+"use client";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import {
+  Check,
+  CircleAlert,
+  ExternalLink,
+  Eye,
+  Layers,
+  MoreVertical,
+  Pencil,
+  RefreshCw,
+  SendHorizontal,
+  Trash2,
+} from "lucide-react";
+import { useUiStrings } from "@/components/i18n/LanguageProvider";
+import { ArticleCardSearch } from "@/components/admin/ArticleCardSearch";
+import { PostThumb } from "@/components/admin/PostThumb";
+import { site } from "@/config/site";
+import type { Tri } from "@/lib/i18n/strings";
+import { youtubeThumbnail } from "@/lib/utils/images";
+import {
+  assignBulkRange,
+  assignSingleArticle,
+  cancelOpenBatch,
+  setTaskStatus,
+  updateOpenBatch,
+} from "@/app/admin/tasks/actions";
+import { createTaskRequest } from "@/app/admin/task-requests/actions";
+import { useDeskPath } from "@/components/admin/DeskPathProvider";
+
+type ContentType = "article" | "video" | "short";
+type TaskMenuTarget = { kind: "batch"; key: string } | { kind: "task"; id: string };
+
+function parseBatchRange(
+  label: string,
+): { contentType: ContentType | null; fromPos: string; toPos: string } | null {
+  const match = /^(?:(article|video|short):)?(\d+)-(\d+)$/.exec(label.trim());
+  if (!match) return null;
+  return {
+    contentType: (match[1] as ContentType | undefined) || null,
+    fromPos: match[2],
+    toPos: match[3],
+  };
+}
+
+function batchRangeDisplay(label: string) {
+  const parsed = parseBatchRange(label);
+  if (!parsed) return label;
+  return `${parsed.fromPos}–${parsed.toPos}`;
+}
+
+export type TaskRow = {
+  id: string;
+  postId: string;
+  title: string;
+  thumbnail: string | null;
+  videoUrl: string | null;
+  postStatus: string;
+  postType: string;
+  updatedAt: string | null;
+  slug: string | null;
+  status: string;
+  batchLabel: string;
+  notes: string;
+  assigneeId: string;
+  assigneeName: string;
+  createdAt: string;
+};
+
+const statusNames: Record<string, Tri> = {
+  draft: { en: "Draft", kn: "ಕರಡು", hi: "ड्राफ़्ट" },
+  scheduled: { en: "Scheduled", kn: "ನಿಗದಿತ", hi: "निर्धारित" },
+  published: { en: "Published", kn: "ಪ್ರಕಟಿತ", hi: "प्रकाशित" },
+  archived: { en: "Archived", kn: "ಸಂಗ್ರಹಿತ", hi: "संग्रहीत" },
+};
+const typeNames: Record<string, Tri> = {
+  article: { en: "Article", kn: "ಲೇಖನ", hi: "लेख" },
+  video: { en: "Video", kn: "ವಿಡಿಯೋ", hi: "वीडियो" },
+  short: { en: "Post", kn: "ಪೋಸ್ಟ್", hi: "पोस्ट" },
+};
+const assignTypeOptions: { value: ContentType; label: Tri }[] = [
+  { value: "article", label: { en: "Articles", kn: "ಲೇಖನಗಳು", hi: "लेख" } },
+  { value: "video", label: { en: "Videos", kn: "ವಿಡಿಯೋಗಳು", hi: "वीडियो" } },
+  { value: "short", label: { en: "Posts", kn: "ಪೋಸ್ಟ್‌ಗಳು", hi: "पोस्ट" } },
+];
+const taskStatusNames: Record<string, Tri> = {
+  open: { en: "Open", kn: "ತೆರೆದ", hi: "खुला" },
+  done: { en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" },
+  cancelled: { en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" },
+};
+const requestStatusNames: Record<string, Tri> = {
+  requested: { en: "Requested", kn: "ವಿನಂತಿಸಲಾಗಿದೆ", hi: "अनुरोधित" },
+  processing: { en: "Processing", kn: "ಸಂಸ್ಕರಣೆ", hi: "प्रोसेसिंग" },
+  ready: { en: "Ready", kn: "ಸಿದ್ಧ", hi: "तैयार" },
+};
+
+function cardThumbnail(thumbnail: string | null, video: string | null) {
+  const cover = (thumbnail || "").trim();
+  const fromVideo = video ? youtubeThumbnail(video) : null;
+  const logo = !cover || cover.includes("jwalamala-logo");
+  if (logo && fromVideo) return fromVideo;
+  return (cover || fromVideo || "/images/jwalamala-logo.jpg").replace(
+    "/maxresdefault.jpg",
+    "/hqdefault.jpg",
+  );
+}
+
+export type StaffOption = { id: string; name: string };
+
+export type ActiveRequestInfo = { id: string; status: string };
+
+export type BatchSummary = {
+  key: string;
+  batchLabel: string;
+  assigneeId: string;
+  assigneeName: string;
+  count: number;
+  notes: string;
+  createdAt: string;
+};
+
+type TypeCounts = Partial<Record<ContentType, number>>;
+
+type Props = {
+  isAdmin: boolean;
+  totalArticles: number;
+  totalsByType?: TypeCounts;
+  openByType?: TypeCounts;
+  remainingByType?: TypeCounts;
+  /** Exact open-task total (staff bulk assignments can exceed the loaded card sample). */
+  openTaskTotal?: number;
+  staff: StaffOption[];
+  tasks: TaskRow[];
+  batches?: BatchSummary[];
+  activeRequests?: Record<string, ActiveRequestInfo>;
+  /** When set, Tasks shows only this batch's articles (from /tasks?batch=…). */
+  focusBatch?: string | null;
+  focusBatchTotal?: number;
+  focusBatchPage?: number;
+  focusBatchPageSize?: number;
+};
+
+function taskCardTone(task: TaskRow) {
+  if (task.status === "cancelled") return "archived";
+  if (task.status === "done") return "published";
+  return task.postStatus || "draft";
+}
+
+function taskStatusPillClass(status: string) {
+  if (status === "open") return "scheduled";
+  if (status === "done") return "published";
+  return "archived";
+}
+
+function batchItemLabel(batchLabel: string): Tri {
+  const parsed = parseBatchRange(batchLabel);
+  if (parsed?.contentType === "video") {
+    return { en: "videos", kn: "ವಿಡಿಯೋಗಳು", hi: "वीडियो" };
+  }
+  if (parsed?.contentType === "short") {
+    return { en: "posts", kn: "ಪೋಸ್ಟ್‌ಗಳು", hi: "पोस्ट" };
+  }
+  return { en: "articles", kn: "ಲೇಖನಗಳು", hi: "लेख" };
+}
+
+export function TaskBoard({
+  isAdmin,
+  totalArticles,
+  totalsByType = {},
+  openByType = {},
+  remainingByType = {},
+  openTaskTotal,
+  staff,
+  tasks,
+  batches = [],
+  activeRequests = {},
+  focusBatch = null,
+  focusBatchTotal = 0,
+  focusBatchPage = 1,
+  focusBatchPageSize = 40,
+}: Props) {
+  const { tr } = useUiStrings();
+  const router = useRouter();
+  const basePath = useDeskPath();
+  const [pending, start] = useTransition();
+  const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
+  const [contentType, setContentType] = useState<ContentType>("article");
+  const [assigneeId, setAssigneeId] = useState(staff[0]?.id || "");
+  const typeTotal = totalsByType[contentType] ?? totalArticles;
+  const typeOpen = openByType[contentType] ?? 0;
+  const typeRemaining = remainingByType[contentType] ?? Math.max(0, typeTotal - typeOpen);
+  const [fromPos, setFromPos] = useState("1");
+  const [toPos, setToPos] = useState(String(Math.min(1000, Math.max(1, typeTotal || totalArticles))));
+  const [singlePostId, setSinglePostId] = useState("");
+  const [singlePostTitle, setSinglePostTitle] = useState("");
+  const [notes, setNotes] = useState("");
+  const [filterAssignee, setFilterAssignee] = useState("all");
+  const [filterStatus, setFilterStatus] = useState<"open" | "done" | "cancelled" | "all">("open");
+  const [filterContentType, setFilterContentType] = useState<"all" | ContentType>("all");
+  const [cancelTask, setCancelTask] = useState<TaskRow | null>(null);
+  const [cancelBatch, setCancelBatch] = useState<BatchSummary | null>(null);
+  const [editBatch, setEditBatch] = useState<BatchSummary | null>(null);
+  const [editFromPos, setEditFromPos] = useState("1");
+  const [editToPos, setEditToPos] = useState("1");
+  const [editContentType, setEditContentType] = useState<ContentType>("article");
+  const [editNotes, setEditNotes] = useState("");
+  const [detailTask, setDetailTask] = useState<TaskRow | null>(null);
+  const [detailBatch, setDetailBatch] = useState<BatchSummary | null>(null);
+  const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
+  const [requestNote, setRequestNote] = useState("");
+  const [menuTarget, setMenuTarget] = useState<TaskMenuTarget | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  function menuTriggerKey(target: TaskMenuTarget) {
+    return target.kind === "batch" ? `batch:${target.key}` : `task:${target.id}`;
+  }
+
+  function closeMenu() {
+    setMenuTarget(null);
+    setMenuPos(null);
+  }
+
+  function placeMenu(button: HTMLButtonElement, panel?: HTMLElement | null) {
+    const rect = button.getBoundingClientRect();
+    const panelWidth = Math.max(panel?.offsetWidth || 0, 200);
+    const panelHeight = Math.max(panel?.offsetHeight || 0, 220);
+    const gap = 8;
+    const left = Math.min(
+      Math.max(12, rect.right - panelWidth),
+      Math.max(12, window.innerWidth - panelWidth - 12),
+    );
+    const below = rect.bottom + gap;
+    const fitsBelow = below + panelHeight <= window.innerHeight - 12;
+    const top = fitsBelow
+      ? below
+      : Math.max(12, Math.min(rect.top - panelHeight - gap, window.innerHeight - panelHeight - 12));
+    setMenuPos({ top, left });
+  }
+
+  function sameMenuTarget(a: TaskMenuTarget, b: TaskMenuTarget) {
+    if (a.kind !== b.kind) return false;
+    return a.kind === "batch" ? a.key === b.key : a.id === b.id;
+  }
+
+  function openMenu(target: TaskMenuTarget, button: HTMLButtonElement) {
+    if (menuTarget && sameMenuTarget(menuTarget, target)) {
+      closeMenu();
+      return;
+    }
+    placeMenu(button);
+    setMenuTarget(target);
+  }
+
+  useEffect(() => {
+    if (!menuTarget) return;
+    const key = menuTriggerKey(menuTarget);
+    function onReposition() {
+      const trigger = triggerRefs.current[key];
+      if (trigger) placeMenu(trigger, menuRef.current);
+    }
+    const frame = window.requestAnimationFrame(onReposition);
+    function onPointer(event: MouseEvent) {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRefs.current[key]?.contains(target)) return;
+      closeMenu();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeMenu();
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [menuTarget]);
+
+  useEffect(() => {
+    const max = Math.max(1, totalsByType[contentType] ?? totalArticles);
+    setToPos((current) => {
+      const n = Number(current);
+      if (!Number.isFinite(n) || n < 1) return String(Math.min(1000, max));
+      return String(Math.min(n, max));
+    });
+  }, [contentType, totalsByType, totalArticles]);
+
+  useEffect(() => {
+    if (!cancelTask && !cancelBatch && !editBatch && !detailTask && !detailBatch) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape" || pending) return;
+      setCancelTask(null);
+      setCancelBatch(null);
+      setEditBatch(null);
+      setDetailTask(null);
+      setDetailBatch(null);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [cancelTask, cancelBatch, editBatch, detailTask, detailBatch, pending]);
+
+  function openEditBatch(batch: BatchSummary) {
+    const range = parseBatchRange(batch.batchLabel);
+    setEditBatch(batch);
+    setEditFromPos(range?.fromPos || "1");
+    setEditToPos(range?.toPos || String(batch.count || 1));
+    setEditContentType(range?.contentType || "article");
+    setEditNotes(batch.notes || "");
+  }
+
+  const visibleBatches = useMemo(() => {
+    if (filterStatus === "done" || filterStatus === "cancelled") return [];
+    return batches.filter((batch) => {
+      if (focusBatch && batch.batchLabel !== focusBatch) return false;
+      if (isAdmin && filterAssignee !== "all" && batch.assigneeId !== filterAssignee) return false;
+      if (filterContentType !== "all") {
+        const parsed = parseBatchRange(batch.batchLabel);
+        const batchType = parsed?.contentType;
+        if (batchType !== filterContentType) return false;
+      }
+      return true;
+    });
+  }, [batches, filterAssignee, filterStatus, filterContentType, isAdmin, focusBatch]);
+
+  const visible = useMemo(() => {
+    return tasks.filter((t) => {
+      if (focusBatch) {
+        return t.batchLabel === focusBatch && (filterStatus === "all" || t.status === filterStatus);
+      }
+      if (filterStatus !== "all" && t.status !== filterStatus) return false;
+      if (isAdmin && filterAssignee !== "all" && t.assigneeId !== filterAssignee) return false;
+      if (filterContentType !== "all" && t.postType !== filterContentType) return false;
+      // Bulk batches already have a summary card — hide open batch members from the list noise.
+      if (
+        filterStatus === "open" &&
+        t.status === "open" &&
+        t.batchLabel &&
+        visibleBatches.some((b) => b.assigneeId === t.assigneeId && b.batchLabel === t.batchLabel)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [tasks, filterStatus, filterAssignee, filterContentType, visibleBatches, isAdmin, focusBatch]);
+
+  const focusBatchPages = Math.max(1, Math.ceil((focusBatchTotal || 0) / focusBatchPageSize));
+  const menuBatch =
+    menuTarget?.kind === "batch"
+      ? visibleBatches.find((batch) => batch.key === menuTarget.key) || null
+      : null;
+  const menuTask =
+    menuTarget?.kind === "task"
+      ? visible.find((task) => task.id === menuTarget.id) ||
+        tasks.find((task) => task.id === menuTarget.id) ||
+        null
+      : null;
+  function batchHref(label: string, page = 1) {
+    const qs = new URLSearchParams({ batch: label });
+    if (page > 1) qs.set("page", String(page));
+    return `${basePath}/tasks?${qs.toString()}`;
+  }
+
+  function run(
+    action: () => Promise<{
+      ok?: true;
+      error?: string;
+      assigned?: number;
+      added?: number;
+      removed?: number;
+    }>,
+    done: string,
+    opts?: { showCancelled?: boolean },
+  ) {
+    setMessage({});
+    start(async () => {
+      const result = await action();
+      if (result.error) setMessage({ error: result.error });
+      else {
+        let extra = "";
+        if (opts?.showCancelled && typeof result.assigned === "number") {
+          extra = tr({
+            en: ` ${result.assigned} deleted.`,
+            kn: ` ${result.assigned} ಅಳಿಸಲಾಯಿತು.`,
+            hi: ` ${result.assigned} हटाए गए।`,
+          });
+        } else if (typeof result.added === "number" || typeof result.removed === "number") {
+          const added = result.added || 0;
+          const removed = result.removed || 0;
+          extra = tr({
+            en: ` Now ${result.assigned ?? 0} open (${added} added, ${removed} removed).`,
+            kn: ` ಈಗ ${result.assigned ?? 0} ತೆರೆದ (${added} ಸೇರಿಸಲಾಯಿತು, ${removed} ತೆಗೆದುಹಾಕಲಾಯಿತು).`,
+            hi: ` अब ${result.assigned ?? 0} खुले (${added} जोड़े, ${removed} हटाए)।`,
+          });
+        } else if (typeof result.assigned === "number") {
+          extra = tr({
+            en: ` Assigned ${result.assigned}.`,
+            kn: ` ${result.assigned} ನಿಯೋಜಿಸಲಾಯಿತು.`,
+            hi: ` ${result.assigned} असाइन हुए।`,
+          });
+        }
+        setMessage({ ok: done + extra });
+        if (opts?.showCancelled) setFilterStatus("cancelled");
+        router.refresh();
+      }
+    });
+  }
+
+  const loadedOpenCount = tasks.filter((t) => t.status === "open").length;
+  const batchOpenCount = visibleBatches.reduce((sum, batch) => sum + batch.count, 0);
+  const openCount =
+    typeof openTaskTotal === "number" && openTaskTotal > 0
+      ? openTaskTotal
+      : Math.max(loadedOpenCount, batchOpenCount);
+  const updatedOn = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "Asia/Kolkata",
+      }),
+    [],
+  );
+
+  return (
+    <div style={{ display: "grid", gap: "1.5rem" }}>
+      <p>
+        {isAdmin
+          ? tr({
+              en: `${totalArticles.toLocaleString("en-IN")} items in the library. Only admins can create, update, or delete staff tasks. After you assign a range, remaining counts update below.`,
+              kn: `ಲೈಬ್ರರಿಯಲ್ಲಿ ${totalArticles.toLocaleString("en-IN")} ಐಟಂಗಳಿವೆ. ಸಿಬ್ಬಂದಿ ಕಾರ್ಯಗಳನ್ನು ರಚಿಸಲು, ನವೀಕರಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ವ್ಯಾಪ್ತಿ ನಿಯೋಜಿಸಿದ ನಂತರ ಕೆಳಗಿನ ಉಳಿದ ಎಣಿಕೆಗಳು ನವೀಕರಿಸುತ್ತವೆ.`,
+              hi: `लाइब्रेरी में ${totalArticles.toLocaleString("en-IN")} आइटम हैं। स्टाफ़ कार्य बनाना, अपडेट या हटाना केवल एडमिन कर सकते हैं। रेंज असाइन के बाद नीचे शेष संख्या अपडेट होती है।`,
+            })
+          : tr({
+              en: `You have ${openCount.toLocaleString("en-IN")} open task${openCount === 1 ? "" : "s"}. Open a batch to see its articles here, then mark items done. Only an admin can change or delete your assignment.`,
+              kn: `ನಿಮಗೆ ${openCount.toLocaleString("en-IN")} ತೆರೆದ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಬ್ಯಾಚ್ ತೆರೆದು ಲೇಖನಗಳನ್ನು ಇಲ್ಲೇ ನೋಡಿ, ನಂತರ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ. ನಿಯೋಜನೆ ಬದಲಾಯಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ.`,
+              hi: `आपके ${openCount.toLocaleString("en-IN")} खुले कार्य हैं। बैच खोलकर लेख यहीं देखें, फिर पूर्ण चिह्नित करें। असाइनमेंट बदलना या हटाना केवल एडमिन कर सकते हैं।`,
+            })}
+      </p>
+
+      {focusBatch ? (
+        <div className="task-batch-focus" role="status">
+          <p>
+            {`${tr({ en: "Showing", kn: "ತೋರಿಸಲಾಗುತ್ತಿದೆ", hi: "दिखा रहे हैं" })} ${focusBatchTotal.toLocaleString("en-IN")} ${tr({ en: "open", kn: "ತೆರೆದ", hi: "खुले" })} ${tr(batchItemLabel(focusBatch))} · #${batchRangeDisplay(focusBatch)}`}
+          </p>
+          <Link href={`${basePath}/tasks`} prefetch={false} className="button button-outline is-compact">
+            {tr({ en: "Back to all tasks", kn: "ಎಲ್ಲಾ ಕಾರ್ಯಗಳಿಗೆ ಹಿಂದೆ", hi: "सभी कार्यों पर वापस" })}
+          </Link>
+        </div>
+      ) : null}
+
+      {isAdmin ? (
+        <div className="task-type-status" role="status" aria-live="polite">
+          {assignTypeOptions.map((option) => {
+            const total = totalsByType[option.value] ?? 0;
+            const open = openByType[option.value] ?? 0;
+            const remaining = remainingByType[option.value] ?? Math.max(0, total - open);
+            return (
+              <div key={option.value} className="task-type-status-item">
+                <strong>{tr(option.label)}</strong>
+                <span>
+                  {tr({
+                    en: `${total.toLocaleString("en-IN")} total`,
+                    kn: `${total.toLocaleString("en-IN")} ಒಟ್ಟು`,
+                    hi: `${total.toLocaleString("en-IN")} कुल`,
+                  })}
+                </span>
+                <span>
+                  {tr({
+                    en: `${open.toLocaleString("en-IN")} open`,
+                    kn: `${open.toLocaleString("en-IN")} ತೆರೆದ`,
+                    hi: `${open.toLocaleString("en-IN")} खुले`,
+                  })}
+                </span>
+                <span className="task-type-status-remaining">
+                  {tr({
+                    en: `${remaining.toLocaleString("en-IN")} remaining`,
+                    kn: `${remaining.toLocaleString("en-IN")} ಉಳಿದಿವೆ`,
+                    hi: `${remaining.toLocaleString("en-IN")} शेष`,
+                  })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {message.error ? <p role="alert">{message.error}</p> : null}
+      {message.ok ? <p role="status">{message.ok}</p> : null}
+
+      {isAdmin ? (
+        <div style={{ display: "grid", gap: "1.25rem" }}>
+          <section style={{ display: "grid", gap: "0.75rem" }}>
+            <h2>
+              {tr({
+                en: "Bulk assign by number range",
+                kn: "ಸಂಖ್ಯಾ ವ್ಯಾಪ್ತಿಯಿಂದ ಬೃಹತ್ ನಿಯೋಜನೆ",
+                hi: "संख्या रेंज से बल्क असाइन",
+              })}
+            </h2>
+            <p>
+              {tr({
+                en: "Within the selected type, items are numbered oldest to newest (1 = oldest). Pick Articles, Videos, or Posts first, then assign ranges like 1–1000.",
+                kn: "ಆಯ್ಕೆಮಾಡಿದ ಪ್ರಕಾರದೊಳಗೆ ಐಟಂಗಳನ್ನು ಹಳೆಯದರಿಂದ ಹೊಸದರವರೆಗೆ ಸಂಖ್ಯೆ ಮಾಡಲಾಗುತ್ತದೆ (1 = ಹಳೆಯದು). ಮೊದಲು Articles / Videos / Posts ಆಯ್ಕೆಮಾಡಿ, ನಂತರ 1–1000 ರಂತಹ ವ್ಯಾಪ್ತಿ ನಿಯೋಜಿಸಿ.",
+                hi: "चुने प्रकार में आइटम पुराने से नए गिने जाते हैं (1 = सबसे पुराना)। पहले Articles / Videos / Posts चुनें, फिर 1–1000 जैसी रेंज असाइन करें।",
+              })}
+            </p>
+            <p className="task-card-meta">
+              {tr({
+                en: `${typeTotal.toLocaleString("en-IN")} in this type · ${typeOpen.toLocaleString("en-IN")} open · ${typeRemaining.toLocaleString("en-IN")} remaining`,
+                kn: `ಈ ಪ್ರಕಾರದಲ್ಲಿ ${typeTotal.toLocaleString("en-IN")} · ${typeOpen.toLocaleString("en-IN")} ತೆರೆದ · ${typeRemaining.toLocaleString("en-IN")} ಉಳಿದಿವೆ`,
+                hi: `इस प्रकार में ${typeTotal.toLocaleString("en-IN")} · ${typeOpen.toLocaleString("en-IN")} खुले · ${typeRemaining.toLocaleString("en-IN")} शेष`,
+              })}
+            </p>
+            <div className="field-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "end" }}>
+              <label className="field">
+                <span>{tr({ en: "Content type", kn: "ವಿಷಯ ಪ್ರಕಾರ", hi: "कंटेंट प्रकार" })}</span>
+                <select
+                  value={contentType}
+                  onChange={(e) => {
+                    setContentType(e.target.value as ContentType);
+                    setSinglePostId("");
+                    setSinglePostTitle("");
+                  }}
+                >
+                  {assignTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {tr(option.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>{tr({ en: "Staff", kn: "ಸಿಬ್ಬಂದಿ", hi: "स्टाफ़" })}</span>
+                <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} disabled={!staff.length}>
+                  {!staff.length ? (
+                    <option value="">{tr({ en: "Create a staff account first", kn: "ಮೊದಲು ಸಿಬ್ಬಂದಿ ಖಾತೆ ತೆರೆಯಿರಿ", hi: "पहले स्टाफ़ खाता बनाएँ" })}</option>
+                  ) : (
+                    staff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <label className="field">
+                <span>{tr({ en: "From #", kn: "ಪ್ರಾರಂಭ #", hi: "से #" })}</span>
+                <input inputMode="numeric" value={fromPos} onChange={(e) => setFromPos(e.target.value)} />
+              </label>
+              <label className="field">
+                <span>{tr({ en: "To #", kn: "ಕೊನೆ #", hi: "तक #" })}</span>
+                <input inputMode="numeric" value={toPos} onChange={(e) => setToPos(e.target.value)} />
+              </label>
+              <label className="field" style={{ minWidth: "12rem", flex: 1 }}>
+                <span>{tr({ en: "Note (optional)", kn: "ಟಿಪ್ಪಣಿ (ಐಚ್ಛಿಕ)", hi: "नोट (वैकल्पिक)" })}</span>
+                <input value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
+              </label>
+              <button
+                type="button"
+                className="button button-ember"
+                disabled={pending || !staff.length}
+                onClick={() =>
+                  run(
+                    () =>
+                      assignBulkRange({
+                        assigneeId,
+                        fromPos,
+                        toPos,
+                        contentType,
+                        notes,
+                      }),
+                    tr({ en: "Bulk assignment saved.", kn: "ಬೃಹತ್ ನಿಯೋಜನೆ ಉಳಿಸಲಾಯಿತು.", hi: "बल्क असाइनमेंट सहेजा गया।" }),
+                  )
+                }
+              >
+                {tr({ en: "Assign range", kn: "ವ್ಯಾಪ್ತಿ ನಿಯೋಜಿಸಿ", hi: "रेंज असाइन करें" })}
+              </button>
+            </div>
+          </section>
+
+          <section style={{ display: "grid", gap: "0.75rem" }}>
+            <h2>
+              {tr({
+                en: "Assign one item",
+                kn: "ಒಂದು ಐಟಂ ನಿಯೋಜಿಸಿ",
+                hi: "एक आइटम असाइन करें",
+              })}
+            </h2>
+            <p>
+              {tr({
+                en: "Choose the content type, search by title, then assign to staff.",
+                kn: "ವಿಷಯ ಪ್ರಕಾರ ಆಯ್ಕೆಮಾಡಿ, ಶೀರ್ಷಿಕೆಯಿಂದ ಹುಡುಕಿ, ನಂತರ ಸಿಬ್ಬಂದಿಗೆ ನಿಯೋಜಿಸಿ.",
+                hi: "कंटेंट प्रकार चुनें, शीर्षक से खोजें, फिर स्टाफ़ को असाइन करें।",
+              })}
+            </p>
+            <label className="field" style={{ maxWidth: 280 }}>
+              <span>{tr({ en: "Content type", kn: "ವಿಷಯ ಪ್ರಕಾರ", hi: "कंटेंट प्रकार" })}</span>
+              <select
+                value={contentType}
+                onChange={(e) => {
+                  setContentType(e.target.value as ContentType);
+                  setSinglePostId("");
+                  setSinglePostTitle("");
+                }}
+              >
+                {assignTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {tr(option.label)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <ArticleCardSearch
+              value={singlePostId}
+              selectedTitle={singlePostTitle}
+              contentType={contentType}
+              onChange={(hit) => {
+                setSinglePostId(hit?.id || "");
+                setSinglePostTitle(hit?.title || "");
+              }}
+            />
+            <div className="field-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "end" }}>
+              <label className="field">
+                <span>{tr({ en: "Staff", kn: "ಸಿಬ್ಬಂದಿ", hi: "स्टाफ़" })}</span>
+                <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} disabled={!staff.length}>
+                  {staff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="button button-ember"
+                disabled={pending || !staff.length || !singlePostId}
+                onClick={() =>
+                  run(
+                    () =>
+                      assignSingleArticle({
+                        assigneeId,
+                        postId: singlePostId,
+                        contentType,
+                        notes,
+                      }),
+                    tr({ en: "Item assigned.", kn: "ಐಟಂ ನಿಯೋಜಿಸಲಾಯಿತು.", hi: "आइटम असाइन हुआ।" }),
+                  )
+                }
+              >
+                {tr({ en: "Assign item", kn: "ಐಟಂ ನಿಯೋಜಿಸಿ", hi: "आइटम असाइन करें" })}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      <section style={{ display: "grid", gap: "0.75rem" }}>
+        <div className="section-title" style={{ margin: 0 }}>
+          <h2 style={{ margin: 0 }}>
+            {tr({ en: "Assignments", kn: "ನಿಯೋಜನೆಗಳು", hi: "असाइनमेंट" })}
+          </h2>
+          <div className="page-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            {isAdmin ? (
+              <label className="field" style={{ margin: 0 }}>
+                <span className="sr-only">{tr({ en: "Staff filter", kn: "ಸಿಬ್ಬಂದಿ ಫಿಲ್ಟರ್", hi: "स्टाफ़ फ़िल्टर" })}</span>
+                <select value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}>
+                  <option value="all">{tr({ en: "All staff", kn: "ಎಲ್ಲಾ ಸಿಬ್ಬಂದಿ", hi: "सभी स्टाफ़" })}</option>
+                  {staff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <button
+              type="button"
+              className="button button-outline is-compact task-refresh-btn"
+              disabled={pending}
+              onClick={() => {
+                setMessage({});
+                start(() => {
+                  router.refresh();
+                });
+              }}
+            >
+              <RefreshCw size={15} aria-hidden="true" />
+              {tr({ en: "Refresh", kn: "ರಿಫ್ರೆಶ್", hi: "रिफ़्रेश" })}
+            </button>
+            <label className="field" style={{ margin: 0 }}>
+              <span className="sr-only">{tr({ en: "Status filter", kn: "ಸ್ಥಿತಿ ಫಿಲ್ಟರ್", hi: "स्थिति फ़िल्टर" })}</span>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+              >
+                <option value="open">{tr({ en: "Open", kn: "ತೆರೆದ", hi: "खुला" })}</option>
+                <option value="done">{tr({ en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" })}</option>
+                <option value="cancelled">{tr({ en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" })}</option>
+                <option value="all">{tr({ en: "All statuses", kn: "ಎಲ್ಲಾ ಸ್ಥಿತಿಗಳು", hi: "सभी स्थितियाँ" })}</option>
+              </select>
+            </label>
+            <label className="field" style={{ margin: 0 }}>
+              <span className="sr-only">{tr({ en: "Content type filter", kn: "ವಿಷಯ ಪ್ರಕಾರ ಫಿಲ್ಟರ್", hi: "कंटेंट प्रकार फ़िल्टर" })}</span>
+              <select
+                value={filterContentType}
+                onChange={(e) => setFilterContentType(e.target.value as typeof filterContentType)}
+              >
+                <option value="all">{tr({ en: "All types", kn: "ಎಲ್ಲಾ ಪ್ರಕಾರಗಳು", hi: "सभी प्रकार" })}</option>
+                {assignTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {tr(option.label)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {!visibleBatches.length && !visible.length ? (
+          <p>
+            {tr({
+              en: "No assignments in this view yet. Use the status filter to see Cancelled or Done.",
+              kn: "ಈ ನೋಟದಲ್ಲಿ ಇನ್ನೂ ನಿಯೋಜನೆಗಳಿಲ್ಲ. ರದ್ದು ಅಥವಾ ಮುಗಿದಿದೆ ನೋಡಲು ಸ್ಥಿತಿ ಫಿಲ್ಟರ್ ಬಳಸಿ.",
+              hi: "इस दृश्य में अभी कोई असाइनमेंट नहीं। रद्द या पूर्ण देखने के लिए स्थिति फ़िल्टर उपयोग करें।",
+            })}
+          </p>
+        ) : (
+          <div className="post-card-list">
+            {visibleBatches.map((batch, index) => {
+              const menuOpen =
+                menuTarget?.kind === "batch" && menuTarget.key === batch.key;
+              const triggerKey = `batch:${batch.key}`;
+              return (
+                <article
+                  key={batch.key}
+                  className={
+                    "post-card is-scheduled task-batch-card" + (menuOpen ? " is-menu-open" : "")
+                  }
+                  style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
+                >
+                  <div className="post-card-thumb task-batch-thumb" aria-hidden="true">
+                    <Layers size={36} strokeWidth={1.75} />
+                    <div className="post-card-badges">
+                      <span className="status-pill is-scheduled">
+                        {tr({ en: "Open batch", kn: "ತೆರೆದ ಬ್ಯಾಚ್", hi: "खुला बैच" })}
+                      </span>
+                      <span className="post-card-type">#{batch.batchLabel}</span>
+                    </div>
+                  </div>
+                  <div className="post-card-body">
+                    <div className="task-request-card-top">
+                      <h2>
+                        {`${batch.count.toLocaleString("en-IN")} ${tr(batchItemLabel(batch.batchLabel))} · #${batchRangeDisplay(batch.batchLabel)}`}
+                      </h2>
+                      <div className="password-vault-menu">
+                        <button
+                          type="button"
+                          className="password-vault-menu-trigger"
+                          ref={(node) => {
+                            triggerRefs.current[triggerKey] = node;
+                          }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpen}
+                          aria-label={tr({
+                            en: "More actions",
+                            kn: "ಹೆಚ್ಚು ಕ್ರಿಯೆಗಳು",
+                            hi: "और क्रियाएँ",
+                          })}
+                          disabled={pending}
+                          onClick={(event) =>
+                            openMenu({ kind: "batch", key: batch.key }, event.currentTarget)
+                          }
+                        >
+                          <MoreVertical size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="task-card-meta">
+                      {isAdmin ? <strong>{batch.assigneeName}</strong> : null}
+                      {isAdmin && batch.notes ? ` · ${batch.notes}` : null}
+                      {!isAdmin && batch.notes ? batch.notes : null}
+                      {!isAdmin && !batch.notes
+                        ? tr({
+                            en: "Use ⋮ for all actions.",
+                            kn: "ಎಲ್ಲಾ ಕ್ರಿಯೆಗಳಿಗೆ ⋮ ಬಳಸಿ.",
+                            hi: "सभी क्रियाओं के लिए ⋮ उपयोग करें।",
+                          })
+                        : null}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
+            {visible.map((task, index) => {
+              const menuOpen = menuTarget?.kind === "task" && menuTarget.id === task.id;
+              const triggerKey = `task:${task.id}`;
+              return (
+                <article
+                  key={task.id}
+                  className={
+                    "post-card is-" + taskCardTone(task) + (menuOpen ? " is-menu-open" : "")
+                  }
+                  style={{ animationDelay: Math.min(index + visibleBatches.length, 11) * 45 + "ms" }}
+                >
+                  <div className="post-card-thumb">
+                    <PostThumb
+                      src={cardThumbnail(task.thumbnail, task.videoUrl)}
+                      eager={index < 6}
+                    />
+                    <div className="post-card-badges">
+                      <span className={"status-pill is-" + taskStatusPillClass(task.status)}>
+                        {taskStatusNames[task.status]
+                          ? tr(taskStatusNames[task.status])
+                          : task.status}
+                      </span>
+                      {task.postStatus ? (
+                        <span className={"status-pill is-" + task.postStatus}>
+                          {statusNames[task.postStatus]
+                            ? tr(statusNames[task.postStatus])
+                            : task.postStatus}
+                        </span>
+                      ) : null}
+                      {task.postType ? (
+                        <span className="post-card-type">
+                          {typeNames[task.postType]
+                            ? tr(typeNames[task.postType])
+                            : task.postType}
+                        </span>
+                      ) : null}
+                      {activeRequests[task.id] ? (
+                        <span className="status-pill is-draft">
+                          {requestStatusNames[activeRequests[task.id].status]
+                            ? tr(requestStatusNames[activeRequests[task.id].status])
+                            : activeRequests[task.id].status}
+                        </span>
+                      ) : null}
+                    </div>
+                    {task.updatedAt ? (
+                      <time className="post-card-updated" dateTime={task.updatedAt}>
+                        {tr({ en: "Updated", kn: "ಬದಲಾವಣೆ", hi: "बदलाव" })}{" "}
+                        {updatedOn.format(new Date(task.updatedAt))}
+                      </time>
+                    ) : null}
+                  </div>
+                  <div className="post-card-body">
+                    <div className="task-request-card-top">
+                      <h2>
+                        <Link href={`${basePath}/posts/${task.postId}`} prefetch={false}>
+                          {task.title || task.postId}
+                        </Link>
+                      </h2>
+                      <div className="password-vault-menu">
+                        <button
+                          type="button"
+                          className="password-vault-menu-trigger"
+                          ref={(node) => {
+                            triggerRefs.current[triggerKey] = node;
+                          }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpen}
+                          aria-label={tr({
+                            en: "More actions",
+                            kn: "ಹೆಚ್ಚು ಕ್ರಿಯೆಗಳು",
+                            hi: "और क्रियाएँ",
+                          })}
+                          disabled={pending}
+                          onClick={(event) =>
+                            openMenu({ kind: "task", id: task.id }, event.currentTarget)
+                          }
+                        >
+                          <MoreVertical size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="task-card-meta">
+                      {isAdmin ? (
+                        <>
+                          <strong>{task.assigneeName}</strong>
+                          {" · "}
+                        </>
+                      ) : null}
+                      {task.batchLabel ? `#${task.batchLabel}` : null}
+                      {task.batchLabel && task.notes ? " · " : null}
+                      {task.notes || null}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {focusBatch && focusBatchTotal > focusBatchPageSize ? (
+          <div className="task-batch-pager" role="navigation" aria-label={tr({ en: "Batch pages", kn: "ಬ್ಯಾಚ್ ಪುಟಗಳು", hi: "बैच पृष्ठ" })}>
+            <p className="task-card-meta">
+              {tr({
+                en: `Page ${focusBatchPage} of ${focusBatchPages}`,
+                kn: `ಪುಟ ${focusBatchPage} / ${focusBatchPages}`,
+                hi: `पृष्ठ ${focusBatchPage} / ${focusBatchPages}`,
+              })}
+            </p>
+            <div className="page-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {focusBatchPage > 1 ? (
+                <Link
+                  href={batchHref(focusBatch, focusBatchPage - 1)}
+                  prefetch={false}
+                  className="button button-outline is-compact"
+                >
+                  {tr({ en: "Previous", kn: "ಹಿಂದೆ", hi: "पिछला" })}
+                </Link>
+              ) : null}
+              {focusBatchPage < focusBatchPages ? (
+                <Link
+                  href={batchHref(focusBatch, focusBatchPage + 1)}
+                  prefetch={false}
+                  className="button button-outline is-compact"
+                >
+                  {tr({ en: "Next", kn: "ಮುಂದೆ", hi: "अगला" })}
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {menuBatch && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="password-vault-menu-panel is-portal"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const batch = menuBatch;
+                  closeMenu();
+                  setDetailBatch(batch);
+                }}
+              >
+                <Eye size={15} aria-hidden="true" />
+                {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+              </button>
+              {!focusBatch || focusBatch !== menuBatch.batchLabel ? (
+                <Link
+                  href={batchHref(menuBatch.batchLabel)}
+                  prefetch={false}
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                </Link>
+              ) : null}
+              {isAdmin ? (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={pending}
+                    onClick={() => {
+                      const batch = menuBatch;
+                      closeMenu();
+                      openEditBatch(batch);
+                    }}
+                  >
+                    <Pencil size={15} aria-hidden="true" />
+                    {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="is-danger"
+                    disabled={pending}
+                    onClick={() => {
+                      const batch = menuBatch;
+                      closeMenu();
+                      setCancelBatch(batch);
+                    }}
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                    {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                  </button>
+                </>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {menuTask && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="password-vault-menu-panel is-portal"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const task = menuTask;
+                  closeMenu();
+                  setDetailTask(task);
+                }}
+              >
+                <Eye size={15} aria-hidden="true" />
+                {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+              </button>
+              <Link
+                href={`${basePath}/posts/${menuTask.postId}`}
+                prefetch={false}
+                role="menuitem"
+                onClick={closeMenu}
+              >
+                <Pencil size={15} aria-hidden="true" />
+                {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
+              </Link>
+              {menuTask.postStatus === "published" && menuTask.slug ? (
+                <a
+                  href={`${site.url}/news/${menuTask.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <ExternalLink size={15} aria-hidden="true" />
+                  {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
+                </a>
+              ) : null}
+              {!isAdmin && menuTask.status === "open" && !activeRequests[menuTask.id] ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const task = menuTask;
+                    closeMenu();
+                    setRequestTask(task);
+                    setRequestNote("");
+                  }}
+                >
+                  <SendHorizontal size={15} aria-hidden="true" />
+                  {tr({ en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}
+                </button>
+              ) : null}
+              {!isAdmin && menuTask.status === "open" && activeRequests[menuTask.id] ? (
+                <Link
+                  href={`${basePath}/task-requests`}
+                  prefetch={false}
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <Eye size={15} aria-hidden="true" />
+                  {tr({ en: "View request", kn: "ವಿನಂತಿ ನೋಡಿ", hi: "अनुरोध देखें" })}
+                </Link>
+              ) : null}
+              {menuTask.status === "open" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuTask.id;
+                    closeMenu();
+                    run(
+                      () => setTaskStatus({ id, status: "done" }),
+                      tr({
+                        en: "Marked done.",
+                        kn: "ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಲಾಯಿತು.",
+                        hi: "पूर्ण चिह्नित।",
+                      }),
+                    );
+                  }}
+                >
+                  <Check size={15} aria-hidden="true" />
+                  {tr({ en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" })}
+                </button>
+              ) : null}
+              {isAdmin && menuTask.status === "open" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="is-danger"
+                  disabled={pending}
+                  onClick={() => {
+                    const task = menuTask;
+                    closeMenu();
+                    setCancelTask(task);
+                  }}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                </button>
+              ) : null}
+              {isAdmin && menuTask.status !== "open" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuTask.id;
+                    closeMenu();
+                    run(
+                      () => setTaskStatus({ id, status: "open" }),
+                      tr({
+                        en: "Task reopened.",
+                        kn: "ಕಾರ್ಯ ಮರುತೆರೆಯಲಾಯಿತು.",
+                        hi: "कार्य फिर खोला।",
+                      }),
+                    );
+                  }}
+                >
+                  <RefreshCw size={15} aria-hidden="true" />
+                  {tr({ en: "Reopen", kn: "ಮರುತೆರೆಯಿರಿ", hi: "फिर खोलें" })}
+                </button>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {cancelTask && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setCancelTask(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cancel-task-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="confirm-dialog-icon" aria-hidden="true">
+                  <CircleAlert size={28} strokeWidth={2.25} />
+                </div>
+                <h2 id="cancel-task-title">
+                  {tr({
+                    en: "Delete this task?",
+                    kn: "ಈ ಕಾರ್ಯವನ್ನು ಅಳಿಸುವುದೇ?",
+                    hi: "यह कार्य हटाएँ?",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: "Only admins can delete assignments. The staff member will no longer edit this article from Tasks. It will show as Cancelled.",
+                    kn: "ನಿಯೋಜನೆಗಳನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಅಳಿಸಬಹುದು. ಸಿಬ್ಬಂದಿ ಈ ಲೇಖನವನ್ನು Tasks ನಿಂದ ಸಂಪಾದಿಸಲು ಸಾಧ್ಯವಾಗುವುದಿಲ್ಲ. ಇದು ರದ್ದು ಎಂದು ಕಾಣುತ್ತದೆ.",
+                    hi: "असाइनमेंट केवल एडमिन हटा सकते हैं। स्टाफ़ Tasks से इस लेख को संपादित नहीं कर पाएगा। यह रद्द दिखेगा।",
+                  })}
+                </p>
+                <div className="confirm-dialog-preview">
+                  <span className="confirm-dialog-thumb">
+                    <PostThumb src={cardThumbnail(cancelTask.thumbnail, cancelTask.videoUrl)} eager />
+                  </span>
+                  <div>
+                    <strong>{cancelTask.title || cancelTask.postId}</strong>
+                    <small>
+                      {cancelTask.assigneeName}
+                      {cancelTask.batchLabel ? ` · #${cancelTask.batchLabel}` : ""}
+                    </small>
+                  </div>
+                </div>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setCancelTask(null)}
+                  >
+                    {tr({ en: "Keep task", kn: "ಕಾರ್ಯ ಇರಿಸಿ", hi: "कार्य रखें" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-danger"
+                    disabled={pending}
+                    onClick={() => {
+                      const id = cancelTask.id;
+                      setCancelTask(null);
+                      run(
+                        () => setTaskStatus({ id, status: "cancelled" }),
+                        tr({
+                          en: "Task deleted — shown under Cancelled.",
+                          kn: "ಕಾರ್ಯ ಅಳಿಸಲಾಯಿತು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+                          hi: "कार्य हटाया — रद्द फ़िल्टर में दिखेगा।",
+                        }),
+                        { showCancelled: true },
+                      );
+                    }}
+                  >
+                    {tr({
+                      en: "Yes, delete it",
+                      kn: "ಹೌದು, ಅಳಿಸಿ",
+                      hi: "हाँ, हटाएँ",
+                    })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {cancelBatch && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setCancelBatch(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cancel-batch-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="confirm-dialog-icon" aria-hidden="true">
+                  <CircleAlert size={28} strokeWidth={2.25} />
+                </div>
+                <h2 id="cancel-batch-title">
+                  {tr({
+                    en: "Delete this whole batch?",
+                    kn: "ಈ ಸಂಪೂರ್ಣ ಬ್ಯಾಚ್ ಅಳಿಸುವುದೇ?",
+                    hi: "पूरा बैच हटाएँ?",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: `This deletes all ${cancelBatch.count.toLocaleString("en-IN")} open assignments in #${cancelBatch.batchLabel} for ${cancelBatch.assigneeName}. Only admins can do this. They will appear under Cancelled.`,
+                    kn: `ಇದು ${cancelBatch.assigneeName} ಅವರ #${cancelBatch.batchLabel} ನಲ್ಲಿನ ${cancelBatch.count.toLocaleString("en-IN")} ತೆರೆದ ನಿಯೋಜನೆಗಳನ್ನು ಅಳಿಸುತ್ತದೆ. ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ಅವು ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತವೆ.`,
+                    hi: `यह ${cancelBatch.assigneeName} के #${cancelBatch.batchLabel} में ${cancelBatch.count.toLocaleString("en-IN")} खुले असाइनमेंट हटाता है। केवल एडमिन। वे रद्द फ़िल्टर में दिखेंगे।`,
+                  })}
+                </p>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setCancelBatch(null)}
+                  >
+                    {tr({ en: "Keep batch", kn: "ಬ್ಯಾಚ್ ಇರಿಸಿ", hi: "बैच रखें" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-danger"
+                    disabled={pending}
+                    onClick={() => {
+                      const payload = {
+                        assigneeId: cancelBatch.assigneeId,
+                        batchLabel: cancelBatch.batchLabel,
+                      };
+                      setCancelBatch(null);
+                      run(
+                        () => cancelOpenBatch(payload),
+                        tr({
+                          en: "Batch deleted — shown under Cancelled.",
+                          kn: "ಬ್ಯಾಚ್ ಅಳಿಸಲಾಯಿತು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+                          hi: "बैच हटाया — रद्द फ़िल्टर में दिखेगा।",
+                        }),
+                        { showCancelled: true },
+                      );
+                    }}
+                  >
+                    {tr({
+                      en: "Yes, delete batch",
+                      kn: "ಹೌದು, ಬ್ಯಾಚ್ ಅಳಿಸಿ",
+                      hi: "हाँ, बैच हटाएँ",
+                    })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {editBatch && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setEditBatch(null)}
+            >
+              <form
+                className="delete-dialog confirm-dialog task-detail-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-batch-title"
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const batch = editBatch;
+                  const fromPos = editFromPos;
+                  const toPos = editToPos;
+                  const notesValue = editNotes;
+                  const contentTypeValue = editContentType;
+                  setEditBatch(null);
+                  run(
+                    () =>
+                      updateOpenBatch({
+                        assigneeId: batch.assigneeId,
+                        batchLabel: batch.batchLabel,
+                        fromPos,
+                        toPos,
+                        contentType: contentTypeValue,
+                        notes: notesValue,
+                      }),
+                    tr({
+                      en: "Batch updated.",
+                      kn: "ಬ್ಯಾಚ್ ನವೀಕರಿಸಲಾಯಿತು.",
+                      hi: "बैच अपडेट हुआ।",
+                    }),
+                  );
+                }}
+              >
+                <h2 id="edit-batch-title">
+                  {tr({
+                    en: "Update batch range",
+                    kn: "ಬ್ಯಾಚ್ ವ್ಯಾಪ್ತಿ ನವೀಕರಿಸಿ",
+                    hi: "बैच रेंज अपडेट करें",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: `Change ${editBatch.assigneeName}'s #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} items). Ranges are numbered within the selected type.`,
+                    kn: `${editBatch.assigneeName} ಅವರ #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} ಐಟಂಗಳು) ಬದಲಾಯಿಸಿ. ವ್ಯಾಪ್ತಿ ಆಯ್ಕೆಮಾಡಿದ ಪ್ರಕಾರದೊಳಗೆ ಸಂಖ್ಯೆ ಮಾಡಲಾಗುತ್ತದೆ.`,
+                    hi: `${editBatch.assigneeName} का #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} आइटम) बदलें। रेंज चुने प्रकार में गिनी जाती है।`,
+                  })}
+                </p>
+                <div className="field-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", width: "100%" }}>
+                  <label className="field" style={{ flex: "1 1 8rem" }}>
+                    <span>{tr({ en: "Content type", kn: "ವಿಷಯ ಪ್ರಕಾರ", hi: "कंटेंट प्रकार" })}</span>
+                    <select
+                      value={editContentType}
+                      onChange={(e) => setEditContentType(e.target.value as ContentType)}
+                    >
+                      {assignTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {tr(option.label)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field" style={{ flex: "1 1 6rem" }}>
+                    <span>{tr({ en: "From #", kn: "ಪ್ರಾರಂಭ #", hi: "से #" })}</span>
+                    <input
+                      inputMode="numeric"
+                      value={editFromPos}
+                      onChange={(e) => setEditFromPos(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="field" style={{ flex: "1 1 6rem" }}>
+                    <span>{tr({ en: "To #", kn: "ಕೊನೆ #", hi: "तक #" })}</span>
+                    <input
+                      inputMode="numeric"
+                      value={editToPos}
+                      onChange={(e) => setEditToPos(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+                <label className="field" style={{ display: "grid", gap: 6, textAlign: "left", width: "100%" }}>
+                  <span>{tr({ en: "Note (optional)", kn: "ಟಿಪ್ಪಣಿ (ಐಚ್ಛಿಕ)", hi: "नोट (वैकल्पिक)" })}</span>
+                  <input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} maxLength={500} />
+                </label>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setEditBatch(null)}
+                  >
+                    {tr({ en: "Back", kn: "ಹಿಂದೆ", hi: "वापस" })}
+                  </button>
+                  <button type="submit" className="button" disabled={pending}>
+                    {tr({ en: "Save update", kn: "ನವೀಕರಣ ಉಳಿಸಿ", hi: "अपडेट सहेजें" })}
+                  </button>
+                </div>
+              </form>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {detailTask && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => setDetailTask(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog task-detail-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="task-detail-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="task-detail-title">
+                  {tr({ en: "Task details", kn: "ಕಾರ್ಯ ವಿವರ", hi: "कार्य विवरण" })}
+                </h2>
+                <div className="confirm-dialog-preview">
+                  <span className="confirm-dialog-thumb">
+                    <PostThumb src={cardThumbnail(detailTask.thumbnail, detailTask.videoUrl)} eager />
+                  </span>
+                  <div>
+                    <strong>{detailTask.title || detailTask.postId}</strong>
+                    <small>
+                      <span className={"status-pill is-" + taskStatusPillClass(detailTask.status)}>
+                        {taskStatusNames[detailTask.status]
+                          ? tr(taskStatusNames[detailTask.status])
+                          : detailTask.status}
+                      </span>
+                    </small>
+                  </div>
+                </div>
+                <dl className="task-detail-grid">
+                  <div>
+                    <dt>{tr({ en: "Assignee", kn: "ನಿಯೋಜಿತ", hi: "असाइनी" })}</dt>
+                    <dd>{detailTask.assigneeName}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Batch", kn: "ಬ್ಯಾಚ್", hi: "बैच" })}</dt>
+                    <dd>{detailTask.batchLabel ? `#${detailTask.batchLabel}` : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Article status", kn: "ಲೇಖನ ಸ್ಥಿತಿ", hi: "लेख स्थिति" })}</dt>
+                    <dd>
+                      {detailTask.postStatus
+                        ? statusNames[detailTask.postStatus]
+                          ? tr(statusNames[detailTask.postStatus])
+                          : detailTask.postStatus
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Type", kn: "ಪ್ರಕಾರ", hi: "प्रकार" })}</dt>
+                    <dd>
+                      {detailTask.postType
+                        ? typeNames[detailTask.postType]
+                          ? tr(typeNames[detailTask.postType])
+                          : detailTask.postType
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Notes", kn: "ಟಿಪ್ಪಣಿ", hi: "नोट" })}</dt>
+                    <dd>{detailTask.notes || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Assigned", kn: "ನಿಯೋಜನೆ", hi: "असाइन" })}</dt>
+                    <dd>
+                      {detailTask.createdAt
+                        ? updatedOn.format(new Date(detailTask.createdAt))
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}</dt>
+                    <dd>
+                      {activeRequests[detailTask.id]
+                        ? requestStatusNames[activeRequests[detailTask.id].status]
+                          ? tr(requestStatusNames[activeRequests[detailTask.id].status])
+                          : activeRequests[detailTask.id].status
+                        : tr({ en: "None active", kn: "ಸಕ್ರಿಯವಿಲ್ಲ", hi: "कोई सक्रिय नहीं" })}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="delete-dialog-actions">
+                  <Link
+                    href={`${basePath}/posts/${detailTask.postId}`}
+                    prefetch={false}
+                    className="button button-outline"
+                    onClick={() => setDetailTask(null)}
+                  >
+                    {tr({ en: "Open article", kn: "ಲೇಖನ ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                  </Link>
+                  <button type="button" className="button" onClick={() => setDetailTask(null)}>
+                    {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {detailBatch && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => setDetailBatch(null)}
+            >
+              <div
+                className="delete-dialog confirm-dialog task-detail-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="batch-detail-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="batch-detail-title">
+                  {tr({ en: "Batch details", kn: "ಬ್ಯಾಚ್ ವಿವರ", hi: "बैच विवरण" })}
+                </h2>
+                <dl className="task-detail-grid">
+                  <div>
+                    <dt>{tr({ en: "Batch", kn: "ಬ್ಯಾಚ್", hi: "बैच" })}</dt>
+                    <dd>#{detailBatch.batchLabel}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Assignee", kn: "ನಿಯೋಜಿತ", hi: "असाइनी" })}</dt>
+                    <dd>{detailBatch.assigneeName}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Open articles", kn: "ತೆರೆದ ಲೇಖನಗಳು", hi: "खुले लेख" })}</dt>
+                    <dd>{detailBatch.count.toLocaleString("en-IN")}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Notes", kn: "ಟಿಪ್ಪಣಿ", hi: "नोट" })}</dt>
+                    <dd>{detailBatch.notes || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Last activity", kn: "ಕೊನೆಯ ಚಟುವಟಿಕೆ", hi: "अंतिम गतिविधि" })}</dt>
+                    <dd>
+                      {detailBatch.createdAt
+                        ? updatedOn.format(new Date(detailBatch.createdAt))
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{tr({ en: "Status", kn: "ಸ್ಥಿತಿ", hi: "स्थिति" })}</dt>
+                    <dd>
+                      <span className="status-pill is-scheduled">
+                        {tr({ en: "Open", kn: "ತೆರೆದ", hi: "खुला" })}
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+                <div className="delete-dialog-actions">
+                  {!isAdmin ? (
+                    <Link
+                      href={batchHref(detailBatch.batchLabel)}
+                      prefetch={false}
+                      className="button"
+                      onClick={() => setDetailBatch(null)}
+                    >
+                      {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                    </Link>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="button button-outline"
+                        disabled={pending}
+                        onClick={() => {
+                          const batch = detailBatch;
+                          setDetailBatch(null);
+                          openEditBatch(batch);
+                        }}
+                      >
+                        <Pencil size={15} aria-hidden="true" />
+                        {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-outline"
+                        disabled={pending}
+                        onClick={() => {
+                          const batch = detailBatch;
+                          setDetailBatch(null);
+                          setCancelBatch(batch);
+                        }}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                        {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                      </button>
+                    </>
+                  )}
+                  <button type="button" className="button button-outline" onClick={() => setDetailBatch(null)}>
+                    {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {requestTask && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setRequestTask(null)}
+            >
+              <form
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="request-task-title"
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const taskId = requestTask.id;
+                  const staffNote = requestNote.trim();
+                  setRequestTask(null);
+                  setRequestNote("");
+                  run(
+                    () => createTaskRequest({ taskId, staffNote }),
+                    tr({
+                      en: "Request sent to admin.",
+                      kn: "ವಿನಂತಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
+                      hi: "अनुरोध एडमिन को भेजा।",
+                    }),
+                  );
+                }}
+              >
+                <h2 id="request-task-title">
+                  {tr({
+                    en: "Request verification",
+                    kn: "ಪರಿಶೀಲನೆ ವಿನಂತಿ",
+                    hi: "सत्यापन अनुरोध",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: "Send this assigned article to the admin for the Drive link and next steps.",
+                    kn: "Drive ಲಿಂಕ್ ಮತ್ತು ಮುಂದಿನ ಹಂತಗಳಿಗಾಗಿ ಈ ನಿಯೋಜಿತ ಲೇಖನವನ್ನು ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ.",
+                    hi: "Drive लिंक और अगले चरणों के लिए इस असाइन लेख को एडमिन को भेजें।",
+                  })}
+                </p>
+                <div className="confirm-dialog-preview">
+                  <span className="confirm-dialog-thumb">
+                    <PostThumb src={cardThumbnail(requestTask.thumbnail, requestTask.videoUrl)} eager />
+                  </span>
+                  <div>
+                    <strong>{requestTask.title || requestTask.postId}</strong>
+                  </div>
+                </div>
+                <label className="field" style={{ display: "grid", gap: 6, textAlign: "left", width: "100%" }}>
+                  <span>{tr({ en: "Note for admin", kn: "ಆಡ್ಮಿನ್‌ಗೆ ಟಿಪ್ಪಣಿ", hi: "एडमिन के लिए नोट" })}</span>
+                  <textarea
+                    value={requestNote}
+                    onChange={(e) => setRequestNote(e.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                    placeholder={tr({
+                      en: "What do you need changed or verified?",
+                      kn: "ಏನು ಬದಲಾಯಿಸಬೇಕು ಅಥವಾ ಪರಿಶೀಲಿಸಬೇಕು?",
+                      hi: "क्या बदलना या सत्यापित करना है?",
+                    })}
+                  />
+                </label>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setRequestTask(null)}
+                  >
+                    {tr({ en: "Back", kn: "ಹಿಂದೆ", hi: "वापस" })}
+                  </button>
+                  <button type="submit" className="button" disabled={pending}>
+                    {tr({ en: "Send request", kn: "ವಿನಂತಿ ಕಳುಹಿಸಿ", hi: "अनुरोध भेजें" })}
+                  </button>
+                </div>
+              </form>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 import type { Category, Post, NewsEvent } from "@/lib/types";
-export const categories: Category[] = [
+import { mainNavigationCategories } from "@/config/navigation";
+const baseCategories: Category[] = [
   ["news", "ಸುದ್ದಿ", "News", "समाचार"],
   ["pravachana", "ಪ್ರವಚನ", "Discourses", "प्रवचन"],
   ["utsava", "ಉತ್ಸವ", "Festivals", "उत्सव"],
@@ -19,6 +20,18 @@ export const categories: Category[] = [
   name_en,
   name_hi,
 }));
+export const categories: Category[] = [
+  ...baseCategories,
+  ...mainNavigationCategories
+    .filter((c) => !baseCategories.some((base) => base.slug === c.slug))
+    .map((c, i) => ({
+      id: `seed-category-${baseCategories.length + i + 1}`,
+      slug: c.slug,
+      name_kn: c.name_kn,
+      name_en: c.name_en,
+      name_hi: c.name_hi,
+    })),
+];
 const stories = [
   [
     "shravanabelagola-heritage",

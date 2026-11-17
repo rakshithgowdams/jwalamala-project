@@ -45,6 +45,7 @@ export type Filters = LocationFilters & {
   sort?: string;
   place?: string;
   year?: string;
+  matha?: string;
 };
 export function filterPosts(posts: Post[], f: Filters) {
   const terms = searchTerms(f.q || "");
@@ -72,7 +73,8 @@ export function filterPosts(posts: Post[], f: Filters) {
         (!f.category || p.category_slugs.includes(f.category)) &&
         (!f.type || p.type === f.type) &&
         (!f.place || p.event_place === f.place) &&
-        (!f.year || p.event_date.startsWith(f.year))
+        (!f.year || p.event_date.startsWith(f.year)) &&
+        (!f.matha || p.matha_slugs?.includes(f.matha))
       );
     })
     .sort((a, b) =>

@@ -32,6 +32,7 @@ const schema = z.object({
   place_id: z.uuid().or(z.literal("")).catch(""),
   topic: text,
   series: text,
+  matha: text,
   media: z.boolean().catch(false),
   live: z.boolean().catch(false),
 });
@@ -42,6 +43,7 @@ export async function getListing(
     place_id?: string;
     topic?: string;
     series?: string;
+    matha?: string;
     media?: boolean;
     live?: boolean;
   },
@@ -63,7 +65,8 @@ export async function getListing(
             filters.place_id) &&
         (!filters.media || p.type !== "article") &&
         (!filters.live || p.is_live) &&
-        (!filters.tag || p.tags?.some((t) => t.slug === filters.tag)),
+        (!filters.tag || p.tags?.some((t) => t.slug === filters.tag)) &&
+        (!filters.matha || p.matha_slugs?.includes(filters.matha)),
     );
     return {
       rows: all.slice((page - 1) * size, page * size),

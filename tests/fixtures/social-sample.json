@@ -1,0 +1,57 @@
+[
+  {
+    "postId": "1111111111111111",
+    "url": "https://www.facebook.com/jwalamalanews/posts/1111111111111111",
+    "text": "ಶ್ರವಣಬೆಳಗೊಳದಲ್ಲಿ ಮಹಾಮಸ್ತಕಾಭಿಷೇಕದ ಸಿದ್ಧತೆ\nಭಕ್ತರು ಸೇರುತ್ತಿದ್ದಾರೆ.",
+    "time": "2026-10-01T06:30:00.000Z",
+    "isVideo": false,
+    "media": [{ "thumbnail": "https://scontent.xx.fbcdn.net/v/poster1.jpg", "photo_image": { "uri": "https://scontent.xx.fbcdn.net/v/poster1.jpg" } }]
+  },
+  {
+    "postId": "2222222222222222",
+    "url": "https://www.facebook.com/jwalamalanews/videos/2222222222222222",
+    "text": "ಜೈನ ಭಕ್ತಿಗೀತೆ — ನೇರ ಪ್ರಸಾರ",
+    "time": "2026-10-02T08:00:00.000Z",
+    "isVideo": true,
+    "media": [{ "thumbnail": "https://scontent.xx.fbcdn.net/v/video1.jpg" }],
+    "videoPostViewCount": 1200
+  },
+  {
+    "postId": "3333333333333333",
+    "url": "https://www.facebook.com/reel/3333333333333333",
+    "text": "ರೀಲ್: ಬಸದಿ ಪರಿಚಯ",
+    "time": "2026-10-03T09:00:00.000Z",
+    "isVideo": true,
+    "media": [{ "thumbnail": "https://scontent.xx.fbcdn.net/v/reel1.jpg" }]
+  },
+  {
+    "shortCode": "AbCdEfGhIj",
+    "url": "https://www.instagram.com/p/AbCdEfGhIj/",
+    "caption": "ಪೋಸ್ಟರ್: ಜೈನ ಹಬ್ಬ\nವಿವರಗಳು ಬೆಂಗಳೂರಿನಲ್ಲಿ.",
+    "type": "Image",
+    "displayUrl": "https://scontent.cdninstagram.com/v/t51.2885-15/poster.jpg",
+    "timestamp": "2026-10-04T10:00:00.000Z"
+  },
+  {
+    "shortCode": "ReEl123456",
+    "url": "https://www.instagram.com/reel/ReEl123456/",
+    "caption": "Instagram ರೀಲ್ — ಧರ್ಮದ ನುಡಿ",
+    "type": "Video",
+    "displayUrl": "https://scontent.cdninstagram.com/v/t51.2885-15/reel.jpg",
+    "videoUrl": "https://www.instagram.com/reel/ReEl123456/",
+    "timestamp": "2026-10-05T11:00:00.000Z"
+  },
+  {
+    "shortCode": "SiDeCaR789",
+    "url": "https://www.instagram.com/p/SiDeCaR789/",
+    "caption": "ಕ್ಯಾರೊಸೆಲ್ ಪೋಸ್ಟರ್",
+    "type": "Sidecar",
+    "displayUrl": "https://scontent.cdninstagram.com/v/t51.2885-15/one.jpg",
+    "childPosts": [
+      { "displayUrl": "https://scontent.cdninstagram.com/v/t51.2885-15/one.jpg" },
+      { "displayUrl": "https://scontent.cdninstagram.com/v/t51.2885-15/two.jpg" },
+      { "displayUrl": "https://scontent.cdninstagram.com/v/t51.2885-15/three.jpg" }
+    ],
+    "timestamp": "2026-10-06T12:00:00.000Z"
+  }
+]

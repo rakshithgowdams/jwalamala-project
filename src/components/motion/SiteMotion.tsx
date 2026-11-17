@@ -35,7 +35,6 @@ const panels = [
   ".auth-card",
   ".empty-state",
   ".notice",
-  ".location-disclosure",
   ".value-chart",
   ".event-detail",
   ".resource-list",

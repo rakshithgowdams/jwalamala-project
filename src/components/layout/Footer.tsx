@@ -1,10 +1,10 @@
 import { ChannelLinks } from "@/components/discovery/ChannelLinks";
 import Link from "next/link";
-import Image from "next/image";
-import { site } from "@/config/site";
 import { getUiStrings } from "@/lib/i18n/server";
 import { brandName } from "@/lib/i18n/content";
 import { FlameGarland } from "./FlameGarland";
+import { BrandMark } from "./BrandMark";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 export async function Footer() {
   const { kn, v4: t, locale } = await getUiStrings();
   const brand = brandName(locale);
@@ -14,13 +14,14 @@ export async function Footer() {
         <div className="footer-grid">
           <div>
             <div className="footer-brand">
-              <Image src={site.logo} width={58} height={58} alt="" />
+              <BrandMark size={58} alt={brand} className="brand-mark" />
               <div>
                 <h2>{brand}</h2>
                 <FlameGarland />
               </div>
             </div>
             <p>{kn.footerText}</p>
+            <InstallAppButton className="button button-outline install-app-button footer-install" />
           </div>
           <div>
             <h3>{kn.explore}</h3>
@@ -38,7 +39,6 @@ export async function Footer() {
             <Link href="/credits">{kn.imageCredit}</Link>
             <Link href="/login">{kn.login}</Link>
             <Link href="/signup">{kn.createAccount}</Link>
-            <Link href="/auth/admin">{kn.admin}</Link>
           </div>
         </div>
         <div className="footer-bottom">

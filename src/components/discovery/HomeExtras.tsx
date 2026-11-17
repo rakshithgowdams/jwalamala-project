@@ -9,6 +9,7 @@ import { NewsCard } from "@/components/news/NewsCard";
 import { getUiStrings } from "@/lib/i18n/server";
 import { pickText } from "@/lib/i18n/content";
 import { isoToday } from "@/lib/utils/dates";
+import { toCardPost } from "@/lib/utils/card-post";
 export async function HomeExtras({ config }: { config: HomeConfig }) {
   const { kn, v4: t, locale } = await getUiStrings();
   const [stories, galleries, days, feed, posts] = await Promise.all([
@@ -25,6 +26,7 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
     .slice(0, 3);
   const anniversaries = posts.filter(
     (p) =>
+      !!p.event_date &&
       p.event_date.slice(5) === today.slice(5) &&
       p.event_date.slice(0, 4) < today.slice(0, 4),
   );
@@ -32,6 +34,18 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
     galleries.find((g) => g.id === config.photo_gallery_id) ||
     galleries.find((g) => g.images.length)
   )?.images[0];
+  // The newest followable stories, and only the follow targets that point at them.
+  const followable = new Set(Object.values(feed.targets).flat());
+  const feedPosts = feed.posts
+    .filter((p) => followable.has(p.id))
+    .slice(0, 24)
+    .map(toCardPost);
+  const shown = new Set(feedPosts.map((p) => p.id));
+  const feedTargets = Object.fromEntries(
+    Object.entries(feed.targets)
+      .map(([key, ids]) => [key, ids.filter((id) => shown.has(id))] as const)
+      .filter(([, ids]) => ids.length > 0),
+  );
   const photoCaption = photo
     ? pickText(locale, photo.caption, photo.caption_en, photo.caption_hi)
     : "";
@@ -40,7 +54,7 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
       {config.extras.feed && (
         <section className="section">
           <h2>{t.feed}</h2>
-          <MyFeed {...feed} />
+          <MyFeed posts={feedPosts} targets={feedTargets} />
         </section>
       )}
       {config.extras.stories && stories.length > 0 && (
@@ -104,7 +118,7 @@ export async function HomeExtras({ config }: { config: HomeConfig }) {
           <h2>{kn.onThisDay}</h2>
           <div className="news-grid">
             {anniversaries.slice(0, 3).map((p) => (
-              <NewsCard key={p.id} post={p} />
+              <NewsCard key={p.id} post={toCardPost(p)} />
             ))}
           </div>
         </section>

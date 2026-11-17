@@ -80,9 +80,16 @@ function ScrollRow({
 export function CategoryScrollShowcase({
   posts,
   categories,
+  title,
+  minItems = 2,
+  newsQuery,
 }: {
   posts: Post[];
   categories: Category[];
+  title?: string;
+  minItems?: number;
+  /** Row titles open /news with these filters plus the row's category. */
+  newsQuery?: string;
 }) {
   const { kn, locale } = useUiStrings();
   const rows = categories
@@ -92,13 +99,13 @@ export function CategoryScrollShowcase({
         .filter((p) => p.category_slugs.includes(category.slug))
         .slice(0, 10),
     }))
-    .filter((row) => row.items.length >= 2)
+    .filter((row) => row.items.length >= minItems)
     .slice(0, 8);
   if (!rows.length) return null;
   return (
     <section className="discover-panel">
       <div className="section-title">
-        <h2>{kn.categoryNews}</h2>
+        <h2>{title || kn.categoryNews}</h2>
       </div>
       <div className="discover-scroll-y">
         {rows.map((row, i) => (
@@ -111,7 +118,11 @@ export function CategoryScrollShowcase({
               row.category.name_en,
               row.category.name_hi,
             )}
-            href={`/category/${row.category.slug}`}
+            href={
+              newsQuery
+                ? `/news?${newsQuery}&category=${encodeURIComponent(row.category.slug)}`
+                : `/category/${row.category.slug}`
+            }
           >
             {row.items.map((post) => (
               <div className="discover-card" key={post.id}>

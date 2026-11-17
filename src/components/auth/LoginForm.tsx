@@ -155,7 +155,7 @@ export function LoginForm({
   }
   return (
     <div className="auth-card">
-      <Image src={site.logo} alt="" width={80} height={80} />
+      <Image src="/images/jwalamala-logo.jpg" alt="" width={80} height={80} unoptimized />
       <h1>{mode === "signup" ? kn.createAccount : kn.loginTitle}</h1>
       <p>{kn.loginDescription}</p>
       {!configured && (
@@ -351,7 +351,6 @@ export function LoginForm({
       <Link className="skip" href="/">
         {kn.skip}
       </Link>
-      <Link className="skip" href="/auth/admin">{kn.admin}</Link>
     </div>
   );
 }

@@ -1,9 +1,18 @@
+import type {
+  ImageLayout,
+  SocialPlatform,
+  VideoProvider,
+} from "@/lib/supabase/database.types";
+
 export type Category = {
   id: string;
   slug: string;
   name_kn: string;
   name_en: string;
   name_hi?: string;
+  category_kind?: string;
+  show_in_menu?: boolean;
+  parent_id?: string | null;
 };
 export type Post = {
   id: string;
@@ -28,8 +37,13 @@ export type Post = {
   thumbnail_url: string;
   video_url: string | null;
   video_id: string | null;
-  video_provider: "youtube" | "facebook" | "none";
+  video_provider: VideoProvider;
+  social_platform?: SocialPlatform | null;
+  social_post_url?: string | null;
+  social_post_id?: string | null;
+  image_layout?: ImageLayout;
   category_slugs: string[];
+  matha_slugs?: string[];
   is_featured: boolean;
   is_breaking: boolean;
   is_live: boolean;
@@ -51,6 +65,8 @@ export type Post = {
   transcript?: string;
   seo_title?: string;
   seo_description?: string;
+  /** Comma-separated, written by the editor for the page head. */
+  seo_keywords?: string | null;
   sponsor_name?: string;
   breaking_until?: string;
   allow_comments?: boolean;

@@ -15,9 +15,14 @@ export default async function Offline() {
         <WifiOff size={48} />
         <h1>{kn.offline}</h1>
         <p>{kn.offlineDescription}</p>
-        <Link className="button button-ember" href="/">
-          {kn.retry}
-        </Link>
+        <div className="empty-state-actions">
+          <Link className="button button-ember" href="/">
+            {kn.retry}
+          </Link>
+          <Link className="button button-outline" href="/downloads" prefetch={false}>
+            {kn.openDownloads}
+          </Link>
+        </div>
       </div>
     </div>
   );
