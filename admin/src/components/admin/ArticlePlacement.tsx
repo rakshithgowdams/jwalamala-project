@@ -1,16 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { GripVertical } from "lucide-react";
 import type { Category } from "@/lib/types";
 import type { Tri } from "@/lib/i18n/strings";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { ARTICLE_PLACEMENTS } from "@/lib/admin/article-placements";
 
 type MathaOption = { id: string; name_kn: string; slug: string };
-type LatestLabel = { id: string; title_kn: string };
-
-const THIS_KEY = "__this__";
 
 export function ArticlePlacement({
   categories,
@@ -21,13 +16,6 @@ export function ArticlePlacement({
   mathas,
   mathaIds,
   setMathaIds,
-  pinLatest,
-  setPinLatest,
-  latestIds,
-  setLatestIds,
-  latestLabels = [],
-  postId,
-  postTitle,
 }: {
   categories: Category[];
   primaryCategory: string;
@@ -37,30 +25,10 @@ export function ArticlePlacement({
   mathas: MathaOption[];
   mathaIds: Set<string>;
   setMathaIds: (next: Set<string> | ((current: Set<string>) => Set<string>)) => void;
-  pinLatest: boolean;
-  setPinLatest: (value: boolean) => void;
-  latestIds: string[];
-  setLatestIds: (next: string[] | ((current: string[]) => string[])) => void;
-  latestLabels?: LatestLabel[];
-  postId?: string;
-  postTitle?: string;
 }) {
   const { tr } = useUiStrings();
   const bySlug = new Map(categories.map((c) => [c.slug, c]));
   const selectedIds = new Set([primaryCategory, ...extraCategories]);
-  const titleById = new Map(latestLabels.map((row) => [row.id, row.title_kn]));
-  const dragFrom = useRef<number | null>(null);
-  const [dragOver, setDragOver] = useState<number | null>(null);
-  const [draftOrder, setDraftOrder] = useState<string[] | null>(null);
-
-  const orderKeys = (() => {
-    if (!pinLatest) return [] as string[];
-    if (postId) {
-      return latestIds.includes(postId) ? latestIds : [...latestIds, postId];
-    }
-    if (draftOrder) return draftOrder;
-    return [...latestIds.filter((id) => id !== THIS_KEY), THIS_KEY];
-  })();
 
   function toggleSlug(slug: string, on: boolean) {
     const category = bySlug.get(slug);
@@ -77,154 +45,23 @@ export function ArticlePlacement({
     }
   }
 
-  function applyOrder(keys: string[]) {
-    if (postId) {
-      setLatestIds(keys.filter((key) => key !== THIS_KEY));
-      return;
-    }
-    setDraftOrder(keys);
-    setLatestIds(keys.filter((key) => key !== THIS_KEY));
-  }
-
-  function onDrop(toIndex: number) {
-    const from = dragFrom.current;
-    dragFrom.current = null;
-    setDragOver(null);
-    if (from === null || from === toIndex) return;
-    const next = [...orderKeys];
-    const [row] = next.splice(from, 1);
-    next.splice(toIndex, 0, row);
-    applyOrder(next);
-  }
-
-  function labelFor(key: string) {
-    if (key === THIS_KEY || key === postId) {
-      return (
-        postTitle?.trim() ||
-        tr({
-          en: "This article",
-          kn: "ಈ ಲೇಖನ",
-          hi: "यह लेख",
-        })
-      );
-    }
-    return (
-      titleById.get(key) ||
-      tr({ en: "Pinned article", kn: "ಪಿನ್ ಲೇಖನ", hi: "पिन लेख" })
-    );
-  }
-
-  const latestRank = orderKeys.findIndex((key) => key === postId || key === THIS_KEY);
-
   return (
     <div className="editor-stack article-placement">
       <fieldset className="editor-checklist-box article-placement-box">
         <legend>
           {tr({
-            en: "Required — where should this article show?",
-            kn: "ಅಗತ್ಯ — ಈ ಲೇಖನ ಎಲ್ಲಿ ಕಾಣಿಸಬೇಕು?",
-            hi: "आवश्यक — यह लेख कहाँ दिखे?",
+            en: "Show this article in",
+            kn: "ಈ ಲೇಖನವನ್ನು ಇಲ್ಲಿ ತೋರಿಸಿ",
+            hi: "यह लेख यहाँ दिखाएँ",
           })}
         </legend>
         <p className="article-placement-lead">
           {tr({
-            en: "Choose every section that should list this story. District items also need a district/town above.",
-            kn: "ಈ ವರದಿ ಕಾಣಿಸಬೇಕಾದ ಪ್ರತಿ ವಿಭಾಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ. ಜಿಲ್ಲಾ ವಿಭಾಗಗಳಿಗೆ ಮೇಲೆ ಜಿಲ್ಲೆ/ಊರು ಬೇಕು.",
-            hi: "यह रिपोर्ट जिन अनुभागों में दिखे, उन्हें चुनें। ज़िला अनुभागों के लिए ऊपर ज़िला/शहर भी चाहिए।",
+            en: "Tick sections that should list this story. Latest news sliding chips (Jain / Milan / Other state / Events) are managed in Home layout.",
+            kn: "ಈ ವರದಿ ಕಾಣಿಸಬೇಕಾದ ವಿಭಾಗಗಳನ್ನು ಗುರುತಿಸಿ. ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಸ್ಲೈಡ್‌ಗಳು (ಜೈನ / ಮಿಲನ್ / ಹೊರ ರಾಜ್ಯ / ಕಾರ್ಯಕ್ರಮ) ಮುಖಪುಟ ವಿನ್ಯಾಸದಲ್ಲಿ.",
+            hi: "जिन अनुभागों में यह रिपोर्ट दिखे, उन्हें चुनें। ताज़ा समाचार स्लाइड (जैन / मिलन / अन्य राज्य / कार्यक्रम) होम लेआउट में हैं।",
           })}
         </p>
-
-        <label className="article-placement-row article-placement-latest-row">
-          <input
-            type="checkbox"
-            checked={pinLatest}
-            onChange={(event) => {
-              const on = event.target.checked;
-              setPinLatest(on);
-              if (!on) {
-                setDraftOrder(null);
-                setLatestIds((current) =>
-                  current.filter((id) => id !== postId && id !== THIS_KEY),
-                );
-                return;
-              }
-              if (postId) {
-                setLatestIds((current) =>
-                  current.includes(postId) ? current : [...current, postId].slice(0, 24),
-                );
-              } else {
-                setDraftOrder([...latestIds.filter((id) => id !== THIS_KEY), THIS_KEY]);
-              }
-            }}
-          />
-          <span>
-            <strong>
-              {tr({
-                en: "Latest news (home)",
-                kn: "ಇತ್ತೀಚಿನ ಸುದ್ದಿ (ಮುಖಪುಟ)",
-                hi: "ताज़ा समाचार (होम)",
-              })}
-            </strong>
-            <small>
-              {tr({
-                en: " — pin and drag to set order",
-                kn: " — ಪಿನ್ ಮಾಡಿ, ಎಳೆದು ಕ್ರಮ ಹೊಂದಿಸಿ",
-                hi: " — पिन करें और खींचकर क्रम तय करें",
-              })}
-            </small>
-          </span>
-        </label>
-
-        {pinLatest ? (
-          <div className="article-placement-drag" aria-label={tr({ en: "Latest news order", kn: "ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಕ್ರಮ", hi: "ताज़ा समाचार क्रम" })}>
-            <p className="article-placement-drag-help">
-              {tr({
-                en: "Drag the handle to reorder. Pinned stories appear first on home Latest news.",
-                kn: "ಕ್ರಮ ಬದಲಾಯಿಸಲು ಹ್ಯಾಂಡಲ್ ಎಳೆಯಿರಿ. ಪಿನ್ ಲೇಖನಗಳು ಮುಖಪುಟದ ಇತ್ತೀಚಿನ ಸುದ್ದಿಯಲ್ಲಿ ಮೊದಲು.",
-                hi: "क्रम बदलने के लिए हैंडल खींचें। पिन लेख होम ताज़ा समाचार में पहले आते हैं।",
-              })}
-            </p>
-            <ol className="article-placement-drag-list">
-              {orderKeys.map((key, index) => {
-                const isThis = key === THIS_KEY || key === postId;
-                return (
-                  <li
-                    key={key}
-                    className={
-                      "article-placement-drag-item" +
-                      (isThis ? " is-current" : "") +
-                      (dragOver === index ? " is-over" : "")
-                    }
-                    draggable
-                    onDragStart={() => {
-                      dragFrom.current = index;
-                    }}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setDragOver(index);
-                    }}
-                    onDragLeave={() => setDragOver((current) => (current === index ? null : current))}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      onDrop(index);
-                    }}
-                    onDragEnd={() => {
-                      dragFrom.current = null;
-                      setDragOver(null);
-                    }}
-                  >
-                    <span className="article-placement-drag-handle" aria-hidden="true">
-                      <GripVertical size={16} />
-                    </span>
-                    <span className="article-placement-drag-index">{index + 1}</span>
-                    <span className="article-placement-drag-title">{labelFor(key)}</span>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        ) : null}
-
         <div className="article-placement-list">
           {ARTICLE_PLACEMENTS.map((item) => {
             const category = bySlug.get(item.slug);
@@ -314,14 +151,6 @@ export function ArticlePlacement({
           </div>
         </fieldset>
       ) : null}
-
-      <input type="hidden" name="pin_latest" value={pinLatest ? "1" : ""} />
-      <input type="hidden" name="latest_ids" value={JSON.stringify(latestIds.filter((id) => id !== THIS_KEY))} />
-      <input
-        type="hidden"
-        name="latest_rank"
-        value={pinLatest && latestRank >= 0 ? String(latestRank) : ""}
-      />
     </div>
   );
 }

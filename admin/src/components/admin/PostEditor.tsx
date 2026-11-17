@@ -140,8 +140,6 @@ export function PostEditor({
     authors: { id: string; name_kn: string }[];
     events: { id: string; name_kn: string }[];
     mathas?: { id: string; name_kn: string; slug: string }[];
-    latestIds?: string[];
-    latestLabels?: { id: string; title_kn: string }[];
   };
   mathaIds?: string[];
 }) {
@@ -184,10 +182,6 @@ export function PostEditor({
   const [socialPlatform, setSocialPlatform] = useState(post?.social_platform || "");
   const [socialUrl, setSocialUrl] = useState(post?.social_post_url || "");
   const [mathaIds, setMathaIds] = useState(() => new Set(initialMathaIds));
-  const [latestIds, setLatestIds] = useState(() => [...(choices.latestIds || [])]);
-  const [pinLatest, setPinLatest] = useState(() =>
-    Boolean(post?.id && (choices.latestIds || []).includes(post.id)),
-  );
   const selectedIds = new Set([primaryCategory, ...extraCategories]);
   const selectedSlugs = new Set(
     categories.filter((category) => selectedIds.has(category.id)).map((category) => category.slug),
@@ -391,14 +385,6 @@ export function PostEditor({
             category_ids: data.getAll("category_ids"),
             tag_ids: data.getAll("tag_ids"),
             matha_ids: [...mathaIds],
-            pin_latest: pinLatest,
-            latest_ids: latestIds.filter((id) => id !== "__this__"),
-            latest_rank: (() => {
-              const raw = String(data.get("latest_rank") || "");
-              if (!raw) return undefined;
-              const n = Number(raw);
-              return Number.isFinite(n) ? n : undefined;
-            })(),
             is_featured: data.has("is_featured"),
             is_breaking: data.has("is_breaking"),
             is_live: data.has("is_live"),
@@ -582,9 +568,9 @@ export function PostEditor({
             hi: "कहाँ दिखाना है",
           })}
           description={tr({
-            en: "Required when publishing. Pick Latest news and every section that should list this article.",
-            kn: "ಪ್ರಕಟಿಸುವಾಗ ಅಗತ್ಯ. ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಮತ್ತು ಈ ಲೇಖನ ಕಾಣಿಸಬೇಕಾದ ಪ್ರತಿ ವಿಭಾಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-            hi: "प्रकाशित करते समय आवश्यक। ताज़ा समाचार और हर अनुभाग चुनें जहाँ यह लेख दिखे।",
+            en: "Choose which site sections should list this article when you publish.",
+            kn: "ಪ್ರಕಟಿಸಿದಾಗ ಈ ಲೇಖನ ಯಾವ ವಿಭಾಗಗಳಲ್ಲಿ ಕಾಣಿಸಬೇಕು ಎಂದು ಆಯ್ಕೆಮಾಡಿ.",
+            hi: "प्रकाशित करने पर यह लेख किन अनुभागों में दिखे, चुनें।",
           })}
         >
           <ArticlePlacement
@@ -596,13 +582,6 @@ export function PostEditor({
             mathas={choices.mathas || []}
             mathaIds={mathaIds}
             setMathaIds={setMathaIds}
-            pinLatest={pinLatest}
-            setPinLatest={setPinLatest}
-            latestIds={latestIds}
-            setLatestIds={setLatestIds}
-            latestLabels={choices.latestLabels || []}
-            postId={post?.id}
-            postTitle={post?.title_kn}
           />
         </Section>
 

@@ -6,7 +6,7 @@ import { getUiStrings } from "@/lib/i18n/server";
 import { pickText } from "@/lib/i18n/content";
 import { Fragment } from "react";
 import { getSetting } from "@/lib/v4/settings";
-import { homeSchema, defaultHome } from "@/lib/v4/home";
+import { homeSchema, defaultHome, defaultLatestLinks } from "@/lib/v4/home";
 import { JainTimesPanel } from "@/components/widgets/JainTimesPanel";
 import { AdSlot } from "@/components/ads/AdSlot";
 import Link from "next/link";
@@ -185,22 +185,30 @@ export default async function Home() {
                           >
                             {kn.news}
                           </SectionTitle>
-                          <div className="category-chips">
-                            {categoriesList.slice(0, 7).map((c) => (
-                              <Link
-                                href={`/category/${c.slug}`}
-                                key={c.slug}
-                                className="chip"
-                              >
-                                {pickText(
-                                  locale,
-                                  c.name_kn,
-                                  c.name_en,
-                                  c.name_hi,
-                                )}
-                              </Link>
-                            ))}
-                          </div>
+                          <nav
+                            className="category-chips latest-news-slides"
+                            aria-label={kn.latest}
+                          >
+                            {(config.latest_links?.length
+                              ? config.latest_links
+                              : defaultLatestLinks
+                            )
+                              .filter((link) => link.enabled)
+                              .map((link) => (
+                                <Link
+                                  href={link.href}
+                                  key={link.id}
+                                  className="chip"
+                                >
+                                  {pickText(
+                                    locale,
+                                    link.label_kn,
+                                    link.label_en,
+                                    link.label_hi,
+                                  )}
+                                </Link>
+                              ))}
+                          </nav>
                           <div className="news-grid">
                             {selected.slice(0, section.count).map((p) => (
                               <NewsCard key={p.id} post={p} />

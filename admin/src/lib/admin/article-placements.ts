@@ -25,6 +25,14 @@ export const ARTICLE_PLACEMENTS: {
     },
   },
   {
+    slug: "other-state-news",
+    label: {
+      en: "News from other states",
+      kn: "ಹೊರ ರಾಜ್ಯ ಸುದ್ದಿಗಳು",
+      hi: "अन्य राज्यों के समाचार",
+    },
+  },
+  {
     slug: "kshetra-parichaya",
     label: {
       en: "Jain kshetras by district",

@@ -910,6 +910,15 @@ a.menu-section:hover {
 .section {
   margin-block: 40px;
 }
+.latest-news-slides {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.latest-news-slides > .chip {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+}
 .category-chips {
   display: flex;
   gap: 9px;

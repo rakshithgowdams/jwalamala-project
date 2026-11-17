@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { saveHome } from "@/app/admin/home/actions";
-import { type HomeConfig } from "@/lib/v4/home";
+import { defaultLatestLinks, type HomeConfig } from "@/lib/v4/home";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import type { Tri } from "@/lib/i18n/strings";
 const labels: Record<string, Tri> = {
@@ -43,6 +43,18 @@ export function HomeBuilder({
         sections[index],
       ];
       return { ...c, sections };
+    });
+  }
+  const latestLinks = config.latest_links?.length
+    ? config.latest_links
+    : defaultLatestLinks;
+  function moveLatestLink(index: number, delta: number) {
+    setConfig((c) => {
+      const links = [...(c.latest_links?.length ? c.latest_links : defaultLatestLinks)];
+      const next = index + delta;
+      if (next < 0 || next >= links.length) return c;
+      [links[index], links[next]] = [links[next], links[index]];
+      return { ...c, latest_links: links };
     });
   }
   return (
@@ -172,68 +184,69 @@ export function HomeBuilder({
       <fieldset className="field wide">
         <legend>
           {tr({
-            en: "Latest news pins — drag order with ↑ ↓",
-            kn: "ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಪಿನ್ — ↑ ↓ ಕ್ರಮ",
-            hi: "ताज़ा समाचार पिन — ↑ ↓ क्रम",
+            en: "Latest news sliding links (home)",
+            kn: "ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಸ್ಲೈಡ್ ಲಿಂಕ್‌ಗಳು (ಮುಖಪುಟ)",
+            hi: "ताज़ा समाचार स्लाइड लिंक (होम)",
           })}
         </legend>
-        {posts.slice(0, 60).map((p) => (
-          <label key={p.id} className="chip">
-            <input
-              type="checkbox"
-              checked={config.latest_ids.includes(p.id)}
-              disabled={
-                !config.latest_ids.includes(p.id) && config.latest_ids.length >= 24
-              }
-              onChange={(e) =>
-                setConfig({
-                  ...config,
-                  latest_ids: e.target.checked
-                    ? [...config.latest_ids, p.id]
-                    : config.latest_ids.filter((id) => id !== p.id),
-                })
-              }
-            />
-            {p.title_kn}
-            {config.latest_ids.includes(p.id) ? (
-              <span className="category-chips" style={{ marginLeft: 8 }}>
-                <button
-                  type="button"
-                  className="button is-compact"
-                  disabled={config.latest_ids.indexOf(p.id) <= 0}
-                  onClick={() => {
-                    const index = config.latest_ids.indexOf(p.id);
-                    if (index <= 0) return;
-                    const next = [...config.latest_ids];
-                    [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                    setConfig({ ...config, latest_ids: next });
-                  }}
-                  aria-label={tr({ en: "Move up", kn: "ಮೇಲಕ್ಕೆ", hi: "ऊपर" })}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className="button is-compact"
-                  disabled={
-                    config.latest_ids.indexOf(p.id) < 0 ||
-                    config.latest_ids.indexOf(p.id) >= config.latest_ids.length - 1
-                  }
-                  onClick={() => {
-                    const index = config.latest_ids.indexOf(p.id);
-                    if (index < 0 || index >= config.latest_ids.length - 1) return;
-                    const next = [...config.latest_ids];
-                    [next[index + 1], next[index]] = [next[index], next[index + 1]];
-                    setConfig({ ...config, latest_ids: next });
-                  }}
-                  aria-label={tr({ en: "Move down", kn: "ಕೆಳಕ್ಕೆ", hi: "नीचे" })}
-                >
-                  ↓
-                </button>
-              </span>
-            ) : null}
-          </label>
+        <p className="field-hint" style={{ marginBottom: 8 }}>
+          {tr({
+            en: "These chips slide under Latest news. Click opens that page. Reorder with ↑ ↓.",
+            kn: "ಇವು ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಕೆಳಗೆ ಸ್ಲೈಡ್ ಆಗುತ್ತವೆ. ಕ್ಲಿಕ್‌ನಿಂದ ಆ ಪುಟ ತೆರೆಯುತ್ತದೆ. ↑ ↓ ನಿಂದ ಕ್ರಮ.",
+            hi: "ये चिप्स ताज़ा समाचार के नीचे स्लाइड होते हैं। क्लिक से वह पेज खुलता है। ↑ ↓ से क्रम।",
+          })}
+        </p>
+        {latestLinks.map((link, index) => (
+          <div key={link.id} className="chip" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label className="chip" style={{ margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={link.enabled}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    latest_links: latestLinks.map((row, i) =>
+                      i === index ? { ...row, enabled: e.target.checked } : row,
+                    ),
+                  })
+                }
+              />
+              {link.label_kn}
+              <small style={{ marginLeft: 6 }}>{link.href}</small>
+            </label>
+            <button
+              type="button"
+              className="button is-compact"
+              disabled={index === 0}
+              onClick={() => moveLatestLink(index, -1)}
+              aria-label={tr({ en: "Move up", kn: "ಮೇಲಕ್ಕೆ", hi: "ऊपर" })}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="button is-compact"
+              disabled={index === latestLinks.length - 1}
+              onClick={() => moveLatestLink(index, 1)}
+              aria-label={tr({ en: "Move down", kn: "ಕೆಳಕ್ಕೆ", hi: "नीचे" })}
+            >
+              ↓
+            </button>
+          </div>
         ))}
+        <button
+          type="button"
+          className="button button-outline is-compact"
+          onClick={() =>
+            setConfig({ ...config, latest_links: defaultLatestLinks })
+          }
+        >
+          {tr({
+            en: "Reset to Jain / Milan / Other state / Events",
+            kn: "ಜೈನ / ಮಿಲನ್ / ಹೊರ ರಾಜ್ಯ / ಕಾರ್ಯಕ್ರಮಕ್ಕೆ ಮರುಹೊಂದಿಸಿ",
+            hi: "जैन / मिलन / अन्य राज्य / कार्यक्रम पर रीसेट",
+          })}
+        </button>
       </fieldset>
       {config.sections.map((s, index) => (
         <fieldset key={s.id} className="field wide">
