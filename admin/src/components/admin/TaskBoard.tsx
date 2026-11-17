@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CircleAlert, ExternalLink, Eye, Layers, Pencil, RefreshCw, SendHorizontal } from "lucide-react";
+import { CircleAlert, ExternalLink, Eye, Layers, Pencil, RefreshCw, SendHorizontal, Trash2 } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { ArticleCardSearch } from "@/components/admin/ArticleCardSearch";
 import { PostThumb } from "@/components/admin/PostThumb";
@@ -15,9 +15,16 @@ import {
   assignSingleArticle,
   cancelOpenBatch,
   setTaskStatus,
+  updateOpenBatch,
 } from "@/app/admin/tasks/actions";
 import { createTaskRequest } from "@/app/admin/task-requests/actions";
 import { useDeskPath } from "@/components/admin/DeskPathProvider";
+
+function parseBatchRange(label: string): { fromPos: string; toPos: string } | null {
+  const match = /^(\d+)-(\d+)$/.exec(label.trim());
+  if (!match) return null;
+  return { fromPos: match[1], toPos: match[2] };
+}
 
 export type TaskRow = {
   id: string;
@@ -128,23 +135,36 @@ export function TaskBoard({
   const [filterStatus, setFilterStatus] = useState<"open" | "done" | "cancelled" | "all">("open");
   const [cancelTask, setCancelTask] = useState<TaskRow | null>(null);
   const [cancelBatch, setCancelBatch] = useState<BatchSummary | null>(null);
+  const [editBatch, setEditBatch] = useState<BatchSummary | null>(null);
+  const [editFromPos, setEditFromPos] = useState("1");
+  const [editToPos, setEditToPos] = useState("1");
+  const [editNotes, setEditNotes] = useState("");
   const [detailTask, setDetailTask] = useState<TaskRow | null>(null);
   const [detailBatch, setDetailBatch] = useState<BatchSummary | null>(null);
   const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
   const [requestNote, setRequestNote] = useState("");
 
   useEffect(() => {
-    if (!cancelTask && !cancelBatch && !detailTask && !detailBatch) return;
+    if (!cancelTask && !cancelBatch && !editBatch && !detailTask && !detailBatch) return;
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape" || pending) return;
       setCancelTask(null);
       setCancelBatch(null);
+      setEditBatch(null);
       setDetailTask(null);
       setDetailBatch(null);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [cancelTask, cancelBatch, detailTask, detailBatch, pending]);
+  }, [cancelTask, cancelBatch, editBatch, detailTask, detailBatch, pending]);
+
+  function openEditBatch(batch: BatchSummary) {
+    const range = parseBatchRange(batch.batchLabel);
+    setEditBatch(batch);
+    setEditFromPos(range?.fromPos || "1");
+    setEditToPos(range?.toPos || String(batch.count || 1));
+    setEditNotes(batch.notes || "");
+  }
 
   const visibleBatches = useMemo(() => {
     if (!isAdmin || filterStatus === "done" || filterStatus === "cancelled") return [];
@@ -173,7 +193,13 @@ export function TaskBoard({
   }, [tasks, filterStatus, filterAssignee, isAdmin, visibleBatches]);
 
   function run(
-    action: () => Promise<{ ok?: true; error?: string; assigned?: number }>,
+    action: () => Promise<{
+      ok?: true;
+      error?: string;
+      assigned?: number;
+      added?: number;
+      removed?: number;
+    }>,
     done: string,
     opts?: { showCancelled?: boolean },
   ) {
@@ -182,20 +208,28 @@ export function TaskBoard({
       const result = await action();
       if (result.error) setMessage({ error: result.error });
       else {
-        const extra =
-          typeof result.assigned === "number"
-            ? opts?.showCancelled
-              ? tr({
-                  en: ` ${result.assigned} cancelled.`,
-                  kn: ` ${result.assigned} ರದ್ದು.`,
-                  hi: ` ${result.assigned} रद्द।`,
-                })
-              : tr({
-                  en: ` Assigned ${result.assigned}.`,
-                  kn: ` ${result.assigned} ನಿಯೋಜಿಸಲಾಯಿತು.`,
-                  hi: ` ${result.assigned} असाइन हुए।`,
-                })
-            : "";
+        let extra = "";
+        if (opts?.showCancelled && typeof result.assigned === "number") {
+          extra = tr({
+            en: ` ${result.assigned} deleted.`,
+            kn: ` ${result.assigned} ಅಳಿಸಲಾಯಿತು.`,
+            hi: ` ${result.assigned} हटाए गए।`,
+          });
+        } else if (typeof result.added === "number" || typeof result.removed === "number") {
+          const added = result.added || 0;
+          const removed = result.removed || 0;
+          extra = tr({
+            en: ` Now ${result.assigned ?? 0} open (${added} added, ${removed} removed).`,
+            kn: ` ಈಗ ${result.assigned ?? 0} ತೆರೆದ (${added} ಸೇರಿಸಲಾಯಿತು, ${removed} ತೆಗೆದುಹಾಕಲಾಯಿತು).`,
+            hi: ` अब ${result.assigned ?? 0} खुले (${added} जोड़े, ${removed} हटाए)।`,
+          });
+        } else if (typeof result.assigned === "number") {
+          extra = tr({
+            en: ` Assigned ${result.assigned}.`,
+            kn: ` ${result.assigned} ನಿಯೋಜಿಸಲಾಯಿತು.`,
+            hi: ` ${result.assigned} असाइन हुए।`,
+          });
+        }
         setMessage({ ok: done + extra });
         if (opts?.showCancelled) setFilterStatus("cancelled");
         router.refresh();
@@ -221,14 +255,14 @@ export function TaskBoard({
       <p>
         {isAdmin
           ? tr({
-              en: `${totalArticles.toLocaleString("en-IN")} articles in the library. Assign a single piece or a numbered block (for example 1–1000, 1001–2000) to different staff. Staff can edit only articles assigned to them. Super admins can open and edit any article at any time — no assignment needed.`,
-              kn: `ಲೈಬ್ರರಿಯಲ್ಲಿ ${totalArticles.toLocaleString("en-IN")} ಲೇಖನಗಳಿವೆ. ಒಂದು ಲೇಖನ ಅಥವಾ ಸಂಖ್ಯೆಯ ವ್ಯಾಪ್ತಿ (ಉದಾ. 1–1000, 1001–2000) ಸಿಬ್ಬಂದಿಗೆ ನಿಯೋಜಿಸಿ. ಸಿಬ್ಬಂದಿ ತಮಗೆ ನಿಯೋಜಿಸಿದ ಲೇಖನಗಳನ್ನು ಮಾತ್ರ ಸಂಪಾದಿಸಬಹುದು. ಸೂಪರ್ ಅಡ್ಮಿನ್‌ಗಳು ಯಾವುದೇ ಲೇಖನವನ್ನು ಯಾವಾಗ ಬೇಕಾದರೂ ಸಂಪಾದಿಸಬಹುದು — ನಿಯೋಜನೆ ಬೇಕಿಲ್ಲ.`,
-              hi: `लाइब्रेरी में ${totalArticles.toLocaleString("en-IN")} लेख हैं। एक लेख या संख्या ब्लॉक (जैसे 1–1000, 1001–2000) अलग-अलग स्टाफ़ को दें। स्टाफ़ केवल असाइन लेख संपादित कर सकते हैं। सुपर एडमिन किसी भी लेख को कभी भी संपादित कर सकते हैं — असाइनमेंट ज़रूरी नहीं।`,
+              en: `${totalArticles.toLocaleString("en-IN")} articles in the library. Only admins can create, update, or delete staff tasks. Example: assign 1–2000 to one person, then Update to 1–2500 or 1–200, or Delete the whole batch.`,
+              kn: `ಲೈಬ್ರರಿಯಲ್ಲಿ ${totalArticles.toLocaleString("en-IN")} ಲೇಖನಗಳಿವೆ. ಸಿಬ್ಬಂದಿ ಕಾರ್ಯಗಳನ್ನು ರಚಿಸಲು, ನವೀಕರಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ಉದಾ.: 1–2000 ನಿಯೋಜಿಸಿ, ನಂತರ Update ಮೂಲಕ 1–2500 ಅಥವಾ 1–200 ಮಾಡಿ, ಅಥವಾ Delete ಮಾಡಿ.`,
+              hi: `लाइब्रेरी में ${totalArticles.toLocaleString("en-IN")} लेख हैं। स्टाफ़ कार्य बनाना, अपडेट या हटाना केवल एडमिन कर सकते हैं। उदाहरण: 1–2000 असाइन करें, फिर Update से 1–2500 या 1–200 करें, या Delete करें।`,
             })
           : tr({
-              en: `You have ${openCount} open article task${openCount === 1 ? "" : "s"}. Open an article to edit it, then mark the task done.`,
-              kn: `ನಿಮಗೆ ${openCount} ತೆರೆದ ಲೇಖನ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಸಂಪಾದಿಸಲು ಲೇಖನ ತೆರೆಯಿರಿ, ನಂತರ ಕಾರ್ಯ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ.`,
-              hi: `आपके ${openCount} खुले लेख कार्य हैं। संपादन के लिए लेख खोलें, फिर कार्य पूर्ण चिह्नित करें।`,
+              en: `You have ${openCount} open article task${openCount === 1 ? "" : "s"}. Open an article to edit it, then mark the task done. Only an admin can change or delete your assignment.`,
+              kn: `ನಿಮಗೆ ${openCount} ತೆರೆದ ಲೇಖನ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಸಂಪಾದಿಸಲು ಲೇಖನ ತೆರೆಯಿರಿ, ನಂತರ ಕಾರ್ಯ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ. ನಿಯೋಜನೆ ಬದಲಾಯಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ.`,
+              hi: `आपके ${openCount} खुले लेख कार्य हैं। संपादन के लिए लेख खोलें, फिर कार्य पूर्ण चिह्नित करें। असाइनमेंट बदलना या हटाना केवल एडमिन कर सकते हैं।`,
             })}
       </p>
 
@@ -456,9 +490,19 @@ export function TaskBoard({
                       type="button"
                       className="button button-outline is-compact"
                       disabled={pending}
+                      onClick={() => openEditBatch(batch)}
+                    >
+                      <Pencil size={15} aria-hidden="true" />
+                      {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-outline is-compact"
+                      disabled={pending}
                       onClick={() => setCancelBatch(batch)}
                     >
-                      {tr({ en: "Cancel batch", kn: "ಬ್ಯಾಚ್ ರದ್ದು", hi: "बैच रद्द" })}
+                      <Trash2 size={15} aria-hidden="true" />
+                      {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
                     </button>
                   </div>
                 </div>
@@ -600,7 +644,8 @@ export function TaskBoard({
                         disabled={pending}
                         onClick={() => setCancelTask(task)}
                       >
-                        {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
+                        <Trash2 size={15} aria-hidden="true" />
+                        {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
                       </button>
                     ) : null}
                     {isAdmin && task.status !== "open" ? (
@@ -648,16 +693,16 @@ export function TaskBoard({
                 </div>
                 <h2 id="cancel-task-title">
                   {tr({
-                    en: "Are you sure?",
-                    kn: "ನೀವು ಖಚಿತವೇ?",
-                    hi: "क्या आप सुनिश्चित हैं?",
+                    en: "Delete this task?",
+                    kn: "ಈ ಕಾರ್ಯವನ್ನು ಅಳಿಸುವುದೇ?",
+                    hi: "यह कार्य हटाएँ?",
                   })}
                 </h2>
                 <p>
                   {tr({
-                    en: "This will cancel the assignment. The staff member will no longer be able to edit this article from Tasks.",
-                    kn: "ಇದು ನಿಯೋಜನೆಯನ್ನು ರದ್ದುಗೊಳಿಸುತ್ತದೆ. ಸಿಬ್ಬಂದಿ ಈ ಲೇಖನವನ್ನು ಕಾರ್ಯಗಳಿಂದ ಸಂಪಾದಿಸಲು ಸಾಧ್ಯವಾಗುವುದಿಲ್ಲ.",
-                    hi: "यह असाइनमेंट रद्द कर देगा। स्टाफ़ Tasks से इस लेख को संपादित नहीं कर पाएगा।",
+                    en: "Only admins can delete assignments. The staff member will no longer edit this article from Tasks. It will show as Cancelled.",
+                    kn: "ನಿಯೋಜನೆಗಳನ್ನು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಅಳಿಸಬಹುದು. ಸಿಬ್ಬಂದಿ ಈ ಲೇಖನವನ್ನು Tasks ನಿಂದ ಸಂಪಾದಿಸಲು ಸಾಧ್ಯವಾಗುವುದಿಲ್ಲ. ಇದು ರದ್ದು ಎಂದು ಕಾಣುತ್ತದೆ.",
+                    hi: "असाइनमेंट केवल एडमिन हटा सकते हैं। स्टाफ़ Tasks से इस लेख को संपादित नहीं कर पाएगा। यह रद्द दिखेगा।",
                   })}
                 </p>
                 <div className="confirm-dialog-preview">
@@ -679,7 +724,7 @@ export function TaskBoard({
                     disabled={pending}
                     onClick={() => setCancelTask(null)}
                   >
-                    {tr({ en: "Keep assignment", kn: "ನಿಯೋಜನೆ ಇರಿಸಿ", hi: "असाइनमेंट रखें" })}
+                    {tr({ en: "Keep task", kn: "ಕಾರ್ಯ ಇರಿಸಿ", hi: "कार्य रखें" })}
                   </button>
                   <button
                     type="button"
@@ -691,18 +736,18 @@ export function TaskBoard({
                       run(
                         () => setTaskStatus({ id, status: "cancelled" }),
                         tr({
-                          en: "Assignment cancelled — shown under Cancelled.",
-                          kn: "ನಿಯೋಜನೆ ರದ್ದು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
-                          hi: "असाइनमेंट रद्द — रद्द फ़िल्टर में दिखेगा।",
+                          en: "Task deleted — shown under Cancelled.",
+                          kn: "ಕಾರ್ಯ ಅಳಿಸಲಾಯಿತು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+                          hi: "कार्य हटाया — रद्द फ़िल्टर में दिखेगा।",
                         }),
                         { showCancelled: true },
                       );
                     }}
                   >
                     {tr({
-                      en: "Yes, cancel it",
-                      kn: "ಹೌದು, ರದ್ದುಮಾಡಿ",
-                      hi: "हाँ, रद्द करें",
+                      en: "Yes, delete it",
+                      kn: "ಹೌದು, ಅಳಿಸಿ",
+                      hi: "हाँ, हटाएँ",
                     })}
                   </button>
                 </div>
@@ -730,16 +775,16 @@ export function TaskBoard({
                 </div>
                 <h2 id="cancel-batch-title">
                   {tr({
-                    en: "Cancel this whole batch?",
-                    kn: "ಈ ಸಂಪೂರ್ಣ ಬ್ಯಾಚ್ ರದ್ದುಮಾಡುವುದೇ?",
-                    hi: "पूरा बैच रद्द करें?",
+                    en: "Delete this whole batch?",
+                    kn: "ಈ ಸಂಪೂರ್ಣ ಬ್ಯಾಚ್ ಅಳಿಸುವುದೇ?",
+                    hi: "पूरा बैच हटाएँ?",
                   })}
                 </h2>
                 <p>
                   {tr({
-                    en: `This marks all ${cancelBatch.count.toLocaleString("en-IN")} open assignments in #${cancelBatch.batchLabel} for ${cancelBatch.assigneeName} as Cancelled. They will appear under the Cancelled filter.`,
-                    kn: `ಇದು ${cancelBatch.assigneeName} ಅವರ #${cancelBatch.batchLabel} ನಲ್ಲಿನ ${cancelBatch.count.toLocaleString("en-IN")} ತೆರೆದ ನಿಯೋಜನೆಗಳನ್ನು ರದ್ದು ಎಂದು ಗುರುತಿಸುತ್ತದೆ. ಅವು ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತವೆ.`,
-                    hi: `यह ${cancelBatch.assigneeName} के #${cancelBatch.batchLabel} में ${cancelBatch.count.toLocaleString("en-IN")} खुले असाइनमेंट रद्द चिह्नित करेगा। वे रद्द फ़िल्टर में दिखेंगे।`,
+                    en: `This deletes all ${cancelBatch.count.toLocaleString("en-IN")} open assignments in #${cancelBatch.batchLabel} for ${cancelBatch.assigneeName}. Only admins can do this. They will appear under Cancelled.`,
+                    kn: `ಇದು ${cancelBatch.assigneeName} ಅವರ #${cancelBatch.batchLabel} ನಲ್ಲಿನ ${cancelBatch.count.toLocaleString("en-IN")} ತೆರೆದ ನಿಯೋಜನೆಗಳನ್ನು ಅಳಿಸುತ್ತದೆ. ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ಅವು ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತವೆ.`,
+                    hi: `यह ${cancelBatch.assigneeName} के #${cancelBatch.batchLabel} में ${cancelBatch.count.toLocaleString("en-IN")} खुले असाइनमेंट हटाता है। केवल एडमिन। वे रद्द फ़िल्टर में दिखेंगे।`,
                   })}
                 </p>
                 <div className="delete-dialog-actions">
@@ -764,22 +809,115 @@ export function TaskBoard({
                       run(
                         () => cancelOpenBatch(payload),
                         tr({
-                          en: "Batch cancelled — shown under Cancelled.",
-                          kn: "ಬ್ಯಾಚ್ ರದ್ದು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
-                          hi: "बैच रद्द — रद्द फ़िल्टर में दिखेगा।",
+                          en: "Batch deleted — shown under Cancelled.",
+                          kn: "ಬ್ಯಾಚ್ ಅಳಿಸಲಾಯಿತು — ರದ್ದು ಫಿಲ್ಟರ್‌ನಲ್ಲಿ ಕಾಣುತ್ತದೆ.",
+                          hi: "बैच हटाया — रद्द फ़िल्टर में दिखेगा।",
                         }),
                         { showCancelled: true },
                       );
                     }}
                   >
                     {tr({
-                      en: "Yes, cancel batch",
-                      kn: "ಹೌದು, ಬ್ಯಾಚ್ ರದ್ದುಮಾಡಿ",
-                      hi: "हाँ, बैच रद्द करें",
+                      en: "Yes, delete batch",
+                      kn: "ಹೌದು, ಬ್ಯಾಚ್ ಅಳಿಸಿ",
+                      hi: "हाँ, बैच हटाएँ",
                     })}
                   </button>
                 </div>
               </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {editBatch && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop"
+              onClick={() => !pending && setEditBatch(null)}
+            >
+              <form
+                className="delete-dialog confirm-dialog task-detail-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-batch-title"
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const batch = editBatch;
+                  const fromPos = editFromPos;
+                  const toPos = editToPos;
+                  const notesValue = editNotes;
+                  setEditBatch(null);
+                  run(
+                    () =>
+                      updateOpenBatch({
+                        assigneeId: batch.assigneeId,
+                        batchLabel: batch.batchLabel,
+                        fromPos,
+                        toPos,
+                        notes: notesValue,
+                      }),
+                    tr({
+                      en: "Batch updated.",
+                      kn: "ಬ್ಯಾಚ್ ನವೀಕರಿಸಲಾಯಿತು.",
+                      hi: "बैच अपडेट हुआ।",
+                    }),
+                  );
+                }}
+              >
+                <h2 id="edit-batch-title">
+                  {tr({
+                    en: "Update batch range",
+                    kn: "ಬ್ಯಾಚ್ ವ್ಯಾಪ್ತಿ ನವೀಕರಿಸಿ",
+                    hi: "बैच रेंज अपडेट करें",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: `Change ${editBatch.assigneeName}'s #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} articles). Example: 1–2000 → 1–2500 adds articles; 1–200 removes the rest.`,
+                    kn: `${editBatch.assigneeName} ಅವರ #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} ಲೇಖನಗಳು) ಬದಲಾಯಿಸಿ. ಉದಾ.: 1–2000 → 1–2500 ಸೇರಿಸುತ್ತದೆ; 1–200 ಉಳಿದವುಗಳನ್ನು ತೆಗೆಯುತ್ತದೆ.`,
+                    hi: `${editBatch.assigneeName} का #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} लेख) बदलें। उदाहरण: 1–2000 → 1–2500 जोड़ता है; 1–200 बाकी हटाता है।`,
+                  })}
+                </p>
+                <div className="field-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", width: "100%" }}>
+                  <label className="field" style={{ flex: "1 1 6rem" }}>
+                    <span>{tr({ en: "From #", kn: "ಪ್ರಾರಂಭ #", hi: "से #" })}</span>
+                    <input
+                      inputMode="numeric"
+                      value={editFromPos}
+                      onChange={(e) => setEditFromPos(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="field" style={{ flex: "1 1 6rem" }}>
+                    <span>{tr({ en: "To #", kn: "ಕೊನೆ #", hi: "तक #" })}</span>
+                    <input
+                      inputMode="numeric"
+                      value={editToPos}
+                      onChange={(e) => setEditToPos(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+                <label className="field" style={{ display: "grid", gap: 6, textAlign: "left", width: "100%" }}>
+                  <span>{tr({ en: "Note (optional)", kn: "ಟಿಪ್ಪಣಿ (ಐಚ್ಛಿಕ)", hi: "नोट (वैकल्पिक)" })}</span>
+                  <input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} maxLength={500} />
+                </label>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setEditBatch(null)}
+                  >
+                    {tr({ en: "Back", kn: "ಹಿಂದೆ", hi: "वापस" })}
+                  </button>
+                  <button type="submit" className="button" disabled={pending}>
+                    {tr({ en: "Save update", kn: "ನವೀಕರಣ ಉಳಿಸಿ", hi: "अपडेट सहेजें" })}
+                  </button>
+                </div>
+              </form>
             </div>,
             document.body,
           )
@@ -945,10 +1083,24 @@ export function TaskBoard({
                     onClick={() => {
                       const batch = detailBatch;
                       setDetailBatch(null);
+                      openEditBatch(batch);
+                    }}
+                  >
+                    <Pencil size={15} aria-hidden="true" />
+                    {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => {
+                      const batch = detailBatch;
+                      setDetailBatch(null);
                       setCancelBatch(batch);
                     }}
                   >
-                    {tr({ en: "Cancel batch", kn: "ಬ್ಯಾಚ್ ರದ್ದು", hi: "बैच रद्द" })}
+                    <Trash2 size={15} aria-hidden="true" />
+                    {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
                   </button>
                   <button type="button" className="button" onClick={() => setDetailBatch(null)}>
                     {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}

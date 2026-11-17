@@ -5,8 +5,39 @@ import { requireStaff } from "@/lib/auth/require-user";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getUiStrings } from "@/lib/i18n/server";
 
-type Result = { ok?: true; error?: string; assigned?: number };
+type Result = {
+  ok?: true;
+  error?: string;
+  assigned?: number;
+  added?: number;
+  removed?: number;
+};
 type Fail = (en: string, kn: string, hi: string) => Result;
+
+function parseBatchLabel(label: string): { fromPos: number; toPos: number } | null {
+  const match = /^(\d+)-(\d+)$/.exec(label.trim());
+  if (!match) return null;
+  const fromPos = Number(match[1]);
+  const toPos = Number(match[2]);
+  if (!Number.isFinite(fromPos) || !Number.isFinite(toPos) || toPos < fromPos) return null;
+  return { fromPos, toPos };
+}
+
+async function loadPostsInRange(
+  server: NonNullable<ReturnType<typeof getAdminClient>>,
+  fromPos: number,
+  toPos: number,
+) {
+  const from = fromPos - 1;
+  const size = toPos - fromPos + 1;
+  return server
+    .from("posts")
+    .select("id")
+    .neq("status", "archived")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, from + size - 1);
+}
 
 async function requireAdminAssign(): Promise<
   | { denied: Result }
@@ -176,15 +207,7 @@ export async function assignBulkRange(input: unknown): Promise<Result> {
   const bad = await assertStaffAssignee(server, assigneeId, fail);
   if (bad) return bad;
 
-  const from = fromPos - 1;
-  const size = toPos - fromPos + 1;
-  const { data: posts, error: listError } = await server
-    .from("posts")
-    .select("id")
-    .neq("status", "archived")
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true })
-    .range(from, from + size - 1);
+  const { data: posts, error: listError } = await loadPostsInRange(server, fromPos, toPos);
   if (listError)
     return fail(listError.message || "Could not load articles.", "ಲೇಖನಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "लेख लोड नहीं हो सके।");
   if (!posts?.length)
@@ -212,7 +235,10 @@ export async function assignBulkRange(input: unknown): Promise<Result> {
   return { ok: true, assigned: count };
 }
 
-/** Admin or the assigned staff member can mark a task done / cancelled / reopen. */
+/**
+ * Staff may only mark their own open task done.
+ * Create / update / cancel / reopen / delete stay admin-only.
+ */
 export async function setTaskStatus(input: unknown): Promise<Result> {
   const [{ user, profile }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   const fail: Fail = (en, kn, hi) => ({ error: tr({ en, kn, hi }) as string });
@@ -228,15 +254,18 @@ export async function setTaskStatus(input: unknown): Promise<Result> {
     .eq("id", parsed.data.id)
     .maybeSingle();
   if (!task) return fail("Task not found.", "ಕಾರ್ಯ ಸಿಗಲಿಲ್ಲ.", "कार्य नहीं मिला।");
-  const allowed = profile.role === "admin" || task.assignee_id === user.id;
-  if (!allowed)
-    return fail("You cannot change this task.", "ಈ ಕಾರ್ಯವನ್ನು ನೀವು ಬದಲಾಯಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.", "आप यह कार्य नहीं बदल सकते।");
-  if (profile.role !== "admin" && parsed.data.status === "open")
-    return fail(
-      "Only an administrator can reopen a task.",
-      "ಕಾರ್ಯವನ್ನು ಮರುತೆರೆಯಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಸಾಧ್ಯ.",
-      "केवल एडमिन कार्य दोबारा खोल सकते हैं।",
-    );
+
+  const isAdmin = profile.role === "admin";
+  if (!isAdmin) {
+    if (task.assignee_id !== user.id)
+      return fail("You cannot change this task.", "ಈ ಕಾರ್ಯವನ್ನು ನೀವು ಬದಲಾಯಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.", "आप यह कार्य नहीं बदल सकते।");
+    if (parsed.data.status !== "done")
+      return fail(
+        "Only an administrator can create, update, or delete assignments.",
+        "ನಿಯೋಜನೆಗಳನ್ನು ರಚಿಸಲು, ನವೀಕರಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಸಾಧ್ಯ.",
+        "केवल एडमिन असाइनमेंट बना / अपडेट / हटा सकते हैं।",
+      );
+  }
 
   const { error } = await server
     .from("article_tasks")
@@ -255,7 +284,7 @@ const cancelBatchSchema = z.object({
 
 /**
  * Cancel every open assignment in a numbered bulk batch (e.g. "1-1000" for one staff).
- * Returns how many rows were cancelled.
+ * Returns how many rows were cancelled. Admin only.
  */
 export async function cancelOpenBatch(input: unknown): Promise<Result> {
   const access = await requireAdminAssign();
@@ -291,7 +320,149 @@ export async function cancelOpenBatch(input: unknown): Promise<Result> {
 
   revalidatePath("/admin/tasks");
   revalidatePath("/staff/tasks");
-  return { ok: true, assigned };
+  return { ok: true, assigned, removed: assigned };
+}
+
+const updateBatchSchema = z.object({
+  assigneeId: uuid,
+  batchLabel: z.string().trim().min(1).max(120),
+  fromPos: z.coerce.number().int().min(1).max(1_000_000),
+  toPos: z.coerce.number().int().min(1).max(1_000_000),
+  notes: notesSchema.optional(),
+});
+
+/**
+ * Resize an open bulk assignment. Example: change Shashank's 1–2000 to 1–2500
+ * (adds articles) or 1–200 (cancels the extras). Admin only.
+ */
+export async function updateOpenBatch(input: unknown): Promise<Result> {
+  const access = await requireAdminAssign();
+  if ("denied" in access) return access.denied;
+  const { server, userId, fail } = access;
+  const parsed = updateBatchSchema.safeParse(input);
+  if (!parsed.success)
+    return fail(
+      "Enter a valid from–to range to update this batch.",
+      "ಬ್ಯಾಚ್ ನವೀಕರಿಸಲು ಮಾನ್ಯ ವ್ಯಾಪ್ತಿ ನಮೂದಿಸಿ.",
+      "बैच अपडेट करने के लिए मान्य रेंज दर्ज करें।",
+    );
+
+  const { assigneeId, batchLabel, fromPos, toPos } = parsed.data;
+  if (toPos < fromPos)
+    return fail(
+      "The end number must be greater than or equal to the start number.",
+      "ಕೊನೆಯ ಸಂಖ್ಯೆ ಪ್ರಾರಂಭಕ್ಕಿಂತ ದೊಡ್ಡದು ಅಥವಾ ಸಮನಾಗಿರಬೇಕು.",
+      "अंतिम संख्या शुरू से बड़ी या बराबर होनी चाहिए।",
+    );
+  if (toPos - fromPos + 1 > 5000)
+    return fail(
+      "Keep the updated batch at most 5,000 articles.",
+      "ನವೀಕರಿಸಿದ ಬ್ಯಾಚ್ ಗರಿಷ್ಠ 5,000 ಲೇಖನಗಳಿರಲಿ.",
+      "अपडेटेड बैच अधिकतम 5,000 लेख रखें।",
+    );
+  if (!parseBatchLabel(batchLabel))
+    return fail(
+      "This batch label cannot be resized.",
+      "ಈ ಬ್ಯಾಚ್ ಲೇಬಲ್ ಅನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.",
+      "इस बैच लेबल का आकार नहीं बदल सकते।",
+    );
+
+  const bad = await assertStaffAssignee(server, assigneeId, fail);
+  if (bad) return bad;
+
+  const { data: posts, error: listError } = await loadPostsInRange(server, fromPos, toPos);
+  if (listError)
+    return fail(listError.message || "Could not load articles.", "ಲೇಖನಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "लेख लोड नहीं हो सके।");
+  if (!posts?.length)
+    return fail(
+      "No articles found in that range.",
+      "ಆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಲೇಖನಗಳು ಸಿಗಲಿಲ್ಲ.",
+      "उस रेंज में लेख नहीं मिले।",
+    );
+
+  const newPostIds = posts.map((post) => post.id as string);
+  const newPostSet = new Set(newPostIds);
+  const newLabel = `${fromPos}-${fromPos + posts.length - 1}`;
+  const now = new Date().toISOString();
+  const notes =
+    typeof parsed.data.notes === "string" ? parsed.data.notes : undefined;
+
+  const { data: existingRows, error: existingError } = await server
+    .from("article_tasks")
+    .select("id,post_id,notes")
+    .eq("assignee_id", assigneeId)
+    .eq("batch_label", batchLabel)
+    .eq("status", "open");
+  if (existingError)
+    return fail(existingError.message || "Could not load the batch.", "ಬ್ಯಾಚ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "बैच लोड नहीं हो सका।");
+
+  const existing = existingRows || [];
+  if (!existing.length)
+    return fail(
+      "No open assignments left in that batch.",
+      "ಆ ಬ್ಯಾಚ್‌ನಲ್ಲಿ ತೆರೆದ ನಿಯೋಜನೆಗಳಿಲ್ಲ.",
+      "उस बैच में कोई खुला असाइनमेंट नहीं।",
+    );
+
+  const keepIds: string[] = [];
+  const removeIds: string[] = [];
+  const existingPostIds = new Set<string>();
+  for (const row of existing) {
+    const postId = row.post_id as string;
+    existingPostIds.add(postId);
+    if (newPostSet.has(postId)) keepIds.push(row.id as string);
+    else removeIds.push(row.id as string);
+  }
+
+  let removed = 0;
+  for (let i = 0; i < removeIds.length; i += IN_CHUNK) {
+    const slice = removeIds.slice(i, i + IN_CHUNK);
+    const { error } = await server
+      .from("article_tasks")
+      .update({ status: "cancelled", updated_at: now })
+      .in("id", slice);
+    if (error)
+      return fail(error.message || "Could not shrink the batch.", "ಬ್ಯಾಚ್ ಕಡಿಮೆ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "बैच छोटा नहीं हो सका।");
+    removed += slice.length;
+  }
+
+  const keepPatch: { batch_label: string; updated_at: string; notes?: string } = {
+    batch_label: newLabel,
+    updated_at: now,
+  };
+  if (typeof notes === "string") keepPatch.notes = notes;
+  for (let i = 0; i < keepIds.length; i += IN_CHUNK) {
+    const slice = keepIds.slice(i, i + IN_CHUNK);
+    const { error } = await server.from("article_tasks").update(keepPatch).in("id", slice);
+    if (error)
+      return fail(error.message || "Could not relabel the batch.", "ಬ್ಯಾಚ್ ಲೇಬಲ್ ಬದಲಾಯಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "बैच लेबल नहीं बदला जा सका।");
+  }
+
+  const toAdd = newPostIds.filter((id) => !existingPostIds.has(id));
+  const inheritedNotes =
+    typeof notes === "string" ? notes : ((existing[0].notes as string) || "");
+
+  const { error: addError, count: added } = await insertOpenTasks(
+    server,
+    toAdd.map((postId) => ({
+      post_id: postId,
+      assignee_id: assigneeId,
+      assigned_by: userId,
+      batch_label: newLabel,
+      notes: inheritedNotes,
+    })),
+  );
+  if (addError)
+    return fail(addError.message || "Could not expand the batch.", "ಬ್ಯಾಚ್ ವಿಸ್ತರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "बैच बड़ा नहीं हो सका।");
+
+  revalidatePath("/admin/tasks");
+  revalidatePath("/staff/tasks");
+  return {
+    ok: true,
+    assigned: keepIds.length + added,
+    added,
+    removed,
+  };
 }
 
 export type ArticleSearchHit = {
