@@ -3433,6 +3433,21 @@ body:has(.admin-main .staff-chat) {
   background: var(--surface, #fff);
   border-radius: 0 0 12px 12px;
 }
+.password-vault-delete-thumb {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted, #667085);
+  overflow: hidden;
+}
+.password-vault-delete-thumb img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
 .admin-main .password-vault-title-row {
   display: flex;
   align-items: center;

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  CircleAlert,
   Copy,
   Eye,
   EyeOff,
@@ -54,6 +55,7 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
   const [shareUrl, setShareUrl] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<VaultRow | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -548,24 +550,7 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                 onClick={() => {
                   const row = openRow;
                   closeMenu();
-                  if (
-                    !window.confirm(
-                      tr({
-                        en: "Delete this saved login?",
-                        kn: "ಈ ಉಳಿಸಿದ ಲಾಗಿನ್ ಅಳಿಸುವುದೇ?",
-                        hi: "यह सहेजा लॉगिन हटाएँ?",
-                      }),
-                    )
-                  )
-                    return;
-                  run(
-                    () => deleteVaultEntry({ id: row.id }),
-                    tr({
-                      en: "Login deleted.",
-                      kn: "ಲಾಗಿನ್ ಅಳಿಸಲಾಯಿತು.",
-                      hi: "लॉगिन हटाया।",
-                    }),
-                  );
+                  setDeleteTarget(row);
                 }}
               >
                 <Trash2 size={15} />
@@ -751,6 +736,99 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                   </button>
                 </footer>
               </form>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {deleteTarget && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="delete-dialog-backdrop confirm-dialog-backdrop password-vault-form-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !pending) setDeleteTarget(null);
+              }}
+            >
+              <div
+                className="delete-dialog confirm-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="password-vault-delete-title"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <div className="confirm-dialog-icon" aria-hidden="true">
+                  <CircleAlert size={28} strokeWidth={2.25} />
+                </div>
+                <h2 id="password-vault-delete-title">
+                  {tr({
+                    en: "Are you sure?",
+                    kn: "ನೀವು ಖಚಿತವೇ?",
+                    hi: "क्या आप सुनिश्चित हैं?",
+                  })}
+                </h2>
+                <p>
+                  {tr({
+                    en: "This will permanently delete this saved login. You cannot undo this action.",
+                    kn: "ಈ ಉಳಿಸಿದ ಲಾಗಿನ್ ಶಾಶ್ವತವಾಗಿ ಅಳಿಸಲಾಗುತ್ತದೆ. ಇದನ್ನು ರದ್ದುಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+                    hi: "यह सहेजा लॉगिन स्थायी रूप से हट जाएगा। इसे वापस नहीं लाया जा सकता।",
+                  })}
+                </p>
+                <div className="confirm-dialog-preview">
+                  {deleteTarget.faviconUrl ? (
+                    <span className="confirm-dialog-thumb password-vault-delete-thumb">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={deleteTarget.faviconUrl} alt="" width={40} height={40} />
+                    </span>
+                  ) : (
+                    <span className="confirm-dialog-thumb password-vault-delete-thumb" aria-hidden="true">
+                      <KeyRound size={20} />
+                    </span>
+                  )}
+                  <div>
+                    <strong>{deleteTarget.title || deleteTarget.siteUrl}</strong>
+                    <small>{deleteTarget.email || deleteTarget.siteUrl}</small>
+                  </div>
+                </div>
+                <div className="delete-dialog-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    disabled={pending}
+                    onClick={() => setDeleteTarget(null)}
+                  >
+                    {tr({ en: "Keep login", kn: "ಲಾಗಿನ್ ಇರಿಸಿ", hi: "लॉगिन रखें" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-danger"
+                    disabled={pending}
+                    onClick={() => {
+                      const id = deleteTarget.id;
+                      setDeleteTarget(null);
+                      setRevealed((map) => {
+                        const next = { ...map };
+                        delete next[id];
+                        return next;
+                      });
+                      run(
+                        () => deleteVaultEntry({ id }),
+                        tr({
+                          en: "Login deleted.",
+                          kn: "ಲಾಗಿನ್ ಅಳಿಸಲಾಯಿತು.",
+                          hi: "लॉगिन हटाया।",
+                        }),
+                      );
+                    }}
+                  >
+                    {tr({
+                      en: "Yes, delete it",
+                      kn: "ಹೌದು, ಅಳಿಸಿ",
+                      hi: "हाँ, हटाएँ",
+                    })}
+                  </button>
+                </div>
+              </div>
             </div>,
             document.body,
           )
