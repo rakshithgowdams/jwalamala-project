@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, Eye, Pencil, RefreshCw, Send, X } from "lucide-react";
+import { Check, ExternalLink, Eye, MoreVertical, Pencil, RefreshCw, Send, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { PostThumb } from "@/components/admin/PostThumb";
 import { site } from "@/config/site";
@@ -75,6 +76,70 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [driveUrl, setDriveUrl] = useState("");
   const [adminNote, setAdminNote] = useState("");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  function closeMenu() {
+    setMenuOpenId(null);
+    setMenuPos(null);
+  }
+
+  function placeMenu(button: HTMLButtonElement, panel?: HTMLElement | null) {
+    const rect = button.getBoundingClientRect();
+    const panelWidth = Math.max(panel?.offsetWidth || 0, 200);
+    const panelHeight = Math.max(panel?.offsetHeight || 0, 180);
+    const gap = 8;
+    const left = Math.min(
+      Math.max(12, rect.right - panelWidth),
+      Math.max(12, window.innerWidth - panelWidth - 12),
+    );
+    const below = rect.bottom + gap;
+    const fitsBelow = below + panelHeight <= window.innerHeight - 12;
+    const top = fitsBelow
+      ? below
+      : Math.max(12, Math.min(rect.top - panelHeight - gap, window.innerHeight - panelHeight - 12));
+    setMenuPos({ top, left });
+  }
+
+  function openMenu(rowId: string, button: HTMLButtonElement) {
+    if (menuOpenId === rowId) {
+      closeMenu();
+      return;
+    }
+    placeMenu(button);
+    setMenuOpenId(rowId);
+  }
+
+  useEffect(() => {
+    if (!menuOpenId) return;
+    function onReposition() {
+      const trigger = triggerRefs.current[menuOpenId];
+      if (trigger) placeMenu(trigger, menuRef.current);
+    }
+    const frame = window.requestAnimationFrame(onReposition);
+    function onPointer(event: MouseEvent) {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRefs.current[menuOpenId]?.contains(target)) return;
+      closeMenu();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeMenu();
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [menuOpenId]);
 
   useEffect(() => {
     if (!detailId && !reviewId) return;
@@ -160,6 +225,7 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
           });
 
   const detailRow = detailId ? requests.find((r) => r.id === detailId) : null;
+  const menuRow = menuOpenId ? visible.find((r) => r.id === menuOpenId) : null;
   const stamped = useMemo(
     () =>
       new Intl.DateTimeFormat("en-IN", {
@@ -247,183 +313,235 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
           </p>
         ) : (
           <div className="post-card-list">
-            {visible.map((row, index) => (
-              <article
-                key={row.id}
-                className={
-                  "post-card is-" +
-                  (row.status === "cancelled" || row.status === "rejected"
-                    ? "archived"
-                    : row.status === "done"
-                      ? "published"
-                      : row.postStatus || "draft")
-                }
-                style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
-              >
-                <div className="post-card-thumb">
-                  <PostThumb src={cardThumbnail(row.thumbnail, row.videoUrl)} eager={index < 6} />
-                  <div className="post-card-badges">
-                    <span className={"status-pill is-" + statusPillClass(row.status)}>
-                      {requestStatusNames[row.status]
-                        ? tr(requestStatusNames[row.status])
-                        : row.status}
-                    </span>
+            {visible.map((row, index) => {
+              const menuOpen = menuOpenId === row.id;
+              return (
+                <article
+                  key={row.id}
+                  className={
+                    "post-card task-request-card is-" +
+                    (row.status === "cancelled" || row.status === "rejected"
+                      ? "archived"
+                      : row.status === "done"
+                        ? "published"
+                        : row.postStatus || "draft") +
+                    (menuOpen ? " is-menu-open" : "")
+                  }
+                  style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
+                >
+                  <div className="post-card-thumb">
+                    <PostThumb src={cardThumbnail(row.thumbnail, row.videoUrl)} eager={index < 6} />
+                    <div className="post-card-badges">
+                      <span className={"status-pill is-" + statusPillClass(row.status)}>
+                        {requestStatusNames[row.status]
+                          ? tr(requestStatusNames[row.status])
+                          : row.status}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="post-card-body">
-                  <h2>
-                    <Link href={`${basePath}/posts/${row.postId}`} prefetch={false}>
-                      {row.title || row.postId}
-                    </Link>
-                  </h2>
-                  <p className="task-card-meta">
-                    {isAdmin ? (
-                      <>
-                        <strong>{row.requesterName}</strong>
-                        {" · "}
-                      </>
-                    ) : null}
-                    {row.staffNote ||
-                      tr({ en: "No staff note", kn: "ಸಿಬ್ಬಂದಿ ಟಿಪ್ಪಣಿ ಇಲ್ಲ", hi: "स्टाफ़ नोट नहीं" })}
-                  </p>
-                  {row.adminNote ? (
-                    <p className="task-request-admin-note">
-                      <strong>
-                        {row.status === "rejected"
-                          ? tr({ en: "Rejection note", kn: "ತಿರಸ್ಕಾರ ಟಿಪ್ಪಣಿ", hi: "अस्वीकृति नोट" })
-                          : row.status === "cancelled"
-                            ? tr({ en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" })
-                            : tr({ en: "Admin", kn: "ಆಡ್ಮಿನ್", hi: "एडमिन" })}
-                        :
-                      </strong>{" "}
-                      {row.adminNote}
+                  <div className="post-card-body">
+                    <div className="task-request-card-top">
+                      <h2>
+                        <Link href={`${basePath}/posts/${row.postId}`} prefetch={false}>
+                          {row.title || row.postId}
+                        </Link>
+                      </h2>
+                      <div className="password-vault-menu">
+                        <button
+                          type="button"
+                          className="password-vault-menu-trigger"
+                          ref={(node) => {
+                            triggerRefs.current[row.id] = node;
+                          }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpen}
+                          aria-label={tr({
+                            en: "More actions",
+                            kn: "ಹೆಚ್ಚು ಕ್ರಿಯೆಗಳು",
+                            hi: "और क्रियाएँ",
+                          })}
+                          disabled={pending}
+                          onClick={(event) => openMenu(row.id, event.currentTarget)}
+                        >
+                          <MoreVertical size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="task-card-meta">
+                      {isAdmin ? (
+                        <>
+                          <strong>{row.requesterName}</strong>
+                          {" · "}
+                        </>
+                      ) : null}
+                      {row.staffNote ||
+                        tr({ en: "No staff note", kn: "ಸಿಬ್ಬಂದಿ ಟಿಪ್ಪಣಿ ಇಲ್ಲ", hi: "स्टाफ़ नोट नहीं" })}
                     </p>
-                  ) : null}
-                  {row.driveUrl ? (
-                    <p className="task-request-drive">
-                      <a href={row.driveUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink size={14} aria-hidden="true" />
-                        {tr({ en: "Open Drive link", kn: "Drive ಲಿಂಕ್ ತೆರೆಯಿರಿ", hi: "Drive लिंक खोलें" })}
-                      </a>
-                    </p>
-                  ) : null}
-
-                  <div className="post-actions">
-                    <button
-                      type="button"
-                      className="button button-outline is-compact"
-                      onClick={() => setDetailId(row.id)}
-                    >
-                      <Eye size={15} aria-hidden="true" />
-                      {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
-                    </button>
-                    <Link
-                      href={`${basePath}/posts/${row.postId}`}
-                      prefetch={false}
-                      className="button button-outline is-compact"
-                    >
-                      <Pencil size={15} aria-hidden="true" />
-                      {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
-                    </Link>
-                    {row.postStatus === "published" && row.slug ? (
-                      <a
-                        href={`${site.url}/news/${row.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="button button-outline is-compact"
-                      >
-                        <ExternalLink size={15} aria-hidden="true" />
-                        {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
-                      </a>
+                    {row.adminNote ? (
+                      <p className="task-request-admin-note">
+                        <strong>
+                          {row.status === "rejected"
+                            ? tr({ en: "Rejection note", kn: "ತಿರಸ್ಕಾರ ಟಿಪ್ಪಣಿ", hi: "अस्वीकृति नोट" })
+                            : row.status === "cancelled"
+                              ? tr({ en: "Cancelled", kn: "ರದ್ದು", hi: "रद्द" })
+                              : tr({ en: "Admin", kn: "ಆಡ್ಮಿನ್", hi: "एडमिन" })}
+                          :
+                        </strong>{" "}
+                        {row.adminNote}
+                      </p>
+                    ) : null}
+                    {row.driveUrl ? (
+                      <p className="task-request-drive">
+                        <a href={row.driveUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink size={14} aria-hidden="true" />
+                          {tr({ en: "Open Drive link", kn: "Drive ಲಿಂಕ್ ತೆರೆಯಿರಿ", hi: "Drive लिंक खोलें" })}
+                        </a>
+                      </p>
                     ) : null}
 
-                    {isAdmin && (row.status === "requested" || row.status === "rejected") ? (
-                      <button
-                        type="button"
-                        className="button is-compact"
-                        disabled={pending}
-                        onClick={() => {
-                          setReviewId(row.id);
-                          setDriveUrl(row.driveUrl || "");
-                          setAdminNote(row.adminNote || "");
-                        }}
-                      >
-                        <Check size={15} aria-hidden="true" />
-                        {tr({ en: "Review", kn: "ಪರಿಶೀಲಿಸಿ", hi: "समीक्षा" })}
-                      </button>
-                    ) : null}
+                    <div className="post-actions">
+                      {isAdmin && (row.status === "requested" || row.status === "rejected") ? (
+                        <button
+                          type="button"
+                          className="button is-compact"
+                          disabled={pending}
+                          onClick={() => {
+                            setReviewId(row.id);
+                            setDriveUrl(row.driveUrl || "");
+                            setAdminNote(row.adminNote || "");
+                          }}
+                        >
+                          <Check size={15} aria-hidden="true" />
+                          {tr({ en: "Review", kn: "ಪರಿಶೀಲಿಸಿ", hi: "समीक्षा" })}
+                        </button>
+                      ) : null}
 
-                    {!isAdmin && row.status === "processing" ? (
-                      <button
-                        type="button"
-                        className="button is-compact"
-                        disabled={pending}
-                        onClick={() =>
-                          run(
-                            () => submitTaskRequestReady({ id: row.id }),
-                            tr({
-                              en: "Sent to admin for publish.",
-                              kn: "ಪ್ರಕಟಣೆಗಾಗಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
-                              hi: "प्रकाशन के लिए एडमिन को भेजा।",
-                            }),
-                          )
-                        }
-                      >
-                        <Send size={15} aria-hidden="true" />
-                        {tr({ en: "Send to admin", kn: "ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ", hi: "एडमिन को भेजें" })}
-                      </button>
-                    ) : null}
+                      {!isAdmin && row.status === "processing" ? (
+                        <button
+                          type="button"
+                          className="button is-compact"
+                          disabled={pending}
+                          onClick={() =>
+                            run(
+                              () => submitTaskRequestReady({ id: row.id }),
+                              tr({
+                                en: "Sent to admin for publish.",
+                                kn: "ಪ್ರಕಟಣೆಗಾಗಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
+                                hi: "प्रकाशन के लिए एडमिन को भेजा।",
+                              }),
+                            )
+                          }
+                        >
+                          <Send size={15} aria-hidden="true" />
+                          {tr({ en: "Send to admin", kn: "ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ", hi: "एडमिन को भेजें" })}
+                        </button>
+                      ) : null}
 
-                    {isAdmin && row.status === "ready" ? (
-                      <button
-                        type="button"
-                        className="button is-compact"
-                        disabled={pending}
-                        onClick={() =>
-                          run(
-                            () => completeTaskRequest({ id: row.id }),
-                            tr({
-                              en: "Moved to Completed.",
-                              kn: "ಪೂರ್ಣ ವಿಭಾಗಕ್ಕೆ ಸರಿಸಲಾಯಿತು.",
-                              hi: "पूर्ण अनुभाग में भेजा।",
-                            }),
-                          )
-                        }
-                      >
-                        <Check size={15} aria-hidden="true" />
-                        {tr({ en: "Mark done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण चिह्नित" })}
-                      </button>
-                    ) : null}
-
-                    {(isAdmin && ["requested", "processing", "ready", "rejected"].includes(row.status)) ||
-                    (!isAdmin && row.status === "requested") ? (
-                      <button
-                        type="button"
-                        className="button button-outline is-compact"
-                        disabled={pending}
-                        onClick={() =>
-                          run(
-                            () => cancelTaskRequest({ id: row.id }),
-                            tr({
-                              en: "Request cancelled — see Completed tab.",
-                              kn: "ವಿನಂತಿ ರದ್ದು — ಪೂರ್ಣ ಟ್ಯಾಬ್ ನೋಡಿ.",
-                              hi: "अनुरोध रद्द — पूर्ण टैब देखें।",
-                            }),
-                            { goCompleted: true },
-                          )
-                        }
-                      >
-                        <X size={15} aria-hidden="true" />
-                        {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
-                      </button>
-                    ) : null}
+                      {isAdmin && row.status === "ready" ? (
+                        <button
+                          type="button"
+                          className="button is-compact"
+                          disabled={pending}
+                          onClick={() =>
+                            run(
+                              () => completeTaskRequest({ id: row.id }),
+                              tr({
+                                en: "Moved to Completed.",
+                                kn: "ಪೂರ್ಣ ವಿಭಾಗಕ್ಕೆ ಸರಿಸಲಾಯಿತು.",
+                                hi: "पूर्ण अनुभाग में भेजा।",
+                              }),
+                            )
+                          }
+                        >
+                          <Check size={15} aria-hidden="true" />
+                          {tr({ en: "Mark done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण चिह्नित" })}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
+
+      {menuRow && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="password-vault-menu-panel is-portal"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const id = menuRow.id;
+                  closeMenu();
+                  setDetailId(id);
+                }}
+              >
+                <Eye size={15} aria-hidden="true" />
+                {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+              </button>
+              <Link
+                href={`${basePath}/posts/${menuRow.postId}`}
+                prefetch={false}
+                role="menuitem"
+                onClick={closeMenu}
+              >
+                <Pencil size={15} aria-hidden="true" />
+                {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
+              </Link>
+              {menuRow.postStatus === "published" && menuRow.slug ? (
+                <a
+                  href={`${site.url}/news/${menuRow.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <ExternalLink size={15} aria-hidden="true" />
+                  {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
+                </a>
+              ) : (
+                <button type="button" role="menuitem" disabled>
+                  <ExternalLink size={15} aria-hidden="true" />
+                  {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
+                </button>
+              )}
+              {(isAdmin &&
+                ["requested", "processing", "ready", "rejected"].includes(menuRow.status)) ||
+              (!isAdmin && menuRow.status === "requested") ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="is-danger"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuRow.id;
+                    closeMenu();
+                    run(
+                      () => cancelTaskRequest({ id }),
+                      tr({
+                        en: "Request cancelled — see Completed tab.",
+                        kn: "ವಿನಂತಿ ರದ್ದು — ಪೂರ್ಣ ಟ್ಯಾಬ್ ನೋಡಿ.",
+                        hi: "अनुरोध रद्द — पूर्ण टैब देखें।",
+                      }),
+                      { goCompleted: true },
+                    );
+                  }}
+                >
+                  <X size={15} aria-hidden="true" />
+                  {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
+                </button>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {detailRow ? (
         <div

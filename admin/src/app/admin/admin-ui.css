@@ -1131,6 +1131,30 @@
   color: inherit;
   font-weight: 600;
 }
+.admin-main .task-batch-focus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-md, 10px);
+  background: color-mix(in srgb, var(--panel, #fff) 90%, var(--accent) 10%);
+}
+.admin-main .task-batch-focus p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.admin-main .task-batch-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
 .admin-main .task-type-status {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2435,7 +2459,6 @@ body:has(.admin-main .staff-chat) {
   line-height: 1;
 }
 .admin-main .staff-chat-create-btn svg,
-.admin-main .staff-chat-settings-btn svg,
 .admin-main .staff-chat-hint svg {
   display: block;
   flex: 0 0 auto;
@@ -2548,16 +2571,42 @@ body:has(.admin-main .staff-chat) {
 }
 .admin-main .staff-chat-main-head-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
+  align-self: center;
   gap: 8px;
+  margin-left: auto;
 }
 .admin-main .staff-chat-settings-btn {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 14px;
+  margin: 0;
+  line-height: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+.admin-main .staff-chat-settings-inner {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   line-height: 1;
+}
+.admin-main .staff-chat-settings-btn svg {
+  display: block;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.admin-main .staff-chat-settings-label {
+  display: block;
+  line-height: 1;
+  transform: translateY(0.5px);
 }
 .admin-main .staff-chat-body {
   display: flex;
@@ -3277,6 +3326,17 @@ body:has(.admin-main .staff-chat) {
 .admin-main .task-request-panel {
   display: grid;
   gap: 14px;
+}
+.admin-main .task-request-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.admin-main .task-request-card-top h2 {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .admin-main .task-request-toolbar {
   display: flex;

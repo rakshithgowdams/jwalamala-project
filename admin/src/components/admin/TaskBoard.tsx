@@ -1,9 +1,19 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CircleAlert, ExternalLink, Eye, Layers, Pencil, RefreshCw, SendHorizontal, Trash2 } from "lucide-react";
+import {
+  CircleAlert,
+  ExternalLink,
+  Eye,
+  Layers,
+  MoreVertical,
+  Pencil,
+  RefreshCw,
+  SendHorizontal,
+  Trash2,
+} from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import { ArticleCardSearch } from "@/components/admin/ArticleCardSearch";
 import { PostThumb } from "@/components/admin/PostThumb";
@@ -124,6 +134,11 @@ type Props = {
   tasks: TaskRow[];
   batches?: BatchSummary[];
   activeRequests?: Record<string, ActiveRequestInfo>;
+  /** When set, Tasks shows only this batch's articles (from /tasks?batch=…). */
+  focusBatch?: string | null;
+  focusBatchTotal?: number;
+  focusBatchPage?: number;
+  focusBatchPageSize?: number;
 };
 
 function taskCardTone(task: TaskRow) {
@@ -160,6 +175,10 @@ export function TaskBoard({
   tasks,
   batches = [],
   activeRequests = {},
+  focusBatch = null,
+  focusBatchTotal = 0,
+  focusBatchPage = 1,
+  focusBatchPageSize = 40,
 }: Props) {
   const { tr } = useUiStrings();
   const router = useRouter();
@@ -190,6 +209,70 @@ export function TaskBoard({
   const [detailBatch, setDetailBatch] = useState<BatchSummary | null>(null);
   const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
   const [requestNote, setRequestNote] = useState("");
+  const [menuBatchKey, setMenuBatchKey] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const batchTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  function closeBatchMenu() {
+    setMenuBatchKey(null);
+    setMenuPos(null);
+  }
+
+  function placeBatchMenu(button: HTMLButtonElement, panel?: HTMLElement | null) {
+    const rect = button.getBoundingClientRect();
+    const panelWidth = Math.max(panel?.offsetWidth || 0, 200);
+    const panelHeight = Math.max(panel?.offsetHeight || 0, 180);
+    const gap = 8;
+    const left = Math.min(
+      Math.max(12, rect.right - panelWidth),
+      Math.max(12, window.innerWidth - panelWidth - 12),
+    );
+    const below = rect.bottom + gap;
+    const fitsBelow = below + panelHeight <= window.innerHeight - 12;
+    const top = fitsBelow
+      ? below
+      : Math.max(12, Math.min(rect.top - panelHeight - gap, window.innerHeight - panelHeight - 12));
+    setMenuPos({ top, left });
+  }
+
+  function openBatchMenu(batchKey: string, button: HTMLButtonElement) {
+    if (menuBatchKey === batchKey) {
+      closeBatchMenu();
+      return;
+    }
+    placeBatchMenu(button);
+    setMenuBatchKey(batchKey);
+  }
+
+  useEffect(() => {
+    if (!menuBatchKey) return;
+    function onReposition() {
+      const trigger = batchTriggerRefs.current[menuBatchKey];
+      if (trigger) placeBatchMenu(trigger, menuRef.current);
+    }
+    const frame = window.requestAnimationFrame(onReposition);
+    function onPointer(event: MouseEvent) {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (batchTriggerRefs.current[menuBatchKey]?.contains(target)) return;
+      closeBatchMenu();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeBatchMenu();
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [menuBatchKey]);
 
   useEffect(() => {
     const max = Math.max(1, totalsByType[contentType] ?? totalArticles);
@@ -226,6 +309,7 @@ export function TaskBoard({
   const visibleBatches = useMemo(() => {
     if (filterStatus === "done" || filterStatus === "cancelled") return [];
     return batches.filter((batch) => {
+      if (focusBatch && batch.batchLabel !== focusBatch) return false;
       if (isAdmin && filterAssignee !== "all" && batch.assigneeId !== filterAssignee) return false;
       if (filterContentType !== "all") {
         const parsed = parseBatchRange(batch.batchLabel);
@@ -234,10 +318,13 @@ export function TaskBoard({
       }
       return true;
     });
-  }, [batches, filterAssignee, filterStatus, filterContentType, isAdmin]);
+  }, [batches, filterAssignee, filterStatus, filterContentType, isAdmin, focusBatch]);
 
   const visible = useMemo(() => {
     return tasks.filter((t) => {
+      if (focusBatch) {
+        return t.batchLabel === focusBatch && (filterStatus === "all" || t.status === filterStatus);
+      }
       if (filterStatus !== "all" && t.status !== filterStatus) return false;
       if (isAdmin && filterAssignee !== "all" && t.assigneeId !== filterAssignee) return false;
       if (filterContentType !== "all" && t.postType !== filterContentType) return false;
@@ -252,7 +339,17 @@ export function TaskBoard({
       }
       return true;
     });
-  }, [tasks, filterStatus, filterAssignee, filterContentType, visibleBatches, isAdmin]);
+  }, [tasks, filterStatus, filterAssignee, filterContentType, visibleBatches, isAdmin, focusBatch]);
+
+  const focusBatchPages = Math.max(1, Math.ceil((focusBatchTotal || 0) / focusBatchPageSize));
+  const menuBatch = menuBatchKey
+    ? visibleBatches.find((batch) => batch.key === menuBatchKey) || null
+    : null;
+  function batchHref(label: string, page = 1) {
+    const qs = new URLSearchParams({ batch: label });
+    if (page > 1) qs.set("page", String(page));
+    return `${basePath}/tasks?${qs.toString()}`;
+  }
 
   function run(
     action: () => Promise<{
@@ -327,11 +424,22 @@ export function TaskBoard({
               hi: `लाइब्रेरी में ${totalArticles.toLocaleString("en-IN")} आइटम हैं। स्टाफ़ कार्य बनाना, अपडेट या हटाना केवल एडमिन कर सकते हैं। रेंज असाइन के बाद नीचे शेष संख्या अपडेट होती है।`,
             })
           : tr({
-              en: `You have ${openCount.toLocaleString("en-IN")} open task${openCount === 1 ? "" : "s"}. Open Articles to work through your batch, then mark items done. Only an admin can change or delete your assignment.`,
-              kn: `ನಿಮಗೆ ${openCount.toLocaleString("en-IN")} ತೆರೆದ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಬ್ಯಾಚ್ ಮಾಡಲು ಲೇಖನಗಳು ತೆರೆಯಿರಿ, ನಂತರ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ. ನಿಯೋಜನೆ ಬದಲಾಯಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ.`,
-              hi: `आपके ${openCount.toLocaleString("en-IN")} खुले कार्य हैं। बैच पर काम के लिए लेख खोलें, फिर पूर्ण चिह्नित करें। असाइनमेंट बदलना या हटाना केवल एडमिन कर सकते हैं।`,
+              en: `You have ${openCount.toLocaleString("en-IN")} open task${openCount === 1 ? "" : "s"}. Open a batch to see its articles here, then mark items done. Only an admin can change or delete your assignment.`,
+              kn: `ನಿಮಗೆ ${openCount.toLocaleString("en-IN")} ತೆರೆದ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಬ್ಯಾಚ್ ತೆರೆದು ಲೇಖನಗಳನ್ನು ಇಲ್ಲೇ ನೋಡಿ, ನಂತರ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ. ನಿಯೋಜನೆ ಬದಲಾಯಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ.`,
+              hi: `आपके ${openCount.toLocaleString("en-IN")} खुले कार्य हैं। बैच खोलकर लेख यहीं देखें, फिर पूर्ण चिह्नित करें। असाइनमेंट बदलना या हटाना केवल एडमिन कर सकते हैं।`,
             })}
       </p>
+
+      {focusBatch ? (
+        <div className="task-batch-focus" role="status">
+          <p>
+            {`${tr({ en: "Showing", kn: "ತೋರಿಸಲಾಗುತ್ತಿದೆ", hi: "दिखा रहे हैं" })} ${focusBatchTotal.toLocaleString("en-IN")} ${tr({ en: "open", kn: "ತೆರೆದ", hi: "खुले" })} ${tr(batchItemLabel(focusBatch))} · #${batchRangeDisplay(focusBatch)}`}
+          </p>
+          <Link href={`${basePath}/tasks`} prefetch={false} className="button button-outline is-compact">
+            {tr({ en: "Back to all tasks", kn: "ಎಲ್ಲಾ ಕಾರ್ಯಗಳಿಗೆ ಹಿಂದೆ", hi: "सभी कार्यों पर वापस" })}
+          </Link>
+        </div>
+      ) : null}
 
       {isAdmin ? (
         <div className="task-type-status" role="status" aria-live="polite">
@@ -611,82 +719,67 @@ export function TaskBoard({
           </p>
         ) : (
           <div className="post-card-list">
-            {visibleBatches.map((batch, index) => (
-              <article
-                key={batch.key}
-                className="post-card is-scheduled task-batch-card"
-                style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
-              >
-                <div className="post-card-thumb task-batch-thumb" aria-hidden="true">
-                  <Layers size={36} strokeWidth={1.75} />
-                  <div className="post-card-badges">
-                    <span className="status-pill is-scheduled">
-                      {tr({ en: "Open batch", kn: "ತೆರೆದ ಬ್ಯಾಚ್", hi: "खुला बैच" })}
-                    </span>
-                    <span className="post-card-type">#{batch.batchLabel}</span>
+            {visibleBatches.map((batch, index) => {
+              const menuOpen = menuBatchKey === batch.key;
+              return (
+                <article
+                  key={batch.key}
+                  className={
+                    "post-card is-scheduled task-batch-card" + (menuOpen ? " is-menu-open" : "")
+                  }
+                  style={{ animationDelay: Math.min(index, 11) * 45 + "ms" }}
+                >
+                  <div className="post-card-thumb task-batch-thumb" aria-hidden="true">
+                    <Layers size={36} strokeWidth={1.75} />
+                    <div className="post-card-badges">
+                      <span className="status-pill is-scheduled">
+                        {tr({ en: "Open batch", kn: "ತೆರೆದ ಬ್ಯಾಚ್", hi: "खुला बैच" })}
+                      </span>
+                      <span className="post-card-type">#{batch.batchLabel}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="post-card-body">
-                  <h2>
-                    {`${batch.count.toLocaleString("en-IN")} ${tr(batchItemLabel(batch.batchLabel))} · #${batchRangeDisplay(batch.batchLabel)}`}
-                  </h2>
-                  <p className="task-card-meta">
-                    {isAdmin ? <strong>{batch.assigneeName}</strong> : null}
-                    {isAdmin && batch.notes ? ` · ${batch.notes}` : null}
-                    {!isAdmin && batch.notes ? batch.notes : null}
-                    {!isAdmin && !batch.notes
-                      ? tr({
-                          en: "Open Articles to work through this batch.",
-                          kn: "ಈ ಬ್ಯಾಚ್ ಮಾಡಲು ಲೇಖನಗಳು ತೆರೆಯಿರಿ.",
-                          hi: "इस बैच पर काम के लिए लेख खोलें।",
-                        })
-                      : null}
-                  </p>
-                  <div className="post-actions">
-                    <button
-                      type="button"
-                      className="button button-outline is-compact"
-                      onClick={() => setDetailBatch(batch)}
-                    >
-                      <Eye size={15} aria-hidden="true" />
-                      {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
-                    </button>
-                    {!isAdmin ? (
-                      <Link
-                        href={`${basePath}/posts`}
-                        prefetch={false}
-                        className="button is-compact"
-                      >
-                        <Pencil size={15} aria-hidden="true" />
-                        {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
-                      </Link>
-                    ) : null}
-                    {isAdmin ? (
-                      <>
+                  <div className="post-card-body">
+                    <div className="task-request-card-top">
+                      <h2>
+                        {`${batch.count.toLocaleString("en-IN")} ${tr(batchItemLabel(batch.batchLabel))} · #${batchRangeDisplay(batch.batchLabel)}`}
+                      </h2>
+                      <div className="password-vault-menu">
                         <button
                           type="button"
-                          className="button button-outline is-compact"
+                          className="password-vault-menu-trigger"
+                          ref={(node) => {
+                            batchTriggerRefs.current[batch.key] = node;
+                          }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpen}
+                          aria-label={tr({
+                            en: "More actions",
+                            kn: "ಹೆಚ್ಚು ಕ್ರಿಯೆಗಳು",
+                            hi: "और क्रियाएँ",
+                          })}
                           disabled={pending}
-                          onClick={() => openEditBatch(batch)}
+                          onClick={(event) => openBatchMenu(batch.key, event.currentTarget)}
                         >
-                          <Pencil size={15} aria-hidden="true" />
-                          {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                          <MoreVertical size={18} aria-hidden="true" />
                         </button>
-                        <button
-                          type="button"
-                          className="button button-outline is-compact"
-                          disabled={pending}
-                          onClick={() => setCancelBatch(batch)}
-                        >
-                          <Trash2 size={15} aria-hidden="true" />
-                          {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
-                        </button>
-                      </>
-                    ) : null}
+                      </div>
+                    </div>
+                    <p className="task-card-meta">
+                      {isAdmin ? <strong>{batch.assigneeName}</strong> : null}
+                      {isAdmin && batch.notes ? ` · ${batch.notes}` : null}
+                      {!isAdmin && batch.notes ? batch.notes : null}
+                      {!isAdmin && !batch.notes
+                        ? tr({
+                            en: "Use ⋮ for Details and Open articles.",
+                            kn: "ವಿವರ ಮತ್ತು ಲೇಖನಗಳಿಗೆ ⋮ ಬಳಸಿ.",
+                            hi: "विवरण और लेख के लिए ⋮ उपयोग करें।",
+                          })
+                        : null}
+                    </p>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
             {visible.map((task, index) => (
               <article
                 key={task.id}
@@ -852,7 +945,105 @@ export function TaskBoard({
             ))}
           </div>
         )}
+        {focusBatch && focusBatchTotal > focusBatchPageSize ? (
+          <div className="task-batch-pager" role="navigation" aria-label={tr({ en: "Batch pages", kn: "ಬ್ಯಾಚ್ ಪುಟಗಳು", hi: "बैच पृष्ठ" })}>
+            <p className="task-card-meta">
+              {tr({
+                en: `Page ${focusBatchPage} of ${focusBatchPages}`,
+                kn: `ಪುಟ ${focusBatchPage} / ${focusBatchPages}`,
+                hi: `पृष्ठ ${focusBatchPage} / ${focusBatchPages}`,
+              })}
+            </p>
+            <div className="page-actions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {focusBatchPage > 1 ? (
+                <Link
+                  href={batchHref(focusBatch, focusBatchPage - 1)}
+                  prefetch={false}
+                  className="button button-outline is-compact"
+                >
+                  {tr({ en: "Previous", kn: "ಹಿಂದೆ", hi: "पिछला" })}
+                </Link>
+              ) : null}
+              {focusBatchPage < focusBatchPages ? (
+                <Link
+                  href={batchHref(focusBatch, focusBatchPage + 1)}
+                  prefetch={false}
+                  className="button button-outline is-compact"
+                >
+                  {tr({ en: "Next", kn: "ಮುಂದೆ", hi: "अगला" })}
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </section>
+
+      {menuBatch && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="password-vault-menu-panel is-portal"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const batch = menuBatch;
+                  closeBatchMenu();
+                  setDetailBatch(batch);
+                }}
+              >
+                <Eye size={15} aria-hidden="true" />
+                {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+              </button>
+              {!focusBatch || focusBatch !== menuBatch.batchLabel ? (
+                <Link
+                  href={batchHref(menuBatch.batchLabel)}
+                  prefetch={false}
+                  role="menuitem"
+                  onClick={closeBatchMenu}
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                </Link>
+              ) : null}
+              {isAdmin ? (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={pending}
+                    onClick={() => {
+                      const batch = menuBatch;
+                      closeBatchMenu();
+                      openEditBatch(batch);
+                    }}
+                  >
+                    <Pencil size={15} aria-hidden="true" />
+                    {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="is-danger"
+                    disabled={pending}
+                    onClick={() => {
+                      const batch = menuBatch;
+                      closeBatchMenu();
+                      setCancelBatch(batch);
+                    }}
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                    {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                  </button>
+                </>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {cancelTask && typeof document !== "undefined"
         ? createPortal(
@@ -1272,7 +1463,7 @@ export function TaskBoard({
                 <div className="delete-dialog-actions">
                   {!isAdmin ? (
                     <Link
-                      href={`${basePath}/posts`}
+                      href={batchHref(detailBatch.batchLabel)}
                       prefetch={false}
                       className="button"
                       onClick={() => setDetailBatch(null)}

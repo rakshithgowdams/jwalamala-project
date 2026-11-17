@@ -14,8 +14,8 @@ type Result = {
 };
 type Fail = (en: string, kn: string, hi: string) => Result;
 
-export const TASK_CONTENT_TYPES = ["article", "video", "short"] as const;
-export type TaskContentType = (typeof TASK_CONTENT_TYPES)[number];
+const TASK_CONTENT_TYPES = ["article", "video", "short"] as const;
+type TaskContentType = (typeof TASK_CONTENT_TYPES)[number];
 
 const contentTypeSchema = z.enum(TASK_CONTENT_TYPES);
 

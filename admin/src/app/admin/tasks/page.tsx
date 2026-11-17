@@ -30,10 +30,46 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] || null : value;
 }
 
-export default async function TasksPage() {
-  const [{ user, profile, db }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
+function mapTaskRows(taskRows: TaskJoinRow[]): TaskRow[] {
+  return taskRows.map((row) => {
+    const post = one(row.posts);
+    const person = one(row.profiles);
+    return {
+      id: row.id,
+      postId: row.post_id,
+      title: post?.title_kn || row.post_id,
+      thumbnail: post?.thumbnail_url || null,
+      videoUrl: post?.video_url || null,
+      postStatus: post?.status || "",
+      postType: post?.type || "",
+      updatedAt: post?.updated_at || null,
+      slug: post?.slug || null,
+      status: row.status,
+      batchLabel: row.batch_label || "",
+      notes: row.notes || "",
+      assigneeId: row.assignee_id,
+      assigneeName: person?.full_name || "Staff",
+      createdAt: row.created_at,
+    };
+  });
+}
+
+const BATCH_PAGE_SIZE = 40;
+
+export default async function TasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ batch?: string; page?: string }>;
+}) {
+  const [{ user, profile, db }, { tr }, params] = await Promise.all([
+    requireStaff(),
+    getUiStrings(),
+    searchParams,
+  ]);
   const isAdmin = profile.role === "admin";
   const server = getAdminClient() || db;
+  const focusBatch = (params.batch || "").trim().slice(0, 120);
+  const batchPage = Math.max(1, Math.min(500, Math.floor(Number(params.page)) || 1));
 
   const emptyCount = Promise.resolve({ count: 0 });
   function openAssignedCount(type: "article" | "video" | "short") {
@@ -56,6 +92,7 @@ export default async function TasksPage() {
     staffRes,
     tasksRes,
     openBatchRes,
+    batchFocusRes,
   ] = await Promise.all([
     // Staff never see the assign UI — skip the expensive full-library count.
     isAdmin
@@ -110,6 +147,24 @@ export default async function TasksPage() {
       if (!isAdmin) q = q.eq("assignee_id", user.id);
       return q;
     })(),
+    // Exact batch members for /tasks?batch=… (staff open-articles stays on Tasks, not /posts).
+    focusBatch
+      ? (() => {
+          const from = (batchPage - 1) * BATCH_PAGE_SIZE;
+          let q = server
+            .from("article_tasks")
+            .select(
+              "id,post_id,assignee_id,status,batch_label,notes,created_at,posts(title_kn,thumbnail_url,video_url,status,type,updated_at,slug),profiles!assignee_id(full_name)",
+              { count: "exact" },
+            )
+            .eq("batch_label", focusBatch)
+            .eq("status", "open")
+            .order("created_at", { ascending: true })
+            .range(from, from + BATCH_PAGE_SIZE - 1);
+          if (!isAdmin) q = q.eq("assignee_id", user.id);
+          return q;
+        })()
+      : Promise.resolve({ data: [] as TaskJoinRow[], count: 0, error: null }),
   ]);
 
   const totalsByType = {
@@ -201,45 +256,6 @@ export default async function TasksPage() {
     );
   }
 
-  const taskRows = (tasksRes.data || []) as TaskJoinRow[];
-  const tasks: TaskRow[] = taskRows.map((row) => {
-    const post = one(row.posts);
-    const person = one(row.profiles);
-    return {
-      id: row.id,
-      postId: row.post_id,
-      title: post?.title_kn || row.post_id,
-      thumbnail: post?.thumbnail_url || null,
-      videoUrl: post?.video_url || null,
-      postStatus: post?.status || "",
-      postType: post?.type || "",
-      updatedAt: post?.updated_at || null,
-      slug: post?.slug || null,
-      status: row.status,
-      batchLabel: row.batch_label || "",
-      notes: row.notes || "",
-      assigneeId: row.assignee_id,
-      assigneeName: person?.full_name || "Staff",
-      createdAt: row.created_at,
-    };
-  });
-
-  const openTaskIds = tasks.filter((t) => t.status === "open").map((t) => t.id);
-  const activeRequests: Record<string, { id: string; status: string }> = {};
-  if (openTaskIds.length) {
-    const { data: requestRows } = await server
-      .from("article_task_requests")
-      .select("id,task_id,status")
-      .in("task_id", openTaskIds)
-      .in("status", ["requested", "processing", "ready"]);
-    for (const row of requestRows || []) {
-      activeRequests[row.task_id as string] = {
-        id: row.id as string,
-        status: row.status as string,
-      };
-    }
-  }
-
   const staffName = new Map(
     (staffRes.data || []).map((s) => [s.id as string, (s.full_name as string) || (s.id as string)]),
   );
@@ -271,6 +287,41 @@ export default async function TasksPage() {
     }
   }
   const batches = [...batchMap.values()].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+  const focusAllowed =
+    Boolean(focusBatch) &&
+    (isAdmin
+      ? batches.some((b) => b.batchLabel === focusBatch)
+      : batches.some((b) => b.batchLabel === focusBatch && b.assigneeId === user.id));
+
+  const batchFocusError = batchFocusRes && "error" in batchFocusRes ? batchFocusRes.error : null;
+  const focusedTasks =
+    focusAllowed && !batchFocusError
+      ? mapTaskRows((batchFocusRes.data || []) as TaskJoinRow[])
+      : [];
+  const focusBatchTotal =
+    focusAllowed && typeof batchFocusRes.count === "number" ? batchFocusRes.count : 0;
+
+  const tasks: TaskRow[] = focusAllowed
+    ? focusedTasks
+    : mapTaskRows((tasksRes.data || []) as TaskJoinRow[]);
+
+  const openTaskIds = tasks.filter((t) => t.status === "open").map((t) => t.id);
+  const activeRequests: Record<string, { id: string; status: string }> = {};
+  if (openTaskIds.length) {
+    const { data: requestRows } = await server
+      .from("article_task_requests")
+      .select("id,task_id,status")
+      .in("task_id", openTaskIds)
+      .in("status", ["requested", "processing", "ready"]);
+    for (const row of requestRows || []) {
+      activeRequests[row.task_id as string] = {
+        id: row.id as string,
+        status: row.status as string,
+      };
+    }
+  }
+
   const openTaskTotal = isAdmin
     ? openByType.article + openByType.video + openByType.short
     : staffOpenTotal || 0;
@@ -294,6 +345,10 @@ export default async function TasksPage() {
         tasks={tasks}
         batches={batches}
         activeRequests={activeRequests}
+        focusBatch={focusAllowed ? focusBatch : null}
+        focusBatchTotal={focusBatchTotal}
+        focusBatchPage={batchPage}
+        focusBatchPageSize={BATCH_PAGE_SIZE}
       />
     </>
   );

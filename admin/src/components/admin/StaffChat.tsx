@@ -768,11 +768,15 @@ export function StaffChat({
               <div className="staff-chat-main-head-actions">
                 <button
                   type="button"
-                  className="button button-ghost staff-chat-settings-btn"
+                  className="button button-outline staff-chat-settings-btn"
                   onClick={() => setSettingsOpen(true)}
                 >
-                  <Settings2 size={16} aria-hidden="true" />
-                  {tr({ en: "Settings", kn: "ಸೆಟ್ಟಿಂಗ್", hi: "सेटिंग" })}
+                  <span className="staff-chat-settings-inner">
+                    <Settings2 size={16} strokeWidth={2} aria-hidden="true" />
+                    <span className="staff-chat-settings-label">
+                      {tr({ en: "Settings", kn: "ಸೆಟ್ಟಿಂಗ್", hi: "सेटिंग" })}
+                    </span>
+                  </span>
                 </button>
               </div>
             </header>
