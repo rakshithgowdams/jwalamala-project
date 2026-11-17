@@ -5,9 +5,7 @@ import { requireStaff } from "@/lib/auth/require-user";
 import { deskBase } from "@/lib/auth/paths";
 import { getUiStrings } from "@/lib/i18n/server";
 import type { Tri } from "@/lib/i18n/strings";
-import { ExternalLink, Pencil } from "lucide-react";
-import { site } from "@/config/site";
-import { DeletePostButton } from "@/components/admin/DeletePostButton";
+import { PostCardActions } from "@/components/admin/PostCardActions";
 import { PostFilters } from "@/components/admin/PostFilters";
 import { PostThumb } from "@/components/admin/PostThumb";
 import { youtubeThumbnail } from "@/lib/utils/images";
@@ -210,27 +208,20 @@ async function PostResults({
               </time>
             </div>
             <div className="post-card-body">
-            <h2>
-              <Link href={`${basePath}/posts/${p.id}`} prefetch={false}>{p.title_kn}</Link>
-            </h2>
-            <div className="post-actions">
-              <Link href={`${basePath}/posts/${p.id}`} prefetch={false} className="button button-outline is-compact">
-                <Pencil size={15} aria-hidden="true" />
-                {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
-              </Link>
-              {p.status === "published" && (
-                <a
-                  href={`${site.url}/news/${p.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="button button-outline is-compact"
-                >
-                  <ExternalLink size={15} aria-hidden="true" />
-                  {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
-                </a>
-              )}
-              {canDelete && <DeletePostButton postId={p.id} title={p.title_kn} compact />}
-            </div>
+              <div className="task-request-card-top">
+                <h2>
+                  <Link href={`${basePath}/posts/${p.id}`} prefetch={false}>
+                    {p.title_kn}
+                  </Link>
+                </h2>
+                <PostCardActions
+                  postId={p.id}
+                  title={p.title_kn}
+                  slug={p.slug}
+                  status={p.status}
+                  canDelete={canDelete}
+                />
+              </div>
             </div>
           </article>
         ))}

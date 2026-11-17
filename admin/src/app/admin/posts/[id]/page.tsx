@@ -27,27 +27,29 @@ export default async function EditPost({
     if (!task) notFound();
   }
   const server = getAdminClient() || db;
-  const [{ data: p }, { data: categories }, requestRes] = await Promise.all([
-    db
-      .from("posts")
-      .select(
-        "*,key_points(seconds,label_kn),post_categories(category_id,is_primary,categories(slug)),post_tags(tag_id)",
-      )
-      .eq("id", id)
-      .maybeSingle(),
-    db.from("categories").select("*").order("sort_order"),
-    (() => {
-      let q = server
-        .from("article_task_requests")
-        .select("id,status,drive_url,staff_note,admin_note")
-        .eq("post_id", id)
-        .in("status", ["requested", "processing", "ready"])
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (!isAdmin) q = q.eq("requester_id", user.id);
-      return q.maybeSingle();
-    })(),
-  ]);
+  const [{ data: p }, { data: categories }, mathaLinks, requestRes] =
+    await Promise.all([
+      db
+        .from("posts")
+        .select(
+          "*,key_points(seconds,label_kn),post_categories(category_id,is_primary,categories(slug)),post_tags(tag_id)",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+      db.from("categories").select("*").order("sort_order"),
+      db.from("post_mathas").select("matha_id").eq("post_id", id),
+      (() => {
+        let q = server
+          .from("article_task_requests")
+          .select("id,status,drive_url,staff_note,admin_note")
+          .eq("post_id", id)
+          .in("status", ["requested", "processing", "ready"])
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (!isAdmin) q = q.eq("requester_id", user.id);
+        return q.maybeSingle();
+      })(),
+    ]);
   if (!p) notFound();
   const post = {
     ...p,
@@ -59,6 +61,7 @@ export default async function EditPost({
       p.post_categories as { categories: { slug: string } }[]
     ).map((c) => c.categories.slug),
   } as Post;
+  const mathaIds = (mathaLinks.data || []).map((row) => row.matha_id);
   const [versions, comments] = await Promise.all([
     db
       .from("post_versions")
@@ -89,6 +92,7 @@ export default async function EditPost({
         post={post}
         categories={categories || []}
         canDelete={profile.role === "admin"}
+        mathaIds={mathaIds}
         {...options}
       />
       {post.sponsor_name && <SponsorReview postId={id} />}

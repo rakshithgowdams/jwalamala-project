@@ -60,6 +60,10 @@ const postSchema = z.object({
     .transform((v) => coverImageUrl(v) || v)
     .refine(isCoverImage),
   tag_ids: z.array(z.uuid()).max(20).default([]),
+  matha_ids: z.array(z.uuid()).max(20).default([]),
+  pin_latest: z.boolean().default(false),
+  latest_ids: z.array(z.uuid()).max(24).default([]),
+  latest_rank: z.number().int().min(0).max(24).optional(),
   public_author_id: z.union([z.uuid(), z.literal("")]).default(""),
   place_id: z.union([z.uuid(), z.literal("")]).default(""),
   event_id: z.union([z.uuid(), z.literal("")]).default(""),
@@ -297,6 +301,30 @@ export async function savePost(input: unknown): Promise<{ id?: string; error?: s
       ),
   ]);
   if (keywordError) console.error("[posts] SEO keywords not saved:", keywordError.message);
+
+  // Matha links for Jain matha listings.
+  {
+    const { error: clearMathas } = await db.from("post_mathas").delete().eq("post_id", id);
+    if (clearMathas)
+      console.error("[posts] post_mathas clear failed:", clearMathas.message);
+    else if (p.matha_ids.length) {
+      const { error: linkMathas } = await db
+        .from("post_mathas")
+        .insert(p.matha_ids.map((matha_id) => ({ post_id: id, matha_id })));
+      if (linkMathas)
+        console.error("[posts] post_mathas insert failed:", linkMathas.message);
+    }
+  }
+
+  // Home Latest news pins (ordered). Works for admin and staff with edit rights.
+  await syncLatestPins(db, {
+    postId: id,
+    pinLatest: p.pin_latest,
+    latestIds: p.latest_ids,
+    latestRank: p.latest_rank,
+    published: p.status === "published",
+  });
+
   // Translation calls the AI provider and takes seconds, so it runs after the
   // response: the article is live in Kannada at once and the English and Hindi
   // versions appear when ready. Drafts are not worth the translation budget.
@@ -315,7 +343,55 @@ export async function savePost(input: unknown): Promise<{ id?: string; error?: s
   // this response re-render the editor the admin is looking at.
   revalidatePath("/admin/posts");
   revalidatePath("/admin");
+  revalidatePath("/");
   return { id };
+}
+
+async function syncLatestPins(
+  db: Awaited<ReturnType<typeof requireStaff>>["db"],
+  input: {
+    postId: string;
+    pinLatest: boolean;
+    latestIds: string[];
+    latestRank?: number;
+    published: boolean;
+  },
+) {
+  const client = getAdminClient() || db;
+  const { data: row } = await client
+    .from("site_settings")
+    .select("value")
+    .eq("key", "homepage")
+    .maybeSingle();
+  const { defaultHome, homeSchema } = await import("@/lib/v4/home");
+  const current = homeSchema.catch(defaultHome).parse(row?.value || defaultHome);
+  let next = input.latestIds.length ? [...input.latestIds] : [...current.latest_ids];
+  next = next.filter((id) => id !== input.postId);
+  if (input.pinLatest && input.published) {
+    const rank =
+      typeof input.latestRank === "number"
+        ? Math.min(Math.max(0, input.latestRank), next.length)
+        : next.length;
+    next.splice(rank, 0, input.postId);
+  }
+  next = [...new Set(next)].slice(0, 24);
+  if (
+    next.length === current.latest_ids.length &&
+    next.every((id, index) => id === current.latest_ids[index])
+  ) {
+    return;
+  }
+  const configuration = { ...current, latest_ids: next };
+  // Prefer service-role client so staff with content.create can still pin.
+  if (getAdminClient()) {
+    const { error } = await client
+      .from("site_settings")
+      .upsert({ key: "homepage", value: configuration }, { onConflict: "key" });
+    if (error) console.error("[posts] latest pins not saved:", error.message);
+    return;
+  }
+  const { error } = await db.rpc("save_homepage", { configuration });
+  if (error) console.error("[posts] latest pins not saved:", error.message);
 }
 
 /** Records that keep their own history but point at an article; deleting it unlinks them. */

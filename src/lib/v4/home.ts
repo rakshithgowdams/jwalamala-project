@@ -28,6 +28,8 @@ export const homeSchema = z.object({
   photo_gallery_id: z.uuid().or(z.literal("")).default(""),
   lead_id: z.union([z.uuid(), z.literal("")]).default(""),
   pick_ids: z.array(z.uuid()).max(12).default([]),
+  /** Pinned Latest news order on the home page. Fills first, then newest. */
+  latest_ids: z.array(z.uuid()).max(24).default([]),
   sections: z
     .array(
       z.object({
@@ -55,6 +57,7 @@ export const defaultHome: HomeConfig = {
   photo_gallery_id: "",
   lead_id: "",
   pick_ids: [],
+  latest_ids: [],
   sections: homeSectionIds.map((id) => ({
     id,
     enabled: id !== "picks",

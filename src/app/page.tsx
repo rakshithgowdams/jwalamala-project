@@ -60,11 +60,25 @@ export default async function Home() {
       {config.sections
         .filter((s) => s.enabled)
         .map((section) => {
-          const selected = posts.filter(
+          const pool = posts.filter(
             (p) =>
               !section.category_slug ||
               p.category_slugs.includes(section.category_slug),
           );
+          const pinnedLatest =
+            section.id === "latest"
+              ? config.latest_ids
+                  .map((id) => pool.find((p) => p.id === id))
+                  .filter((p): p is (typeof pool)[number] => Boolean(p))
+              : [];
+          const pinnedIds = new Set(pinnedLatest.map((p) => p.id));
+          const selected =
+            section.id === "latest"
+              ? [
+                  ...pinnedLatest,
+                  ...pool.filter((p) => !pinnedIds.has(p.id)),
+                ]
+              : pool;
           return (
             <Fragment key={section.id}>
               {(() => {
@@ -99,12 +113,25 @@ export default async function Home() {
                                 >
                                   {kn.latest}
                                 </SectionTitle>
-                                {posts
-                                  .filter((p) => p.id !== lead.id)
-                                  .slice(0, 4)
-                                  .map((p) => (
-                                    <NewsCard key={p.id} post={p} compact />
-                                  ))}
+                                {(() => {
+                                  const asidePinned = config.latest_ids
+                                    .map((id) => posts.find((p) => p.id === id))
+                                    .filter(
+                                      (p): p is (typeof posts)[number] =>
+                                        Boolean(p) && p!.id !== lead.id,
+                                    );
+                                  const asideIds = new Set(asidePinned.map((p) => p.id));
+                                  return [
+                                    ...asidePinned,
+                                    ...posts.filter(
+                                      (p) => p.id !== lead.id && !asideIds.has(p.id),
+                                    ),
+                                  ]
+                                    .slice(0, 4)
+                                    .map((p) => (
+                                      <NewsCard key={p.id} post={p} compact />
+                                    ));
+                                })()}
                               </aside>
                             </div>
                             <AdSlot placement="home-after-hero" format="wide" />

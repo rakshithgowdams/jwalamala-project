@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   CircleAlert,
   ExternalLink,
   Eye,
@@ -31,6 +32,7 @@ import { createTaskRequest } from "@/app/admin/task-requests/actions";
 import { useDeskPath } from "@/components/admin/DeskPathProvider";
 
 type ContentType = "article" | "video" | "short";
+type TaskMenuTarget = { kind: "batch"; key: string } | { kind: "task"; id: string };
 
 function parseBatchRange(
   label: string,
@@ -209,20 +211,24 @@ export function TaskBoard({
   const [detailBatch, setDetailBatch] = useState<BatchSummary | null>(null);
   const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
   const [requestNote, setRequestNote] = useState("");
-  const [menuBatchKey, setMenuBatchKey] = useState<string | null>(null);
+  const [menuTarget, setMenuTarget] = useState<TaskMenuTarget | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const batchTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  function closeBatchMenu() {
-    setMenuBatchKey(null);
+  function menuTriggerKey(target: TaskMenuTarget) {
+    return target.kind === "batch" ? `batch:${target.key}` : `task:${target.id}`;
+  }
+
+  function closeMenu() {
+    setMenuTarget(null);
     setMenuPos(null);
   }
 
-  function placeBatchMenu(button: HTMLButtonElement, panel?: HTMLElement | null) {
+  function placeMenu(button: HTMLButtonElement, panel?: HTMLElement | null) {
     const rect = button.getBoundingClientRect();
     const panelWidth = Math.max(panel?.offsetWidth || 0, 200);
-    const panelHeight = Math.max(panel?.offsetHeight || 0, 180);
+    const panelHeight = Math.max(panel?.offsetHeight || 0, 220);
     const gap = 8;
     const left = Math.min(
       Math.max(12, rect.right - panelWidth),
@@ -236,30 +242,36 @@ export function TaskBoard({
     setMenuPos({ top, left });
   }
 
-  function openBatchMenu(batchKey: string, button: HTMLButtonElement) {
-    if (menuBatchKey === batchKey) {
-      closeBatchMenu();
+  function sameMenuTarget(a: TaskMenuTarget, b: TaskMenuTarget) {
+    if (a.kind !== b.kind) return false;
+    return a.kind === "batch" ? a.key === b.key : a.id === b.id;
+  }
+
+  function openMenu(target: TaskMenuTarget, button: HTMLButtonElement) {
+    if (menuTarget && sameMenuTarget(menuTarget, target)) {
+      closeMenu();
       return;
     }
-    placeBatchMenu(button);
-    setMenuBatchKey(batchKey);
+    placeMenu(button);
+    setMenuTarget(target);
   }
 
   useEffect(() => {
-    if (!menuBatchKey) return;
+    if (!menuTarget) return;
+    const key = menuTriggerKey(menuTarget);
     function onReposition() {
-      const trigger = batchTriggerRefs.current[menuBatchKey];
-      if (trigger) placeBatchMenu(trigger, menuRef.current);
+      const trigger = triggerRefs.current[key];
+      if (trigger) placeMenu(trigger, menuRef.current);
     }
     const frame = window.requestAnimationFrame(onReposition);
     function onPointer(event: MouseEvent) {
       const target = event.target as Node;
       if (menuRef.current?.contains(target)) return;
-      if (batchTriggerRefs.current[menuBatchKey]?.contains(target)) return;
-      closeBatchMenu();
+      if (triggerRefs.current[key]?.contains(target)) return;
+      closeMenu();
     }
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") closeBatchMenu();
+      if (event.key === "Escape") closeMenu();
     }
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);
@@ -272,7 +284,7 @@ export function TaskBoard({
       window.removeEventListener("resize", onReposition);
       window.removeEventListener("scroll", onReposition, true);
     };
-  }, [menuBatchKey]);
+  }, [menuTarget]);
 
   useEffect(() => {
     const max = Math.max(1, totalsByType[contentType] ?? totalArticles);
@@ -342,9 +354,16 @@ export function TaskBoard({
   }, [tasks, filterStatus, filterAssignee, filterContentType, visibleBatches, isAdmin, focusBatch]);
 
   const focusBatchPages = Math.max(1, Math.ceil((focusBatchTotal || 0) / focusBatchPageSize));
-  const menuBatch = menuBatchKey
-    ? visibleBatches.find((batch) => batch.key === menuBatchKey) || null
-    : null;
+  const menuBatch =
+    menuTarget?.kind === "batch"
+      ? visibleBatches.find((batch) => batch.key === menuTarget.key) || null
+      : null;
+  const menuTask =
+    menuTarget?.kind === "task"
+      ? visible.find((task) => task.id === menuTarget.id) ||
+        tasks.find((task) => task.id === menuTarget.id) ||
+        null
+      : null;
   function batchHref(label: string, page = 1) {
     const qs = new URLSearchParams({ batch: label });
     if (page > 1) qs.set("page", String(page));
@@ -720,7 +739,9 @@ export function TaskBoard({
         ) : (
           <div className="post-card-list">
             {visibleBatches.map((batch, index) => {
-              const menuOpen = menuBatchKey === batch.key;
+              const menuOpen =
+                menuTarget?.kind === "batch" && menuTarget.key === batch.key;
+              const triggerKey = `batch:${batch.key}`;
               return (
                 <article
                   key={batch.key}
@@ -748,7 +769,7 @@ export function TaskBoard({
                           type="button"
                           className="password-vault-menu-trigger"
                           ref={(node) => {
-                            batchTriggerRefs.current[batch.key] = node;
+                            triggerRefs.current[triggerKey] = node;
                           }}
                           aria-haspopup="menu"
                           aria-expanded={menuOpen}
@@ -758,7 +779,9 @@ export function TaskBoard({
                             hi: "और क्रियाएँ",
                           })}
                           disabled={pending}
-                          onClick={(event) => openBatchMenu(batch.key, event.currentTarget)}
+                          onClick={(event) =>
+                            openMenu({ kind: "batch", key: batch.key }, event.currentTarget)
+                          }
                         >
                           <MoreVertical size={18} aria-hidden="true" />
                         </button>
@@ -770,9 +793,9 @@ export function TaskBoard({
                       {!isAdmin && batch.notes ? batch.notes : null}
                       {!isAdmin && !batch.notes
                         ? tr({
-                            en: "Use ⋮ for Details and Open articles.",
-                            kn: "ವಿವರ ಮತ್ತು ಲೇಖನಗಳಿಗೆ ⋮ ಬಳಸಿ.",
-                            hi: "विवरण और लेख के लिए ⋮ उपयोग करें।",
+                            en: "Use ⋮ for all actions.",
+                            kn: "ಎಲ್ಲಾ ಕ್ರಿಯೆಗಳಿಗೆ ⋮ ಬಳಸಿ.",
+                            hi: "सभी क्रियाओं के लिए ⋮ उपयोग करें।",
                           })
                         : null}
                     </p>
@@ -780,169 +803,102 @@ export function TaskBoard({
                 </article>
               );
             })}
-            {visible.map((task, index) => (
-              <article
-                key={task.id}
-                className={"post-card is-" + taskCardTone(task)}
-                style={{ animationDelay: Math.min(index + visibleBatches.length, 11) * 45 + "ms" }}
-              >
-                <div className="post-card-thumb">
-                  <PostThumb
-                    src={cardThumbnail(task.thumbnail, task.videoUrl)}
-                    eager={index < 6}
-                  />
-                  <div className="post-card-badges">
-                    <span className={"status-pill is-" + taskStatusPillClass(task.status)}>
-                      {taskStatusNames[task.status] ? tr(taskStatusNames[task.status]) : task.status}
-                    </span>
-                    {task.postStatus ? (
-                      <span className={"status-pill is-" + task.postStatus}>
-                        {statusNames[task.postStatus]
-                          ? tr(statusNames[task.postStatus])
-                          : task.postStatus}
+            {visible.map((task, index) => {
+              const menuOpen = menuTarget?.kind === "task" && menuTarget.id === task.id;
+              const triggerKey = `task:${task.id}`;
+              return (
+                <article
+                  key={task.id}
+                  className={
+                    "post-card is-" + taskCardTone(task) + (menuOpen ? " is-menu-open" : "")
+                  }
+                  style={{ animationDelay: Math.min(index + visibleBatches.length, 11) * 45 + "ms" }}
+                >
+                  <div className="post-card-thumb">
+                    <PostThumb
+                      src={cardThumbnail(task.thumbnail, task.videoUrl)}
+                      eager={index < 6}
+                    />
+                    <div className="post-card-badges">
+                      <span className={"status-pill is-" + taskStatusPillClass(task.status)}>
+                        {taskStatusNames[task.status]
+                          ? tr(taskStatusNames[task.status])
+                          : task.status}
                       </span>
-                    ) : null}
-                    {task.postType ? (
-                      <span className="post-card-type">
-                        {typeNames[task.postType] ? tr(typeNames[task.postType]) : task.postType}
-                      </span>
-                    ) : null}
-                    {activeRequests[task.id] ? (
-                      <span className="status-pill is-draft">
-                        {requestStatusNames[activeRequests[task.id].status]
-                          ? tr(requestStatusNames[activeRequests[task.id].status])
-                          : activeRequests[task.id].status}
-                      </span>
+                      {task.postStatus ? (
+                        <span className={"status-pill is-" + task.postStatus}>
+                          {statusNames[task.postStatus]
+                            ? tr(statusNames[task.postStatus])
+                            : task.postStatus}
+                        </span>
+                      ) : null}
+                      {task.postType ? (
+                        <span className="post-card-type">
+                          {typeNames[task.postType]
+                            ? tr(typeNames[task.postType])
+                            : task.postType}
+                        </span>
+                      ) : null}
+                      {activeRequests[task.id] ? (
+                        <span className="status-pill is-draft">
+                          {requestStatusNames[activeRequests[task.id].status]
+                            ? tr(requestStatusNames[activeRequests[task.id].status])
+                            : activeRequests[task.id].status}
+                        </span>
+                      ) : null}
+                    </div>
+                    {task.updatedAt ? (
+                      <time className="post-card-updated" dateTime={task.updatedAt}>
+                        {tr({ en: "Updated", kn: "ಬದಲಾವಣೆ", hi: "बदलाव" })}{" "}
+                        {updatedOn.format(new Date(task.updatedAt))}
+                      </time>
                     ) : null}
                   </div>
-                  {task.updatedAt ? (
-                    <time className="post-card-updated" dateTime={task.updatedAt}>
-                      {tr({ en: "Updated", kn: "ಬದಲಾವಣೆ", hi: "बदलाव" })}{" "}
-                      {updatedOn.format(new Date(task.updatedAt))}
-                    </time>
-                  ) : null}
-                </div>
-                <div className="post-card-body">
-                  <h2>
-                    <Link href={`${basePath}/posts/${task.postId}`} prefetch={false}>
-                      {task.title || task.postId}
-                    </Link>
-                  </h2>
-                  <p className="task-card-meta">
-                    {isAdmin ? (
-                      <>
-                        <strong>{task.assigneeName}</strong>
-                        {" · "}
-                      </>
-                    ) : null}
-                    {task.batchLabel ? `#${task.batchLabel}` : null}
-                    {task.batchLabel && task.notes ? " · " : null}
-                    {task.notes || null}
-                  </p>
-                  <div className="post-actions">
-                    <button
-                      type="button"
-                      className="button button-outline is-compact"
-                      onClick={() => setDetailTask(task)}
-                    >
-                      <Eye size={15} aria-hidden="true" />
-                      {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
-                    </button>
-                    <Link
-                      href={`${basePath}/posts/${task.postId}`}
-                      prefetch={false}
-                      className="button button-outline is-compact"
-                    >
-                      <Pencil size={15} aria-hidden="true" />
-                      {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
-                    </Link>
-                    {task.postStatus === "published" && task.slug ? (
-                      <a
-                        href={`${site.url}/news/${task.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="button button-outline is-compact"
-                      >
-                        <ExternalLink size={15} aria-hidden="true" />
-                        {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
-                      </a>
-                    ) : null}
-                    {!isAdmin && task.status === "open" && !activeRequests[task.id] ? (
-                      <button
-                        type="button"
-                        className="button button-outline is-compact"
-                        disabled={pending}
-                        onClick={() => {
-                          setRequestTask(task);
-                          setRequestNote("");
-                        }}
-                      >
-                        <SendHorizontal size={15} aria-hidden="true" />
-                        {tr({ en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}
-                      </button>
-                    ) : null}
-                    {!isAdmin && task.status === "open" && activeRequests[task.id] ? (
-                      <Link
-                        href={`${basePath}/task-requests`}
-                        prefetch={false}
-                        className="button button-outline is-compact"
-                      >
-                        {tr({ en: "View request", kn: "ವಿನಂತಿ ನೋಡಿ", hi: "अनुरोध देखें" })}
-                      </Link>
-                    ) : null}
-                    {task.status === "open" ? (
-                      <button
-                        type="button"
-                        className="button is-compact"
-                        disabled={pending}
-                        onClick={() =>
-                          run(
-                            () => setTaskStatus({ id: task.id, status: "done" }),
-                            tr({
-                              en: "Marked done.",
-                              kn: "ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಲಾಯಿತು.",
-                              hi: "पूर्ण चिह्नित।",
-                            }),
-                          )
-                        }
-                      >
-                        {tr({ en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" })}
-                      </button>
-                    ) : null}
-                    {isAdmin && task.status === "open" ? (
-                      <button
-                        type="button"
-                        className="button button-outline is-compact"
-                        disabled={pending}
-                        onClick={() => setCancelTask(task)}
-                      >
-                        <Trash2 size={15} aria-hidden="true" />
-                        {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
-                      </button>
-                    ) : null}
-                    {isAdmin && task.status !== "open" ? (
-                      <button
-                        type="button"
-                        className="button button-outline is-compact"
-                        disabled={pending}
-                        onClick={() =>
-                          run(
-                            () => setTaskStatus({ id: task.id, status: "open" }),
-                            tr({
-                              en: "Task reopened.",
-                              kn: "ಕಾರ್ಯ ಮರುತೆರೆಯಲಾಯಿತು.",
-                              hi: "कार्य फिर खोला।",
-                            }),
-                          )
-                        }
-                      >
-                        {tr({ en: "Reopen", kn: "ಮರುತೆರೆಯಿರಿ", hi: "फिर खोलें" })}
-                      </button>
-                    ) : null}
+                  <div className="post-card-body">
+                    <div className="task-request-card-top">
+                      <h2>
+                        <Link href={`${basePath}/posts/${task.postId}`} prefetch={false}>
+                          {task.title || task.postId}
+                        </Link>
+                      </h2>
+                      <div className="password-vault-menu">
+                        <button
+                          type="button"
+                          className="password-vault-menu-trigger"
+                          ref={(node) => {
+                            triggerRefs.current[triggerKey] = node;
+                          }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpen}
+                          aria-label={tr({
+                            en: "More actions",
+                            kn: "ಹೆಚ್ಚು ಕ್ರಿಯೆಗಳು",
+                            hi: "और क्रियाएँ",
+                          })}
+                          disabled={pending}
+                          onClick={(event) =>
+                            openMenu({ kind: "task", id: task.id }, event.currentTarget)
+                          }
+                        >
+                          <MoreVertical size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="task-card-meta">
+                      {isAdmin ? (
+                        <>
+                          <strong>{task.assigneeName}</strong>
+                          {" · "}
+                        </>
+                      ) : null}
+                      {task.batchLabel ? `#${task.batchLabel}` : null}
+                      {task.batchLabel && task.notes ? " · " : null}
+                      {task.notes || null}
+                    </p>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
         {focusBatch && focusBatchTotal > focusBatchPageSize ? (
@@ -991,7 +947,7 @@ export function TaskBoard({
                 role="menuitem"
                 onClick={() => {
                   const batch = menuBatch;
-                  closeBatchMenu();
+                  closeMenu();
                   setDetailBatch(batch);
                 }}
               >
@@ -1003,7 +959,7 @@ export function TaskBoard({
                   href={batchHref(menuBatch.batchLabel)}
                   prefetch={false}
                   role="menuitem"
-                  onClick={closeBatchMenu}
+                  onClick={closeMenu}
                 >
                   <Pencil size={15} aria-hidden="true" />
                   {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
@@ -1017,7 +973,7 @@ export function TaskBoard({
                     disabled={pending}
                     onClick={() => {
                       const batch = menuBatch;
-                      closeBatchMenu();
+                      closeMenu();
                       openEditBatch(batch);
                     }}
                   >
@@ -1031,7 +987,7 @@ export function TaskBoard({
                     disabled={pending}
                     onClick={() => {
                       const batch = menuBatch;
-                      closeBatchMenu();
+                      closeMenu();
                       setCancelBatch(batch);
                     }}
                   >
@@ -1039,6 +995,139 @@ export function TaskBoard({
                     {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
                   </button>
                 </>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {menuTask && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="password-vault-menu-panel is-portal"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const task = menuTask;
+                  closeMenu();
+                  setDetailTask(task);
+                }}
+              >
+                <Eye size={15} aria-hidden="true" />
+                {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
+              </button>
+              <Link
+                href={`${basePath}/posts/${menuTask.postId}`}
+                prefetch={false}
+                role="menuitem"
+                onClick={closeMenu}
+              >
+                <Pencil size={15} aria-hidden="true" />
+                {tr({ en: "Edit", kn: "ತಿದ್ದಿ", hi: "संपादित करें" })}
+              </Link>
+              {menuTask.postStatus === "published" && menuTask.slug ? (
+                <a
+                  href={`${site.url}/news/${menuTask.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <ExternalLink size={15} aria-hidden="true" />
+                  {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
+                </a>
+              ) : null}
+              {!isAdmin && menuTask.status === "open" && !activeRequests[menuTask.id] ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const task = menuTask;
+                    closeMenu();
+                    setRequestTask(task);
+                    setRequestNote("");
+                  }}
+                >
+                  <SendHorizontal size={15} aria-hidden="true" />
+                  {tr({ en: "Request", kn: "ವಿನಂತಿ", hi: "अनुरोध" })}
+                </button>
+              ) : null}
+              {!isAdmin && menuTask.status === "open" && activeRequests[menuTask.id] ? (
+                <Link
+                  href={`${basePath}/task-requests`}
+                  prefetch={false}
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <Eye size={15} aria-hidden="true" />
+                  {tr({ en: "View request", kn: "ವಿನಂತಿ ನೋಡಿ", hi: "अनुरोध देखें" })}
+                </Link>
+              ) : null}
+              {menuTask.status === "open" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuTask.id;
+                    closeMenu();
+                    run(
+                      () => setTaskStatus({ id, status: "done" }),
+                      tr({
+                        en: "Marked done.",
+                        kn: "ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಲಾಯಿತು.",
+                        hi: "पूर्ण चिह्नित।",
+                      }),
+                    );
+                  }}
+                >
+                  <Check size={15} aria-hidden="true" />
+                  {tr({ en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" })}
+                </button>
+              ) : null}
+              {isAdmin && menuTask.status === "open" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="is-danger"
+                  disabled={pending}
+                  onClick={() => {
+                    const task = menuTask;
+                    closeMenu();
+                    setCancelTask(task);
+                  }}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                </button>
+              ) : null}
+              {isAdmin && menuTask.status !== "open" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuTask.id;
+                    closeMenu();
+                    run(
+                      () => setTaskStatus({ id, status: "open" }),
+                      tr({
+                        en: "Task reopened.",
+                        kn: "ಕಾರ್ಯ ಮರುತೆರೆಯಲಾಯಿತು.",
+                        hi: "कार्य फिर खोला।",
+                      }),
+                    );
+                  }}
+                >
+                  <RefreshCw size={15} aria-hidden="true" />
+                  {tr({ en: "Reopen", kn: "ಮರುತೆರೆಯಿರಿ", hi: "फिर खोलें" })}
+                </button>
               ) : null}
             </div>,
             document.body,

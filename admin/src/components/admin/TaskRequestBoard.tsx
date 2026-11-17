@@ -398,66 +398,6 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                         </a>
                       </p>
                     ) : null}
-
-                    <div className="post-actions">
-                      {isAdmin && (row.status === "requested" || row.status === "rejected") ? (
-                        <button
-                          type="button"
-                          className="button is-compact"
-                          disabled={pending}
-                          onClick={() => {
-                            setReviewId(row.id);
-                            setDriveUrl(row.driveUrl || "");
-                            setAdminNote(row.adminNote || "");
-                          }}
-                        >
-                          <Check size={15} aria-hidden="true" />
-                          {tr({ en: "Review", kn: "ಪರಿಶೀಲಿಸಿ", hi: "समीक्षा" })}
-                        </button>
-                      ) : null}
-
-                      {!isAdmin && row.status === "processing" ? (
-                        <button
-                          type="button"
-                          className="button is-compact"
-                          disabled={pending}
-                          onClick={() =>
-                            run(
-                              () => submitTaskRequestReady({ id: row.id }),
-                              tr({
-                                en: "Sent to admin for publish.",
-                                kn: "ಪ್ರಕಟಣೆಗಾಗಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
-                                hi: "प्रकाशन के लिए एडमिन को भेजा।",
-                              }),
-                            )
-                          }
-                        >
-                          <Send size={15} aria-hidden="true" />
-                          {tr({ en: "Send to admin", kn: "ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ", hi: "एडमिन को भेजें" })}
-                        </button>
-                      ) : null}
-
-                      {isAdmin && row.status === "ready" ? (
-                        <button
-                          type="button"
-                          className="button is-compact"
-                          disabled={pending}
-                          onClick={() =>
-                            run(
-                              () => completeTaskRequest({ id: row.id }),
-                              tr({
-                                en: "Moved to Completed.",
-                                kn: "ಪೂರ್ಣ ವಿಭಾಗಕ್ಕೆ ಸರಿಸಲಾಯಿತು.",
-                                hi: "पूर्ण अनुभाग में भेजा।",
-                              }),
-                            )
-                          }
-                        >
-                          <Check size={15} aria-hidden="true" />
-                          {tr({ en: "Mark done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण चिह्नित" })}
-                        </button>
-                      ) : null}
-                    </div>
                   </div>
                 </article>
               );
@@ -512,6 +452,79 @@ export function TaskRequestBoard({ isAdmin, requests, staff }: Props) {
                   {tr({ en: "View", kn: "ನೋಡಿ", hi: "देखें" })}
                 </button>
               )}
+              {menuRow.driveUrl ? (
+                <a
+                  href={menuRow.driveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  <ExternalLink size={15} aria-hidden="true" />
+                  {tr({ en: "Open Drive", kn: "Drive ತೆರೆಯಿರಿ", hi: "Drive खोलें" })}
+                </a>
+              ) : null}
+              {isAdmin && (menuRow.status === "requested" || menuRow.status === "rejected") ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const row = menuRow;
+                    closeMenu();
+                    setReviewId(row.id);
+                    setDriveUrl(row.driveUrl || "");
+                    setAdminNote(row.adminNote || "");
+                  }}
+                >
+                  <Check size={15} aria-hidden="true" />
+                  {tr({ en: "Review", kn: "ಪರಿಶೀಲಿಸಿ", hi: "समीक्षा" })}
+                </button>
+              ) : null}
+              {!isAdmin && menuRow.status === "processing" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuRow.id;
+                    closeMenu();
+                    run(
+                      () => submitTaskRequestReady({ id }),
+                      tr({
+                        en: "Sent to admin for publish.",
+                        kn: "ಪ್ರಕಟಣೆಗಾಗಿ ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಲಾಯಿತು.",
+                        hi: "प्रकाशन के लिए एडमिन को भेजा।",
+                      }),
+                    );
+                  }}
+                >
+                  <Send size={15} aria-hidden="true" />
+                  {tr({ en: "Send to admin", kn: "ಆಡ್ಮಿನ್‌ಗೆ ಕಳುಹಿಸಿ", hi: "एडमिन को भेजें" })}
+                </button>
+              ) : null}
+              {isAdmin && menuRow.status === "ready" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuRow.id;
+                    closeMenu();
+                    run(
+                      () => completeTaskRequest({ id }),
+                      tr({
+                        en: "Moved to Completed.",
+                        kn: "ಪೂರ್ಣ ವಿಭಾಗಕ್ಕೆ ಸರಿಸಲಾಯಿತು.",
+                        hi: "पूर्ण अनुभाग में भेजा।",
+                      }),
+                    );
+                  }}
+                >
+                  <Check size={15} aria-hidden="true" />
+                  {tr({ en: "Mark done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण चिह्नित" })}
+                </button>
+              ) : null}
               {(isAdmin &&
                 ["requested", "processing", "ready", "rejected"].includes(menuRow.status)) ||
               (!isAdmin && menuRow.status === "requested") ? (

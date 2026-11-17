@@ -15,7 +15,11 @@ export async function saveHome(input: unknown) {
         hi: "विवरण जाँचें।",
       }),
     };
-  const ids = [parsed.data.lead_id, ...parsed.data.pick_ids].filter(Boolean);
+  const ids = [
+    parsed.data.lead_id,
+    ...parsed.data.pick_ids,
+    ...parsed.data.latest_ids,
+  ].filter(Boolean);
   if (ids.length) {
     const { data, error } = await db
       .from("posts")

@@ -169,6 +169,72 @@ export function HomeBuilder({
           </label>
         ))}
       </fieldset>
+      <fieldset className="field wide">
+        <legend>
+          {tr({
+            en: "Latest news pins — drag order with ↑ ↓",
+            kn: "ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಪಿನ್ — ↑ ↓ ಕ್ರಮ",
+            hi: "ताज़ा समाचार पिन — ↑ ↓ क्रम",
+          })}
+        </legend>
+        {posts.slice(0, 60).map((p) => (
+          <label key={p.id} className="chip">
+            <input
+              type="checkbox"
+              checked={config.latest_ids.includes(p.id)}
+              disabled={
+                !config.latest_ids.includes(p.id) && config.latest_ids.length >= 24
+              }
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  latest_ids: e.target.checked
+                    ? [...config.latest_ids, p.id]
+                    : config.latest_ids.filter((id) => id !== p.id),
+                })
+              }
+            />
+            {p.title_kn}
+            {config.latest_ids.includes(p.id) ? (
+              <span className="category-chips" style={{ marginLeft: 8 }}>
+                <button
+                  type="button"
+                  className="button is-compact"
+                  disabled={config.latest_ids.indexOf(p.id) <= 0}
+                  onClick={() => {
+                    const index = config.latest_ids.indexOf(p.id);
+                    if (index <= 0) return;
+                    const next = [...config.latest_ids];
+                    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                    setConfig({ ...config, latest_ids: next });
+                  }}
+                  aria-label={tr({ en: "Move up", kn: "ಮೇಲಕ್ಕೆ", hi: "ऊपर" })}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="button is-compact"
+                  disabled={
+                    config.latest_ids.indexOf(p.id) < 0 ||
+                    config.latest_ids.indexOf(p.id) >= config.latest_ids.length - 1
+                  }
+                  onClick={() => {
+                    const index = config.latest_ids.indexOf(p.id);
+                    if (index < 0 || index >= config.latest_ids.length - 1) return;
+                    const next = [...config.latest_ids];
+                    [next[index + 1], next[index]] = [next[index], next[index + 1]];
+                    setConfig({ ...config, latest_ids: next });
+                  }}
+                  aria-label={tr({ en: "Move down", kn: "ಕೆಳಕ್ಕೆ", hi: "नीचे" })}
+                >
+                  ↓
+                </button>
+              </span>
+            ) : null}
+          </label>
+        ))}
+      </fieldset>
       {config.sections.map((s, index) => (
         <fieldset key={s.id} className="field wide">
           <legend>

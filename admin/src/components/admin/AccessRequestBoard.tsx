@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Check, RefreshCw, X } from "lucide-react";
+import { Check, MoreVertical, RefreshCw, X } from "lucide-react";
 import { useUiStrings } from "@/components/i18n/LanguageProvider";
 import type { Tri } from "@/lib/i18n/strings";
 import {
@@ -35,6 +36,70 @@ export function AccessRequestBoard({ isAdmin, requests, staff }: Props) {
   const [filterStaff, setFilterStaff] = useState("all");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [adminNote, setAdminNote] = useState("");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  function closeMenu() {
+    setMenuOpenId(null);
+    setMenuPos(null);
+  }
+
+  function placeMenu(button: HTMLButtonElement, panel?: HTMLElement | null) {
+    const rect = button.getBoundingClientRect();
+    const panelWidth = Math.max(panel?.offsetWidth || 0, 200);
+    const panelHeight = Math.max(panel?.offsetHeight || 0, 140);
+    const gap = 8;
+    const left = Math.min(
+      Math.max(12, rect.right - panelWidth),
+      Math.max(12, window.innerWidth - panelWidth - 12),
+    );
+    const below = rect.bottom + gap;
+    const fitsBelow = below + panelHeight <= window.innerHeight - 12;
+    const top = fitsBelow
+      ? below
+      : Math.max(12, Math.min(rect.top - panelHeight - gap, window.innerHeight - panelHeight - 12));
+    setMenuPos({ top, left });
+  }
+
+  function openMenu(rowId: string, button: HTMLButtonElement) {
+    if (menuOpenId === rowId) {
+      closeMenu();
+      return;
+    }
+    placeMenu(button);
+    setMenuOpenId(rowId);
+  }
+
+  useEffect(() => {
+    if (!menuOpenId) return;
+    function onReposition() {
+      const trigger = triggerRefs.current[menuOpenId];
+      if (trigger) placeMenu(trigger, menuRef.current);
+    }
+    const frame = window.requestAnimationFrame(onReposition);
+    function onPointer(event: MouseEvent) {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRefs.current[menuOpenId]?.contains(target)) return;
+      closeMenu();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeMenu();
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [menuOpenId]);
 
   const counts = useMemo(() => {
     const byStaff = (row: AccessRequestRow) =>
@@ -67,6 +132,7 @@ export function AccessRequestBoard({ isAdmin, requests, staff }: Props) {
   }
 
   const reviewing = reviewId ? requests.find((r) => r.id === reviewId) : null;
+  const menuRow = menuOpenId ? requests.find((r) => r.id === menuOpenId) || null : null;
 
   return (
     <div className="task-request-board">
@@ -154,71 +220,137 @@ export function AccessRequestBoard({ isAdmin, requests, staff }: Props) {
           </p>
         ) : (
           <div className="post-card-list">
-            {visible.map((row) => (
-              <article key={row.id} className="post-card is-draft">
-                <div className="post-card-body">
-                  <h2>{tr(row.sectionLabel)}</h2>
-                  <p className="task-card-meta">
-                    {isAdmin ? (
-                      <>
-                        <strong>{row.requesterName}</strong>
-                        {" · "}
-                      </>
-                    ) : null}
-                    <span className={"status-pill is-" + (row.status === "approved" ? "published" : row.status === "requested" ? "draft" : "archived")}>
-                      {statusNames[row.status] ? tr(statusNames[row.status]) : row.status}
-                    </span>
-                    {" · "}
-                    {row.staffNote ||
-                      tr({ en: "No staff note", kn: "ಸಿಬ್ಬಂದಿ ಟಿಪ್ಪಣಿ ಇಲ್ಲ", hi: "स्टाफ़ नोट नहीं" })}
-                  </p>
-                  {row.adminNote ? (
-                    <p className="task-request-admin-note">
-                      <strong>{tr({ en: "Admin", kn: "ಆಡ್ಮಿನ್", hi: "एडमिन" })}:</strong> {row.adminNote}
-                    </p>
-                  ) : null}
-                  <div className="post-actions">
-                    {isAdmin && row.status === "requested" ? (
-                      <button
-                        type="button"
-                        className="button is-compact"
-                        disabled={pending}
-                        onClick={() => {
-                          setReviewId(row.id);
-                          setAdminNote(row.adminNote || "");
-                        }}
-                      >
-                        <Check size={15} aria-hidden="true" />
-                        {tr({ en: "Review", kn: "ಪರಿಶೀಲಿಸಿ", hi: "समीक्षा" })}
-                      </button>
-                    ) : null}
-                    {row.status === "requested" ? (
-                      <button
-                        type="button"
-                        className="button button-outline is-compact"
-                        disabled={pending}
-                        onClick={() =>
-                          run(
-                            () => cancelAccessRequest({ id: row.id }),
-                            tr({
-                              en: "Request cancelled.",
-                              kn: "ವಿನಂತಿ ರದ್ದುಗೊಂಡಿದೆ.",
-                              hi: "अनुरोध रद्द।",
-                            }),
-                          )
+            {visible.map((row) => {
+              const menuOpen = menuOpenId === row.id;
+              return (
+                <article
+                  key={row.id}
+                  className={"post-card is-draft" + (menuOpen ? " is-menu-open" : "")}
+                >
+                  <div className="post-card-body">
+                    <div className="task-request-card-top">
+                      <h2>{tr(row.sectionLabel)}</h2>
+                      <div className="password-vault-menu">
+                        <button
+                          type="button"
+                          className="password-vault-menu-trigger"
+                          ref={(node) => {
+                            triggerRefs.current[row.id] = node;
+                          }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpen}
+                          aria-label={tr({
+                            en: "More actions",
+                            kn: "ಹೆಚ್ಚು ಕ್ರಿಯೆಗಳು",
+                            hi: "और क्रियाएँ",
+                          })}
+                          disabled={pending}
+                          onClick={(event) => openMenu(row.id, event.currentTarget)}
+                        >
+                          <MoreVertical size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="task-card-meta">
+                      {isAdmin ? (
+                        <>
+                          <strong>{row.requesterName}</strong>
+                          {" · "}
+                        </>
+                      ) : null}
+                      <span
+                        className={
+                          "status-pill is-" +
+                          (row.status === "approved"
+                            ? "published"
+                            : row.status === "requested"
+                              ? "draft"
+                              : "archived")
                         }
                       >
-                        <X size={15} aria-hidden="true" />
-                        {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
-                      </button>
+                        {statusNames[row.status] ? tr(statusNames[row.status]) : row.status}
+                      </span>
+                      {" · "}
+                      {row.staffNote ||
+                        tr({
+                          en: "No staff note",
+                          kn: "ಸಿಬ್ಬಂದಿ ಟಿಪ್ಪಣಿ ಇಲ್ಲ",
+                          hi: "स्टाफ़ नोट नहीं",
+                        })}
+                    </p>
+                    {row.adminNote ? (
+                      <p className="task-request-admin-note">
+                        <strong>{tr({ en: "Admin", kn: "ಆಡ್ಮಿನ್", hi: "एडमिन" })}:</strong>{" "}
+                        {row.adminNote}
+                      </p>
                     ) : null}
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
+
+      {menuRow && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="password-vault-menu-panel is-portal"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
+            >
+              {isAdmin && menuRow.status === "requested" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={pending}
+                  onClick={() => {
+                    const row = menuRow;
+                    closeMenu();
+                    setReviewId(row.id);
+                    setAdminNote(row.adminNote || "");
+                  }}
+                >
+                  <Check size={15} aria-hidden="true" />
+                  {tr({ en: "Review", kn: "ಪರಿಶೀಲಿಸಿ", hi: "समीक्षा" })}
+                </button>
+              ) : null}
+              {menuRow.status === "requested" ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="is-danger"
+                  disabled={pending}
+                  onClick={() => {
+                    const id = menuRow.id;
+                    closeMenu();
+                    run(
+                      () => cancelAccessRequest({ id }),
+                      tr({
+                        en: "Request cancelled.",
+                        kn: "ವಿನಂತಿ ರದ್ದುಗೊಂಡಿದೆ.",
+                        hi: "अनुरोध रद्द।",
+                      }),
+                    );
+                  }}
+                >
+                  <X size={15} aria-hidden="true" />
+                  {tr({ en: "Cancel", kn: "ರದ್ದು", hi: "रद्द" })}
+                </button>
+              ) : (
+                <button type="button" role="menuitem" disabled>
+                  {tr({
+                    en: "No actions available",
+                    kn: "ಯಾವುದೇ ಕ್ರಿಯೆ ಇಲ್ಲ",
+                    hi: "कोई क्रिया नहीं",
+                  })}
+                </button>
+              )}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {reviewing ? (
         <div

@@ -22,6 +22,7 @@ import { PlacePicker } from "./PlacePicker";
 import { FacebookLogo, InstagramLogo, YouTubeLogo } from "./BrandIcons";
 import { DeletePostButton } from "./DeletePostButton";
 import { RestorePostButton } from "./RestorePostButton";
+import { ArticlePlacement } from "./ArticlePlacement";
 import { useDeskPath } from "@/components/admin/DeskPathProvider";
 import { videoFromInput } from "@/lib/utils/video";
 
@@ -127,6 +128,7 @@ export function PostEditor({
   canPublish,
   canDelete = false,
   choices,
+  mathaIds: initialMathaIds = [],
 }: {
   post?: Post;
   categories: Category[];
@@ -137,7 +139,11 @@ export function PostEditor({
     places: PlaceOption[];
     authors: { id: string; name_kn: string }[];
     events: { id: string; name_kn: string }[];
+    mathas?: { id: string; name_kn: string; slug: string }[];
+    latestIds?: string[];
+    latestLabels?: { id: string; title_kn: string }[];
   };
+  mathaIds?: string[];
 }) {
   const { kn, v4: t, tr, l } = useUiStrings();
   const [message, setMessage] = useState(""),
@@ -177,6 +183,11 @@ export function PostEditor({
   const [gallery, setGallery] = useState(post?.media_images || []);
   const [socialPlatform, setSocialPlatform] = useState(post?.social_platform || "");
   const [socialUrl, setSocialUrl] = useState(post?.social_post_url || "");
+  const [mathaIds, setMathaIds] = useState(() => new Set(initialMathaIds));
+  const [latestIds, setLatestIds] = useState(() => [...(choices.latestIds || [])]);
+  const [pinLatest, setPinLatest] = useState(() =>
+    Boolean(post?.id && (choices.latestIds || []).includes(post.id)),
+  );
   const selectedIds = new Set([primaryCategory, ...extraCategories]);
   const selectedSlugs = new Set(
     categories.filter((category) => selectedIds.has(category.id)).map((category) => category.slug),
@@ -379,6 +390,15 @@ export function PostEditor({
             id: post?.id,
             category_ids: data.getAll("category_ids"),
             tag_ids: data.getAll("tag_ids"),
+            matha_ids: [...mathaIds],
+            pin_latest: pinLatest,
+            latest_ids: latestIds.filter((id) => id !== "__this__"),
+            latest_rank: (() => {
+              const raw = String(data.get("latest_rank") || "");
+              if (!raw) return undefined;
+              const n = Number(raw);
+              return Number.isFinite(n) ? n : undefined;
+            })(),
             is_featured: data.has("is_featured"),
             is_breaking: data.has("is_breaking"),
             is_live: data.has("is_live"),
@@ -539,9 +559,51 @@ export function PostEditor({
             }}
           />
           <label className="field">
-            {tr({ en: "Event date (optional)", kn: "ಕಾರ್ಯಕ್ರಮದ ದಿನಾಂಕ (ಐಚ್ಛಿಕ)", hi: "कार्यक्रम की तारीख़ (वैकल्पिक)" })}
+            {tr({
+              en: "Event date (optional)",
+              kn: "ಕಾರ್ಯಕ್ರಮದ ದಿನಾಂಕ (ಐಚ್ಛಿಕ)",
+              hi: "कार्यक्रम की तारीख़ (वैकल्पिक)",
+            })}
             <input name="event_date" type="date" defaultValue={post?.event_date || ""} />
+            <small className="field-hint">
+              {tr({
+                en: "If you publish after the event, the publish date matches this date.",
+                kn: "ಕಾರ್ಯಕ್ರಮದ ನಂತರ ಪ್ರಕಟಿಸಿದರೆ, ಪ್ರಕಟಣೆ ದಿನಾಂಕ ಇದೇ ದಿನಾಂಕಕ್ಕೆ ಹೊಂದುತ್ತದೆ.",
+                hi: "कार्यक्रम के बाद प्रकाशित करने पर प्रकाशन तिथि इसी तारीख़ से मेल खाती है।",
+              })}
+            </small>
           </label>
+        </Section>
+
+        <Section
+          title={tr({
+            en: "Where to show",
+            kn: "ಎಲ್ಲಿ ತೋರಿಸಬೇಕು",
+            hi: "कहाँ दिखाना है",
+          })}
+          description={tr({
+            en: "Required when publishing. Pick Latest news and every section that should list this article.",
+            kn: "ಪ್ರಕಟಿಸುವಾಗ ಅಗತ್ಯ. ಇತ್ತೀಚಿನ ಸುದ್ದಿ ಮತ್ತು ಈ ಲೇಖನ ಕಾಣಿಸಬೇಕಾದ ಪ್ರತಿ ವಿಭಾಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+            hi: "प्रकाशित करते समय आवश्यक। ताज़ा समाचार और हर अनुभाग चुनें जहाँ यह लेख दिखे।",
+          })}
+        >
+          <ArticlePlacement
+            categories={categories}
+            primaryCategory={primaryCategory}
+            extraCategories={extraCategories}
+            setExtraCategories={setExtraCategories}
+            placeId={placeId}
+            mathas={choices.mathas || []}
+            mathaIds={mathaIds}
+            setMathaIds={setMathaIds}
+            pinLatest={pinLatest}
+            setPinLatest={setPinLatest}
+            latestIds={latestIds}
+            setLatestIds={setLatestIds}
+            latestLabels={choices.latestLabels || []}
+            postId={post?.id}
+            postTitle={post?.title_kn}
+          />
         </Section>
 
         <Section
@@ -1099,51 +1161,43 @@ export function PostEditor({
         <section className="editor-section">
           <header>
             <h2>{tr({ en: "Organise", kn: "ವರ್ಗೀಕರಣ", hi: "व्यवस्थित करें" })}</h2>
+            <p>
+              {tr({
+                en: "Sections are chosen under Where to show.",
+                kn: "ವಿಭಾಗಗಳನ್ನು «ಎಲ್ಲಿ ತೋರಿಸಬೇಕು» ನಲ್ಲಿ ಆಯ್ಕೆಮಾಡಿ.",
+                hi: "अनुभाग «कहाँ दिखाना है» में चुनें।",
+              })}
+            </p>
           </header>
           <div className="editor-stack">
-            <fieldset className="editor-checklist-box">
-              <legend>{tr({ en: "Also show in", kn: "ಇವುಗಳಲ್ಲೂ ತೋರಿಸಿ", hi: "इनमें भी दिखाएँ" })}</legend>
-              <div className="editor-scroll-list">
-                {nested.map(({ category: c, depth }) => (
-                  <label key={c.id} className={depth ? "editor-category-child" : undefined}>
-                    <input
-                      type="checkbox"
-                      name="category_ids"
-                      value={c.id}
-                      checked={extraCategories.has(c.id) || c.id === primaryCategory}
-                      disabled={c.id === primaryCategory}
-                      onChange={(event) => {
-                        const on = event.target.checked;
-                        setExtraCategories((current) => {
-                          const copy = new Set(current);
-                          if (on) copy.add(c.id);
-                          else copy.delete(c.id);
-                          return copy;
-                        });
-                        if (on && c.slug === "social-videos" && postType === "article")
-                          setPostType("video");
-                        if (on && c.slug === "social-posters" && postType !== "article" && !selectedSlugs.has("social-videos"))
-                          setPostType("article");
-                      }}
-                    />
-                    {c.name_kn}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            {choices.tags.length > 0 && (
-              <fieldset className="editor-checklist-box">
-                <legend>{t.tags}</legend>
-                <div className="editor-scroll-list">
+            {[...extraCategories].map((id) => (
+              <input key={id} type="hidden" name="category_ids" value={id} />
+            ))}
+            {choices.tags.length > 0 ? (
+              <label className="field">
+                {t.tags}
+                <select
+                  name="tag_ids"
+                  multiple
+                  size={Math.min(6, Math.max(3, choices.tags.length))}
+                  className="editor-simple-select"
+                  defaultValue={post?.tag_ids || []}
+                >
                   {choices.tags.map((tag) => (
-                    <label key={tag.id}>
-                      <input type="checkbox" name="tag_ids" value={tag.id} defaultChecked={post?.tag_ids?.includes(tag.id)} />
+                    <option key={tag.id} value={tag.id}>
                       {tag.name_kn}
-                    </label>
+                    </option>
                   ))}
-                </div>
-              </fieldset>
-            )}
+                </select>
+                <small className="field-hint">
+                  {tr({
+                    en: "Hold Ctrl (Windows) or ⌘ (Mac) to pick more than one.",
+                    kn: "ಹೆಚ್ಚು ಆಯ್ಕೆಗೆ Ctrl (Windows) ಅಥವಾ ⌘ (Mac) ಒತ್ತಿ ಹಿಡಿಯಿರಿ.",
+                    hi: "एक से अधिक चुनने के लिए Ctrl (Windows) या ⌘ (Mac) दबाए रखें।",
+                  })}
+                </small>
+              </label>
+            ) : null}
             {(
               [
                 ["public_author_id", { en: "Author", kn: "ಲೇಖಕ", hi: "लेखक" }, choices.authors],
