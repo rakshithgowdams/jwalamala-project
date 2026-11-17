@@ -1131,6 +1131,36 @@
   color: inherit;
   font-weight: 600;
 }
+.admin-main .task-type-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.admin-main .task-type-status-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-md, 10px);
+  background: color-mix(in srgb, var(--panel, #fff) 92%, var(--accent) 8%);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.admin-main .task-type-status-item strong {
+  color: var(--text, inherit);
+  font-size: 13px;
+  font-weight: 650;
+}
+.admin-main .task-type-status-remaining {
+  color: var(--text, inherit);
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .admin-main .task-type-status {
+    grid-template-columns: 1fr;
+  }
+}
 .admin-main .post-card-empty {
   grid-column: 1 / -1;
   margin: 0;

@@ -28,7 +28,7 @@ export const sectionGroups: SectionGroup[] = [
     ],
   },
   {
-    title: { en: "Content", kn: "ವಿಷಯ", hi: "सामग्री" },
+    title: { en: "Desk", kn: "ಡೆಸ್ಕ್", hi: "डेस्क" },
     sections: [
       { key: "posts", label: { en: "Articles", kn: "ಲೇಖನಗಳು", hi: "लेख" }, view: "content.read", grants: ["content.read", "content.create", "content.edit", "content.publish"] },
       {
@@ -50,14 +50,24 @@ export const sectionGroups: SectionGroup[] = [
         grants: ["admin.access"],
       },
       { key: "desk", label: { en: "News desk", kn: "ಸುದ್ದಿ ವಿಭಾಗ", hi: "न्यूज़ डेस्क" }, view: "content.read", grants: content },
+    ],
+  },
+  {
+    title: { en: "Site structure", kn: "ತಾಣ ರಚನೆ", hi: "साइट संरचना" },
+    sections: [
       { key: "categories", label: { en: "Categories", kn: "ವರ್ಗಗಳು", hi: "श्रेणियाँ" }, view: "content.edit", grants: content },
       { key: "mathas", label: { en: "Jain mathas", kn: "ಜೈನ ಮಠಗಳು", hi: "जैन मठ" }, view: "content.edit", grants: content },
+      { key: "tags", label: { en: "Tags", kn: "ಟ್ಯಾಗ್‌ಗಳು", hi: "टैग" }, view: "content.edit", grants: content },
+      { key: "topics", label: { en: "Topic collections", kn: "ವಿಷಯ ಸಂಗ್ರಹ", hi: "विषय संग्रह" }, view: "content.edit", grants: content },
+      { key: "authors", label: { en: "Authors", kn: "ಲೇಖಕರು", hi: "लेखक" }, view: "content.edit", grants: content },
       { key: "home", label: { en: "Home page layout", kn: "ಮುಖಪುಟ ವಿನ್ಯಾಸ", hi: "होम पेज लेआउट" }, view: "content.edit", grants: content },
       { key: "trending", label: { en: "Trending topics", kn: "ಈಗ ಚರ್ಚೆಯಲ್ಲಿ", hi: "ट्रेंडिंग विषय" }, view: "content.edit", grants: content },
-      { key: "topics", label: { en: "Topic collections", kn: "ವಿಷಯ ಸಂಗ್ರಹ", hi: "विषय संग्रह" }, view: "content.edit", grants: content },
-      { key: "tags", label: { en: "Tags", kn: "ಟ್ಯಾಗ್‌ಗಳು", hi: "टैग" }, view: "content.edit", grants: content },
+    ],
+  },
+  {
+    title: { en: "Formats", kn: "ಸ್ವರೂಪಗಳು", hi: "फ़ॉर्मैट" },
+    sections: [
       { key: "series", label: { en: "Video series", kn: "ವಿಡಿಯೋ ಸರಣಿಗಳು", hi: "वीडियो सीरीज़" }, view: "content.edit", grants: content },
-      { key: "authors", label: { en: "Authors", kn: "ಲೇಖಕರು", hi: "लेखक" }, view: "content.edit", grants: content },
       { key: "live-blogs", label: { en: "Live blogs", kn: "ನೇರ ವರದಿಗಳು", hi: "लाइव ब्लॉग" }, view: "content.edit", grants: content },
       { key: "galleries", label: { en: "Photo galleries", kn: "ಚಿತ್ರ ಸಂಗ್ರಹ", hi: "फ़ोटो गैलरी" }, view: "content.edit", grants: content },
       { key: "web-stories", label: { en: "Web stories", kn: "ಚಿತ್ರಕಥೆಗಳು", hi: "वेब स्टोरीज़" }, view: "content.edit", grants: content },

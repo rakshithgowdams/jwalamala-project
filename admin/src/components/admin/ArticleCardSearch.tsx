@@ -8,9 +8,12 @@ import {
   type ArticleSearchHit,
 } from "@/app/admin/tasks/actions";
 
+type ContentType = "article" | "video" | "short";
+
 type Props = {
   value: string;
   selectedTitle?: string;
+  contentType?: ContentType;
   onChange: (hit: ArticleSearchHit | null) => void;
 };
 
@@ -18,7 +21,12 @@ type Props = {
  * Searchable article picker with result cards — finds any title in the library,
  * not only the recent dropdown list.
  */
-export function ArticleCardSearch({ value, selectedTitle = "", onChange }: Props) {
+export function ArticleCardSearch({
+  value,
+  selectedTitle = "",
+  contentType,
+  onChange,
+}: Props) {
   const { tr } = useUiStrings();
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,13 +40,13 @@ export function ArticleCardSearch({ value, selectedTitle = "", onChange }: Props
     if (!open) return;
     const handle = window.setTimeout(() => {
       start(async () => {
-        const rows = await searchArticlesForAssign(query);
+        const rows = await searchArticlesForAssign(query, contentType);
         setHits(rows);
         setActive(0);
       });
     }, 220);
     return () => window.clearTimeout(handle);
-  }, [query, open]);
+  }, [query, open, contentType]);
 
   function choose(hit: ArticleSearchHit | null) {
     onChange(hit);
@@ -48,20 +56,29 @@ export function ArticleCardSearch({ value, selectedTitle = "", onChange }: Props
 
   function openList() {
     setOpen(true);
-    if (!hits.length) {
-      start(async () => {
-        const rows = await searchArticlesForAssign("");
-        setHits(rows);
-      });
-    }
+    start(async () => {
+      const rows = await searchArticlesForAssign(query, contentType);
+      setHits(rows);
+      setActive(0);
+    });
   }
 
   const display = open ? query : selectedTitle;
+  const typeLabel =
+    contentType === "video"
+      ? tr({ en: "videos", kn: "ವಿಡಿಯೋಗಳು", hi: "वीडियो" })
+      : contentType === "short"
+        ? tr({ en: "posts", kn: "ಪೋಸ್ಟ್‌ಗಳು", hi: "पोस्ट" })
+        : tr({ en: "articles", kn: "ಲೇಖನಗಳು", hi: "लेख" });
 
   return (
     <div className="field article-card-search">
       <label htmlFor={id}>
-        {tr({ en: "Search articles", kn: "ಲೇಖನಗಳನ್ನು ಹುಡುಕಿ", hi: "लेख खोजें" })}
+        {tr({
+          en: `Search ${typeLabel}`,
+          kn: `${typeLabel} ಹುಡುಕಿ`,
+          hi: `${typeLabel} खोजें`,
+        })}
       </label>
       <div className="article-card-search-control">
         <Search size={16} aria-hidden="true" className="article-card-search-icon" />
@@ -76,9 +93,9 @@ export function ArticleCardSearch({ value, selectedTitle = "", onChange }: Props
           aria-controls={`${id}-grid`}
           aria-autocomplete="list"
           placeholder={tr({
-            en: "Type a title to search the full library…",
-            kn: "ಪೂರ್ಣ ಲೈಬ್ರರಿಯಲ್ಲಿ ಹುಡುಕಲು ಶೀರ್ಷಿಕೆ ಟೈಪ್ ಮಾಡಿ…",
-            hi: "पूरी लाइब्रेरी में खोजने के लिए शीर्षक लिखें…",
+            en: "Type a title to search…",
+            kn: "ಹುಡುಕಲು ಶೀರ್ಷಿಕೆ ಟೈಪ್ ಮಾಡಿ…",
+            hi: "खोजने के लिए शीर्षक लिखें…",
           })}
           value={display}
           onFocus={openList}
@@ -107,7 +124,7 @@ export function ArticleCardSearch({ value, selectedTitle = "", onChange }: Props
           <button
             type="button"
             className="article-card-search-clear"
-            aria-label={tr({ en: "Clear article", kn: "ಲೇಖನ ತೆರವುಗೊಳಿಸಿ", hi: "लेख हटाएँ" })}
+            aria-label={tr({ en: "Clear selection", kn: "ಆಯ್ಕೆ ತೆರವುಗೊಳಿಸಿ", hi: "चयन हटाएँ" })}
             onClick={() => {
               choose(null);
               inputRef.current?.focus();
@@ -128,9 +145,9 @@ export function ArticleCardSearch({ value, selectedTitle = "", onChange }: Props
           {!pending && !hits.length ? (
             <p className="article-card-search-empty">
               {tr({
-                en: "No articles match that title.",
-                kn: "ಆ ಶೀರ್ಷಿಕೆಗೆ ಲೇಖನಗಳು ಸಿಗಲಿಲ್ಲ.",
-                hi: "उस शीर्षक से कोई लेख नहीं मिला।",
+                en: "No matches for that title.",
+                kn: "ಆ ಶೀರ್ಷಿಕೆಗೆ ಹೊಂದಾಣಿಕೆ ಸಿಗಲಿಲ್ಲ.",
+                hi: "उस शीर्षक से कोई मिलान नहीं।",
               })}
             </p>
           ) : null}

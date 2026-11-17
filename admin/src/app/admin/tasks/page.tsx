@@ -35,38 +35,98 @@ export default async function TasksPage() {
   const isAdmin = profile.role === "admin";
   const server = getAdminClient() || db;
 
-  const [{ count: totalArticles }, staffRes, tasksRes, openBatchRes] = await Promise.all([
+  const emptyCount = Promise.resolve({ count: 0 });
+  function openAssignedCount(type: "article" | "video" | "short") {
+    if (!isAdmin) return emptyCount;
+    return server
+      .from("article_tasks")
+      .select("id, posts!inner(type)", { count: "exact", head: true })
+      .eq("status", "open")
+      .eq("posts.type", type);
+  }
+  const [
+    { count: totalArticles },
+    { count: articleCount },
+    { count: videoCount },
+    { count: shortCount },
+    { count: openArticles },
+    { count: openVideos },
+    { count: openShorts },
+    { count: staffOpenTotal },
+    staffRes,
+    tasksRes,
+    openBatchRes,
+  ] = await Promise.all([
     // Staff never see the assign UI — skip the expensive full-library count.
     isAdmin
       ? server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived")
-      : Promise.resolve({ count: 0 }),
+      : emptyCount,
+    isAdmin
+      ? server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived").eq("type", "article")
+      : emptyCount,
+    isAdmin
+      ? server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived").eq("type", "video")
+      : emptyCount,
+    isAdmin
+      ? server.from("posts").select("id", { count: "exact", head: true }).neq("status", "archived").eq("type", "short")
+      : emptyCount,
+    openAssignedCount("article"),
+    openAssignedCount("video"),
+    openAssignedCount("short"),
+    // Exact open total for staff — list queries are capped and must not under-count 700+ batches.
+    !isAdmin
+      ? server
+          .from("article_tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "open")
+          .eq("assignee_id", user.id)
+      : emptyCount,
     isAdmin
       ? server.from("profiles").select("id,full_name").eq("role", "staff").order("full_name")
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
     (() => {
       // Embed titles/names so we never .in() thousands of UUIDs (PostgREST Bad Request).
+      // Staff cards are a sample; bulk work is summarized via openBatchRes below.
       let q = server
         .from("article_tasks")
         .select(
           "id,post_id,assignee_id,status,batch_label,notes,created_at,posts(title_kn,thumbnail_url,video_url,status,type,updated_at,slug),profiles!assignee_id(full_name)",
         )
         .order("created_at", { ascending: false })
-        .limit(isAdmin ? 400 : 150);
+        .limit(isAdmin ? 400 : 200);
       if (!isAdmin) q = q.eq("assignee_id", user.id);
       return q;
     })(),
     // Lightweight open-batch rollup so 1–1000 / 1001–2000 blocks stay visible even when
-    // thousands of row cards cannot all be painted.
-    isAdmin
-      ? server
-          .from("article_tasks")
-          .select("batch_label,assignee_id,created_at,notes")
-          .eq("status", "open")
-          .neq("batch_label", "")
-          .order("created_at", { ascending: false })
-          .limit(8000)
-      : Promise.resolve({ data: [] as { batch_label: string; assignee_id: string; created_at: string; notes: string | null }[] }),
+    // thousands of row cards cannot all be painted. Staff need this too, scoped to themselves.
+    (() => {
+      let q = server
+        .from("article_tasks")
+        .select("batch_label,assignee_id,created_at,notes")
+        .eq("status", "open")
+        .neq("batch_label", "")
+        .order("created_at", { ascending: false })
+        .limit(8000);
+      if (!isAdmin) q = q.eq("assignee_id", user.id);
+      return q;
+    })(),
   ]);
+
+  const totalsByType = {
+    article: articleCount || 0,
+    video: videoCount || 0,
+    short: shortCount || 0,
+  };
+  const openByType = {
+    article: openArticles || 0,
+    video: openVideos || 0,
+    short: openShorts || 0,
+  };
+  const remainingByType = {
+    article: Math.max(0, totalsByType.article - openByType.article),
+    video: Math.max(0, totalsByType.video - openByType.video),
+    short: Math.max(0, totalsByType.short - openByType.short),
+  };
 
   if (tasksRes.error) {
     // Fallback without embed aliases if the FK name differs.
@@ -129,6 +189,10 @@ export default async function TasksPage() {
         <TaskBoard
           isAdmin={isAdmin}
           totalArticles={totalArticles || 0}
+          totalsByType={totalsByType}
+          openByType={openByType}
+          remainingByType={remainingByType}
+          openTaskTotal={isAdmin ? 0 : staffOpenTotal || tasks.length}
           staff={(staffRes.data || []).map((s) => ({ id: s.id, name: s.full_name || s.id }))}
           tasks={tasks}
           batches={[]}
@@ -179,6 +243,9 @@ export default async function TasksPage() {
   const staffName = new Map(
     (staffRes.data || []).map((s) => [s.id as string, (s.full_name as string) || (s.id as string)]),
   );
+  if (!isAdmin) {
+    staffName.set(user.id, profile.full_name || "Staff");
+  }
   const batchMap = new Map<string, BatchSummary>();
   for (const row of openBatchRes.data || []) {
     const batchLabel = (row.batch_label as string) || "";
@@ -196,7 +263,7 @@ export default async function TasksPage() {
         key,
         batchLabel,
         assigneeId,
-        assigneeName: staffName.get(assigneeId) || "Staff",
+        assigneeName: staffName.get(assigneeId) || profile.full_name || "Staff",
         count: 1,
         notes: (row.notes as string) || "",
         createdAt: (row.created_at as string) || "",
@@ -204,6 +271,9 @@ export default async function TasksPage() {
     }
   }
   const batches = [...batchMap.values()].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  const openTaskTotal = isAdmin
+    ? openByType.article + openByType.video + openByType.short
+    : staffOpenTotal || 0;
 
   return (
     <>
@@ -213,6 +283,10 @@ export default async function TasksPage() {
       <TaskBoard
         isAdmin={isAdmin}
         totalArticles={totalArticles || 0}
+        totalsByType={totalsByType}
+        openByType={openByType}
+        remainingByType={remainingByType}
+        openTaskTotal={openTaskTotal}
         staff={(staffRes.data || []).map((s) => ({
           id: s.id,
           name: s.full_name || s.id,

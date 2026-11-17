@@ -14,25 +14,39 @@ type Result = {
 };
 type Fail = (en: string, kn: string, hi: string) => Result;
 
-function parseBatchLabel(label: string): { fromPos: number; toPos: number } | null {
-  const match = /^(\d+)-(\d+)$/.exec(label.trim());
+export const TASK_CONTENT_TYPES = ["article", "video", "short"] as const;
+export type TaskContentType = (typeof TASK_CONTENT_TYPES)[number];
+
+const contentTypeSchema = z.enum(TASK_CONTENT_TYPES);
+
+function parseBatchLabel(
+  label: string,
+): { contentType: TaskContentType | null; fromPos: number; toPos: number } | null {
+  const match = /^(?:(article|video|short):)?(\d+)-(\d+)$/.exec(label.trim());
   if (!match) return null;
-  const fromPos = Number(match[1]);
-  const toPos = Number(match[2]);
+  const fromPos = Number(match[2]);
+  const toPos = Number(match[3]);
   if (!Number.isFinite(fromPos) || !Number.isFinite(toPos) || toPos < fromPos) return null;
-  return { fromPos, toPos };
+  const contentType = (match[1] as TaskContentType | undefined) || null;
+  return { contentType, fromPos, toPos };
+}
+
+function formatBatchLabel(contentType: TaskContentType, fromPos: number, toPos: number) {
+  return `${contentType}:${fromPos}-${toPos}`;
 }
 
 async function loadPostsInRange(
   server: NonNullable<ReturnType<typeof getAdminClient>>,
   fromPos: number,
   toPos: number,
+  contentType: TaskContentType,
 ) {
   const from = fromPos - 1;
   const size = toPos - fromPos + 1;
   return server
     .from("posts")
     .select("id")
+    .eq("type", contentType)
     .neq("status", "archived")
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
@@ -68,17 +82,19 @@ async function requireAdminAssign(): Promise<
 const uuid = z.uuid();
 const notesSchema = z.string().trim().max(500).default("");
 
-/** Ordered article positions are 1-based and inclusive (e.g. 1–1000). */
+/** Ordered positions are 1-based and inclusive within a content type (e.g. 1–1000). */
 const bulkSchema = z.object({
   assigneeId: uuid,
   fromPos: z.coerce.number().int().min(1).max(1_000_000),
   toPos: z.coerce.number().int().min(1).max(1_000_000),
+  contentType: contentTypeSchema.default("article"),
   notes: notesSchema,
 });
 
 const singleSchema = z.object({
   assigneeId: uuid,
   postId: uuid,
+  contentType: contentTypeSchema.default("article"),
   notes: notesSchema,
 });
 
@@ -141,7 +157,7 @@ async function insertOpenTasks(
   return { error: null, count: inserted };
 }
 
-/** Assign one article to one staff member. */
+/** Assign one post (of the chosen content type) to one staff member. */
 export async function assignSingleArticle(input: unknown): Promise<Result> {
   const access = await requireAdminAssign();
   if ("denied" in access) return access.denied;
@@ -151,9 +167,20 @@ export async function assignSingleArticle(input: unknown): Promise<Result> {
     return fail("Choose a staff member and an article.", "ಸಿಬ್ಬಂದಿ ಮತ್ತು ಲೇಖನವನ್ನು ಆಯ್ಕೆಮಾಡಿ.", "स्टाफ़ और लेख चुनें।");
   const bad = await assertStaffAssignee(server, parsed.data.assigneeId, fail);
   if (bad) return bad;
-  const { data: post } = await server.from("posts").select("id").eq("id", parsed.data.postId).neq("status", "archived").maybeSingle();
+  const { data: post } = await server
+    .from("posts")
+    .select("id,type")
+    .eq("id", parsed.data.postId)
+    .neq("status", "archived")
+    .maybeSingle();
   if (!post)
     return fail("That article was not found.", "ಆ ಲೇಖನ ಸಿಗಲಿಲ್ಲ.", "वह लेख नहीं मिला।");
+  if ((post.type as string) !== parsed.data.contentType)
+    return fail(
+      "That item does not match the selected content type.",
+      "ಆ ಐಟಂ ಆಯ್ಕೆಮಾಡಿದ ವಿಷಯ ಪ್ರಕಾರಕ್ಕೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ.",
+      "वह आइटम चुने गए कंटेंट प्रकार से मेल नहीं खाता।",
+    );
   const { error, count } = await insertOpenTasks(server, [
     {
       post_id: post.id,
@@ -191,7 +218,7 @@ export async function assignBulkRange(input: unknown): Promise<Result> {
       "ಸಿಬ್ಬಂದಿ ಮತ್ತು ಮಾನ್ಯ ವ್ಯಾಪ್ತಿ ನಮೂದಿಸಿ (ಉದಾ. 1 ರಿಂದ 1000).",
       "स्टाफ़ और मान्य रेंज दर्ज करें (जैसे 1 से 1000)।",
     );
-  const { assigneeId, fromPos, toPos, notes } = parsed.data;
+  const { assigneeId, fromPos, toPos, notes, contentType } = parsed.data;
   if (toPos < fromPos)
     return fail(
       "The end number must be greater than or equal to the start number.",
@@ -207,17 +234,22 @@ export async function assignBulkRange(input: unknown): Promise<Result> {
   const bad = await assertStaffAssignee(server, assigneeId, fail);
   if (bad) return bad;
 
-  const { data: posts, error: listError } = await loadPostsInRange(server, fromPos, toPos);
+  const { data: posts, error: listError } = await loadPostsInRange(
+    server,
+    fromPos,
+    toPos,
+    contentType,
+  );
   if (listError)
     return fail(listError.message || "Could not load articles.", "ಲೇಖನಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "लेख लोड नहीं हो सके।");
   if (!posts?.length)
     return fail(
-      "No articles found in that range.",
-      "ಆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಲೇಖನಗಳು ಸಿಗಲಿಲ್ಲ.",
-      "उस रेंज में लेख नहीं मिले।",
+      "No items found in that range for the selected type.",
+      "ಆಯ್ಕೆಮಾಡಿದ ಪ್ರಕಾರದ ಆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಐಟಂಗಳು ಸಿಗಲಿಲ್ಲ.",
+      "चुने प्रकार की उस रेंज में आइटम नहीं मिले।",
     );
 
-  const batch_label = `${fromPos}-${fromPos + posts.length - 1}`;
+  const batch_label = formatBatchLabel(contentType, fromPos, fromPos + posts.length - 1);
   const { error, count } = await insertOpenTasks(
     server,
     posts.map((post) => ({
@@ -328,6 +360,7 @@ const updateBatchSchema = z.object({
   batchLabel: z.string().trim().min(1).max(120),
   fromPos: z.coerce.number().int().min(1).max(1_000_000),
   toPos: z.coerce.number().int().min(1).max(1_000_000),
+  contentType: contentTypeSchema.optional(),
   notes: notesSchema.optional(),
 });
 
@@ -360,7 +393,8 @@ export async function updateOpenBatch(input: unknown): Promise<Result> {
       "ನವೀಕರಿಸಿದ ಬ್ಯಾಚ್ ಗರಿಷ್ಠ 5,000 ಲೇಖನಗಳಿರಲಿ.",
       "अपडेटेड बैच अधिकतम 5,000 लेख रखें।",
     );
-  if (!parseBatchLabel(batchLabel))
+  const parsedLabel = parseBatchLabel(batchLabel);
+  if (!parsedLabel)
     return fail(
       "This batch label cannot be resized.",
       "ಈ ಬ್ಯಾಚ್ ಲೇಬಲ್ ಅನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.",
@@ -370,19 +404,42 @@ export async function updateOpenBatch(input: unknown): Promise<Result> {
   const bad = await assertStaffAssignee(server, assigneeId, fail);
   if (bad) return bad;
 
-  const { data: posts, error: listError } = await loadPostsInRange(server, fromPos, toPos);
+  let contentType: TaskContentType =
+    parsed.data.contentType || parsedLabel.contentType || "article";
+  if (!parsed.data.contentType && !parsedLabel.contentType) {
+    const { data: sample } = await server
+      .from("article_tasks")
+      .select("post_id,posts(type)")
+      .eq("assignee_id", assigneeId)
+      .eq("batch_label", batchLabel)
+      .eq("status", "open")
+      .limit(1)
+      .maybeSingle();
+    const joined = sample?.posts as { type?: string } | { type?: string }[] | null | undefined;
+    const sampleType = Array.isArray(joined) ? joined[0]?.type : joined?.type;
+    if (sampleType === "article" || sampleType === "video" || sampleType === "short") {
+      contentType = sampleType;
+    }
+  }
+
+  const { data: posts, error: listError } = await loadPostsInRange(
+    server,
+    fromPos,
+    toPos,
+    contentType,
+  );
   if (listError)
     return fail(listError.message || "Could not load articles.", "ಲೇಖನಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "लेख लोड नहीं हो सके।");
   if (!posts?.length)
     return fail(
-      "No articles found in that range.",
-      "ಆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಲೇಖನಗಳು ಸಿಗಲಿಲ್ಲ.",
-      "उस रेंज में लेख नहीं मिले।",
+      "No items found in that range for the selected type.",
+      "ಆಯ್ಕೆಮಾಡಿದ ಪ್ರಕಾರದ ಆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಐಟಂಗಳು ಸಿಗಲಿಲ್ಲ.",
+      "चुने प्रकार की उस रेंज में आइटम नहीं मिले।",
     );
 
   const newPostIds = posts.map((post) => post.id as string);
   const newPostSet = new Set(newPostIds);
-  const newLabel = `${fromPos}-${fromPos + posts.length - 1}`;
+  const newLabel = formatBatchLabel(contentType, fromPos, fromPos + posts.length - 1);
   const now = new Date().toISOString();
   const notes =
     typeof parsed.data.notes === "string" ? parsed.data.notes : undefined;
@@ -474,17 +531,22 @@ export type ArticleSearchHit = {
   updatedAt: string | null;
 };
 
-/** Live title search across the full article library for the Tasks card picker. */
-export async function searchArticlesForAssign(query: string): Promise<ArticleSearchHit[]> {
+/** Live title search across the library for the Tasks card picker. */
+export async function searchArticlesForAssign(
+  query: string,
+  contentType?: TaskContentType | string,
+): Promise<ArticleSearchHit[]> {
   const [{ profile }, server] = await Promise.all([requireStaff(), Promise.resolve(getAdminClient())]);
   if (profile.role !== "admin" || !server) return [];
   const q = query.trim().slice(0, 120).replace(/[%_,]/g, " ");
+  const type = contentTypeSchema.safeParse(contentType);
   let request = server
     .from("posts")
     .select("id,title_kn,status,type,thumbnail_url,updated_at")
     .neq("status", "archived")
     .order("updated_at", { ascending: false })
     .limit(24);
+  if (type.success) request = request.eq("type", type.data);
   if (q) request = request.ilike("title_kn", `%${q}%`);
   const { data } = await request;
   return (data || []).map((row) => ({

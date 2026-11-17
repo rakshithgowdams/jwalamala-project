@@ -20,10 +20,24 @@ import {
 import { createTaskRequest } from "@/app/admin/task-requests/actions";
 import { useDeskPath } from "@/components/admin/DeskPathProvider";
 
-function parseBatchRange(label: string): { fromPos: string; toPos: string } | null {
-  const match = /^(\d+)-(\d+)$/.exec(label.trim());
+type ContentType = "article" | "video" | "short";
+
+function parseBatchRange(
+  label: string,
+): { contentType: ContentType | null; fromPos: string; toPos: string } | null {
+  const match = /^(?:(article|video|short):)?(\d+)-(\d+)$/.exec(label.trim());
   if (!match) return null;
-  return { fromPos: match[1], toPos: match[2] };
+  return {
+    contentType: (match[1] as ContentType | undefined) || null,
+    fromPos: match[2],
+    toPos: match[3],
+  };
+}
+
+function batchRangeDisplay(label: string) {
+  const parsed = parseBatchRange(label);
+  if (!parsed) return label;
+  return `${parsed.fromPos}–${parsed.toPos}`;
 }
 
 export type TaskRow = {
@@ -53,8 +67,13 @@ const statusNames: Record<string, Tri> = {
 const typeNames: Record<string, Tri> = {
   article: { en: "Article", kn: "ಲೇಖನ", hi: "लेख" },
   video: { en: "Video", kn: "ವಿಡಿಯೋ", hi: "वीडियो" },
-  short: { en: "Short video", kn: "ಕಿರು ವಿಡಿಯೋ", hi: "छोटा वीडियो" },
+  short: { en: "Post", kn: "ಪೋಸ್ಟ್", hi: "पोस्ट" },
 };
+const assignTypeOptions: { value: ContentType; label: Tri }[] = [
+  { value: "article", label: { en: "Articles", kn: "ಲೇಖನಗಳು", hi: "लेख" } },
+  { value: "video", label: { en: "Videos", kn: "ವಿಡಿಯೋಗಳು", hi: "वीडियो" } },
+  { value: "short", label: { en: "Posts", kn: "ಪೋಸ್ಟ್‌ಗಳು", hi: "पोस्ट" } },
+];
 const taskStatusNames: Record<string, Tri> = {
   open: { en: "Open", kn: "ತೆರೆದ", hi: "खुला" },
   done: { en: "Done", kn: "ಮುಗಿದಿದೆ", hi: "पूर्ण" },
@@ -91,9 +110,16 @@ export type BatchSummary = {
   createdAt: string;
 };
 
+type TypeCounts = Partial<Record<ContentType, number>>;
+
 type Props = {
   isAdmin: boolean;
   totalArticles: number;
+  totalsByType?: TypeCounts;
+  openByType?: TypeCounts;
+  remainingByType?: TypeCounts;
+  /** Exact open-task total (staff bulk assignments can exceed the loaded card sample). */
+  openTaskTotal?: number;
   staff: StaffOption[];
   tasks: TaskRow[];
   batches?: BatchSummary[];
@@ -112,9 +138,24 @@ function taskStatusPillClass(status: string) {
   return "archived";
 }
 
+function batchItemLabel(batchLabel: string): Tri {
+  const parsed = parseBatchRange(batchLabel);
+  if (parsed?.contentType === "video") {
+    return { en: "videos", kn: "ವಿಡಿಯೋಗಳು", hi: "वीडियो" };
+  }
+  if (parsed?.contentType === "short") {
+    return { en: "posts", kn: "ಪೋಸ್ಟ್‌ಗಳು", hi: "पोस्ट" };
+  }
+  return { en: "articles", kn: "ಲೇಖನಗಳು", hi: "लेख" };
+}
+
 export function TaskBoard({
   isAdmin,
   totalArticles,
+  totalsByType = {},
+  openByType = {},
+  remainingByType = {},
+  openTaskTotal,
   staff,
   tasks,
   batches = [],
@@ -125,24 +166,39 @@ export function TaskBoard({
   const basePath = useDeskPath();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<{ error?: string; ok?: string }>({});
+  const [contentType, setContentType] = useState<ContentType>("article");
   const [assigneeId, setAssigneeId] = useState(staff[0]?.id || "");
+  const typeTotal = totalsByType[contentType] ?? totalArticles;
+  const typeOpen = openByType[contentType] ?? 0;
+  const typeRemaining = remainingByType[contentType] ?? Math.max(0, typeTotal - typeOpen);
   const [fromPos, setFromPos] = useState("1");
-  const [toPos, setToPos] = useState(String(Math.min(1000, Math.max(1, totalArticles))));
+  const [toPos, setToPos] = useState(String(Math.min(1000, Math.max(1, typeTotal || totalArticles))));
   const [singlePostId, setSinglePostId] = useState("");
   const [singlePostTitle, setSinglePostTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterStatus, setFilterStatus] = useState<"open" | "done" | "cancelled" | "all">("open");
+  const [filterContentType, setFilterContentType] = useState<"all" | ContentType>("all");
   const [cancelTask, setCancelTask] = useState<TaskRow | null>(null);
   const [cancelBatch, setCancelBatch] = useState<BatchSummary | null>(null);
   const [editBatch, setEditBatch] = useState<BatchSummary | null>(null);
   const [editFromPos, setEditFromPos] = useState("1");
   const [editToPos, setEditToPos] = useState("1");
+  const [editContentType, setEditContentType] = useState<ContentType>("article");
   const [editNotes, setEditNotes] = useState("");
   const [detailTask, setDetailTask] = useState<TaskRow | null>(null);
   const [detailBatch, setDetailBatch] = useState<BatchSummary | null>(null);
   const [requestTask, setRequestTask] = useState<TaskRow | null>(null);
   const [requestNote, setRequestNote] = useState("");
+
+  useEffect(() => {
+    const max = Math.max(1, totalsByType[contentType] ?? totalArticles);
+    setToPos((current) => {
+      const n = Number(current);
+      if (!Number.isFinite(n) || n < 1) return String(Math.min(1000, max));
+      return String(Math.min(n, max));
+    });
+  }, [contentType, totalsByType, totalArticles]);
 
   useEffect(() => {
     if (!cancelTask && !cancelBatch && !editBatch && !detailTask && !detailBatch) return;
@@ -163,24 +219,30 @@ export function TaskBoard({
     setEditBatch(batch);
     setEditFromPos(range?.fromPos || "1");
     setEditToPos(range?.toPos || String(batch.count || 1));
+    setEditContentType(range?.contentType || "article");
     setEditNotes(batch.notes || "");
   }
 
   const visibleBatches = useMemo(() => {
-    if (!isAdmin || filterStatus === "done" || filterStatus === "cancelled") return [];
+    if (filterStatus === "done" || filterStatus === "cancelled") return [];
     return batches.filter((batch) => {
-      if (filterAssignee !== "all" && batch.assigneeId !== filterAssignee) return false;
+      if (isAdmin && filterAssignee !== "all" && batch.assigneeId !== filterAssignee) return false;
+      if (filterContentType !== "all") {
+        const parsed = parseBatchRange(batch.batchLabel);
+        const batchType = parsed?.contentType;
+        if (batchType !== filterContentType) return false;
+      }
       return true;
     });
-  }, [batches, filterAssignee, filterStatus, isAdmin]);
+  }, [batches, filterAssignee, filterStatus, filterContentType, isAdmin]);
 
   const visible = useMemo(() => {
     return tasks.filter((t) => {
       if (filterStatus !== "all" && t.status !== filterStatus) return false;
       if (isAdmin && filterAssignee !== "all" && t.assigneeId !== filterAssignee) return false;
+      if (filterContentType !== "all" && t.postType !== filterContentType) return false;
       // Bulk batches already have a summary card — hide open batch members from the list noise.
       if (
-        isAdmin &&
         filterStatus === "open" &&
         t.status === "open" &&
         t.batchLabel &&
@@ -190,7 +252,7 @@ export function TaskBoard({
       }
       return true;
     });
-  }, [tasks, filterStatus, filterAssignee, isAdmin, visibleBatches]);
+  }, [tasks, filterStatus, filterAssignee, filterContentType, visibleBatches, isAdmin]);
 
   function run(
     action: () => Promise<{
@@ -237,7 +299,12 @@ export function TaskBoard({
     });
   }
 
-  const openCount = tasks.filter((t) => t.status === "open").length;
+  const loadedOpenCount = tasks.filter((t) => t.status === "open").length;
+  const batchOpenCount = visibleBatches.reduce((sum, batch) => sum + batch.count, 0);
+  const openCount =
+    typeof openTaskTotal === "number" && openTaskTotal > 0
+      ? openTaskTotal
+      : Math.max(loadedOpenCount, batchOpenCount);
   const updatedOn = useMemo(
     () =>
       new Intl.DateTimeFormat("en-IN", {
@@ -255,16 +322,52 @@ export function TaskBoard({
       <p>
         {isAdmin
           ? tr({
-              en: `${totalArticles.toLocaleString("en-IN")} articles in the library. Only admins can create, update, or delete staff tasks. Example: assign 1–2000 to one person, then Update to 1–2500 or 1–200, or Delete the whole batch.`,
-              kn: `ಲೈಬ್ರರಿಯಲ್ಲಿ ${totalArticles.toLocaleString("en-IN")} ಲೇಖನಗಳಿವೆ. ಸಿಬ್ಬಂದಿ ಕಾರ್ಯಗಳನ್ನು ರಚಿಸಲು, ನವೀಕರಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ಉದಾ.: 1–2000 ನಿಯೋಜಿಸಿ, ನಂತರ Update ಮೂಲಕ 1–2500 ಅಥವಾ 1–200 ಮಾಡಿ, ಅಥವಾ Delete ಮಾಡಿ.`,
-              hi: `लाइब्रेरी में ${totalArticles.toLocaleString("en-IN")} लेख हैं। स्टाफ़ कार्य बनाना, अपडेट या हटाना केवल एडमिन कर सकते हैं। उदाहरण: 1–2000 असाइन करें, फिर Update से 1–2500 या 1–200 करें, या Delete करें।`,
+              en: `${totalArticles.toLocaleString("en-IN")} items in the library. Only admins can create, update, or delete staff tasks. After you assign a range, remaining counts update below.`,
+              kn: `ಲೈಬ್ರರಿಯಲ್ಲಿ ${totalArticles.toLocaleString("en-IN")} ಐಟಂಗಳಿವೆ. ಸಿಬ್ಬಂದಿ ಕಾರ್ಯಗಳನ್ನು ರಚಿಸಲು, ನವೀಕರಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ. ವ್ಯಾಪ್ತಿ ನಿಯೋಜಿಸಿದ ನಂತರ ಕೆಳಗಿನ ಉಳಿದ ಎಣಿಕೆಗಳು ನವೀಕರಿಸುತ್ತವೆ.`,
+              hi: `लाइब्रेरी में ${totalArticles.toLocaleString("en-IN")} आइटम हैं। स्टाफ़ कार्य बनाना, अपडेट या हटाना केवल एडमिन कर सकते हैं। रेंज असाइन के बाद नीचे शेष संख्या अपडेट होती है।`,
             })
           : tr({
-              en: `You have ${openCount} open article task${openCount === 1 ? "" : "s"}. Open an article to edit it, then mark the task done. Only an admin can change or delete your assignment.`,
-              kn: `ನಿಮಗೆ ${openCount} ತೆರೆದ ಲೇಖನ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಸಂಪಾದಿಸಲು ಲೇಖನ ತೆರೆಯಿರಿ, ನಂತರ ಕಾರ್ಯ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ. ನಿಯೋಜನೆ ಬದಲಾಯಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ.`,
-              hi: `आपके ${openCount} खुले लेख कार्य हैं। संपादन के लिए लेख खोलें, फिर कार्य पूर्ण चिह्नित करें। असाइनमेंट बदलना या हटाना केवल एडमिन कर सकते हैं।`,
+              en: `You have ${openCount.toLocaleString("en-IN")} open task${openCount === 1 ? "" : "s"}. Open Articles to work through your batch, then mark items done. Only an admin can change or delete your assignment.`,
+              kn: `ನಿಮಗೆ ${openCount.toLocaleString("en-IN")} ತೆರೆದ ಕಾರ್ಯ${openCount === 1 ? "" : "ಗಳು"} ಇವೆ. ಬ್ಯಾಚ್ ಮಾಡಲು ಲೇಖನಗಳು ತೆರೆಯಿರಿ, ನಂತರ ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ. ನಿಯೋಜನೆ ಬದಲಾಯಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಿರ್ವಾಹಕರು ಮಾತ್ರ.`,
+              hi: `आपके ${openCount.toLocaleString("en-IN")} खुले कार्य हैं। बैच पर काम के लिए लेख खोलें, फिर पूर्ण चिह्नित करें। असाइनमेंट बदलना या हटाना केवल एडमिन कर सकते हैं।`,
             })}
       </p>
+
+      {isAdmin ? (
+        <div className="task-type-status" role="status" aria-live="polite">
+          {assignTypeOptions.map((option) => {
+            const total = totalsByType[option.value] ?? 0;
+            const open = openByType[option.value] ?? 0;
+            const remaining = remainingByType[option.value] ?? Math.max(0, total - open);
+            return (
+              <div key={option.value} className="task-type-status-item">
+                <strong>{tr(option.label)}</strong>
+                <span>
+                  {tr({
+                    en: `${total.toLocaleString("en-IN")} total`,
+                    kn: `${total.toLocaleString("en-IN")} ಒಟ್ಟು`,
+                    hi: `${total.toLocaleString("en-IN")} कुल`,
+                  })}
+                </span>
+                <span>
+                  {tr({
+                    en: `${open.toLocaleString("en-IN")} open`,
+                    kn: `${open.toLocaleString("en-IN")} ತೆರೆದ`,
+                    hi: `${open.toLocaleString("en-IN")} खुले`,
+                  })}
+                </span>
+                <span className="task-type-status-remaining">
+                  {tr({
+                    en: `${remaining.toLocaleString("en-IN")} remaining`,
+                    kn: `${remaining.toLocaleString("en-IN")} ಉಳಿದಿವೆ`,
+                    hi: `${remaining.toLocaleString("en-IN")} शेष`,
+                  })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {message.error ? <p role="alert">{message.error}</p> : null}
       {message.ok ? <p role="status">{message.ok}</p> : null}
@@ -281,12 +384,36 @@ export function TaskBoard({
             </h2>
             <p>
               {tr({
-                en: "Articles are numbered from oldest to newest (1 = oldest). Example for 4,000 articles: give 1–1000, 1001–2000, 2001–3000, 3001–4000 to four people.",
-                kn: "ಲೇಖನಗಳನ್ನು ಹಳೆಯದರಿಂದ ಹೊಸದರವರೆಗೆ ಸಂಖ್ಯೆ ಮಾಡಲಾಗುತ್ತದೆ (1 = ಹಳೆಯದು). 4,000 ಲೇಖನಗಳ ಉದಾಹರಣೆ: 1–1000, 1001–2000, 2001–3000, 3001–4000 ನಾಲ್ಕು ಜನರಿಗೆ.",
-                hi: "लेख पुराने से नए क्रम में गिने जाते हैं (1 = सबसे पुराना)। 4,000 लेख का उदाहरण: 1–1000, 1001–2000, 2001–3000, 3001–4000 चार लोगों को।",
+                en: "Within the selected type, items are numbered oldest to newest (1 = oldest). Pick Articles, Videos, or Posts first, then assign ranges like 1–1000.",
+                kn: "ಆಯ್ಕೆಮಾಡಿದ ಪ್ರಕಾರದೊಳಗೆ ಐಟಂಗಳನ್ನು ಹಳೆಯದರಿಂದ ಹೊಸದರವರೆಗೆ ಸಂಖ್ಯೆ ಮಾಡಲಾಗುತ್ತದೆ (1 = ಹಳೆಯದು). ಮೊದಲು Articles / Videos / Posts ಆಯ್ಕೆಮಾಡಿ, ನಂತರ 1–1000 ರಂತಹ ವ್ಯಾಪ್ತಿ ನಿಯೋಜಿಸಿ.",
+                hi: "चुने प्रकार में आइटम पुराने से नए गिने जाते हैं (1 = सबसे पुराना)। पहले Articles / Videos / Posts चुनें, फिर 1–1000 जैसी रेंज असाइन करें।",
+              })}
+            </p>
+            <p className="task-card-meta">
+              {tr({
+                en: `${typeTotal.toLocaleString("en-IN")} in this type · ${typeOpen.toLocaleString("en-IN")} open · ${typeRemaining.toLocaleString("en-IN")} remaining`,
+                kn: `ಈ ಪ್ರಕಾರದಲ್ಲಿ ${typeTotal.toLocaleString("en-IN")} · ${typeOpen.toLocaleString("en-IN")} ತೆರೆದ · ${typeRemaining.toLocaleString("en-IN")} ಉಳಿದಿವೆ`,
+                hi: `इस प्रकार में ${typeTotal.toLocaleString("en-IN")} · ${typeOpen.toLocaleString("en-IN")} खुले · ${typeRemaining.toLocaleString("en-IN")} शेष`,
               })}
             </p>
             <div className="field-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "end" }}>
+              <label className="field">
+                <span>{tr({ en: "Content type", kn: "ವಿಷಯ ಪ್ರಕಾರ", hi: "कंटेंट प्रकार" })}</span>
+                <select
+                  value={contentType}
+                  onChange={(e) => {
+                    setContentType(e.target.value as ContentType);
+                    setSinglePostId("");
+                    setSinglePostTitle("");
+                  }}
+                >
+                  {assignTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {tr(option.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="field">
                 <span>{tr({ en: "Staff", kn: "ಸಿಬ್ಬಂದಿ", hi: "स्टाफ़" })}</span>
                 <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} disabled={!staff.length}>
@@ -324,6 +451,7 @@ export function TaskBoard({
                         assigneeId,
                         fromPos,
                         toPos,
+                        contentType,
                         notes,
                       }),
                     tr({ en: "Bulk assignment saved.", kn: "ಬೃಹತ್ ನಿಯೋಜನೆ ಉಳಿಸಲಾಯಿತು.", hi: "बल्क असाइनमेंट सहेजा गया।" }),
@@ -338,21 +466,39 @@ export function TaskBoard({
           <section style={{ display: "grid", gap: "0.75rem" }}>
             <h2>
               {tr({
-                en: "Assign one article",
-                kn: "ಒಂದು ಲೇಖನ ನಿಯೋಜಿಸಿ",
-                hi: "एक लेख असाइन करें",
+                en: "Assign one item",
+                kn: "ಒಂದು ಐಟಂ ನಿಯೋಜಿಸಿ",
+                hi: "एक आइटम असाइन करें",
               })}
             </h2>
             <p>
               {tr({
-                en: "Use the story picker card search below to find any article by title, then assign it to staff.",
-                kn: "ಕೆಳಗಿನ ಸ್ಟೋರಿ ಪಿಕರ್ ಕಾರ್ಡ್ ಹುಡುಕಾಟದಿಂದ ಯಾವುದೇ ಲೇಖನವನ್ನು ಶೀರ್ಷಿಕೆಯಿಂದ ಹುಡುಕಿ, ನಂತರ ಸಿಬ್ಬಂದಿಗೆ ನಿಯೋಜಿಸಿ.",
-                hi: "नीचे स्टोरी पिकर कार्ड खोज से किसी भी लेख को शीर्षक से खोजें, फिर स्टाफ़ को असाइन करें।",
+                en: "Choose the content type, search by title, then assign to staff.",
+                kn: "ವಿಷಯ ಪ್ರಕಾರ ಆಯ್ಕೆಮಾಡಿ, ಶೀರ್ಷಿಕೆಯಿಂದ ಹುಡುಕಿ, ನಂತರ ಸಿಬ್ಬಂದಿಗೆ ನಿಯೋಜಿಸಿ.",
+                hi: "कंटेंट प्रकार चुनें, शीर्षक से खोजें, फिर स्टाफ़ को असाइन करें।",
               })}
             </p>
+            <label className="field" style={{ maxWidth: 280 }}>
+              <span>{tr({ en: "Content type", kn: "ವಿಷಯ ಪ್ರಕಾರ", hi: "कंटेंट प्रकार" })}</span>
+              <select
+                value={contentType}
+                onChange={(e) => {
+                  setContentType(e.target.value as ContentType);
+                  setSinglePostId("");
+                  setSinglePostTitle("");
+                }}
+              >
+                {assignTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {tr(option.label)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <ArticleCardSearch
               value={singlePostId}
               selectedTitle={singlePostTitle}
+              contentType={contentType}
               onChange={(hit) => {
                 setSinglePostId(hit?.id || "");
                 setSinglePostTitle(hit?.title || "");
@@ -379,13 +525,14 @@ export function TaskBoard({
                       assignSingleArticle({
                         assigneeId,
                         postId: singlePostId,
+                        contentType,
                         notes,
                       }),
-                    tr({ en: "Article assigned.", kn: "ಲೇಖನ ನಿಯೋಜಿಸಲಾಯಿತು.", hi: "लेख असाइन हुआ।" }),
+                    tr({ en: "Item assigned.", kn: "ಐಟಂ ನಿಯೋಜಿಸಲಾಯಿತು.", hi: "आइटम असाइन हुआ।" }),
                   )
                 }
               >
-                {tr({ en: "Assign article", kn: "ಲೇಖನ ನಿಯೋಜಿಸಿ", hi: "लेख असाइन करें" })}
+                {tr({ en: "Assign item", kn: "ಐಟಂ ನಿಯೋಜಿಸಿ", hi: "आइटम असाइन करें" })}
               </button>
             </div>
           </section>
@@ -437,6 +584,20 @@ export function TaskBoard({
                 <option value="all">{tr({ en: "All statuses", kn: "ಎಲ್ಲಾ ಸ್ಥಿತಿಗಳು", hi: "सभी स्थितियाँ" })}</option>
               </select>
             </label>
+            <label className="field" style={{ margin: 0 }}>
+              <span className="sr-only">{tr({ en: "Content type filter", kn: "ವಿಷಯ ಪ್ರಕಾರ ಫಿಲ್ಟರ್", hi: "कंटेंट प्रकार फ़िल्टर" })}</span>
+              <select
+                value={filterContentType}
+                onChange={(e) => setFilterContentType(e.target.value as typeof filterContentType)}
+              >
+                <option value="all">{tr({ en: "All types", kn: "ಎಲ್ಲಾ ಪ್ರಕಾರಗಳು", hi: "सभी प्रकार" })}</option>
+                {assignTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {tr(option.label)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
@@ -467,15 +628,19 @@ export function TaskBoard({
                 </div>
                 <div className="post-card-body">
                   <h2>
-                    {tr({
-                      en: `${batch.count.toLocaleString("en-IN")} articles · #${batch.batchLabel}`,
-                      kn: `${batch.count.toLocaleString("en-IN")} ಲೇಖನಗಳು · #${batch.batchLabel}`,
-                      hi: `${batch.count.toLocaleString("en-IN")} लेख · #${batch.batchLabel}`,
-                    })}
+                    {`${batch.count.toLocaleString("en-IN")} ${tr(batchItemLabel(batch.batchLabel))} · #${batchRangeDisplay(batch.batchLabel)}`}
                   </h2>
                   <p className="task-card-meta">
-                    <strong>{batch.assigneeName}</strong>
-                    {batch.notes ? ` · ${batch.notes}` : null}
+                    {isAdmin ? <strong>{batch.assigneeName}</strong> : null}
+                    {isAdmin && batch.notes ? ` · ${batch.notes}` : null}
+                    {!isAdmin && batch.notes ? batch.notes : null}
+                    {!isAdmin && !batch.notes
+                      ? tr({
+                          en: "Open Articles to work through this batch.",
+                          kn: "ಈ ಬ್ಯಾಚ್ ಮಾಡಲು ಲೇಖನಗಳು ತೆರೆಯಿರಿ.",
+                          hi: "इस बैच पर काम के लिए लेख खोलें।",
+                        })
+                      : null}
                   </p>
                   <div className="post-actions">
                     <button
@@ -486,24 +651,38 @@ export function TaskBoard({
                       <Eye size={15} aria-hidden="true" />
                       {tr({ en: "Details", kn: "ವಿವರ", hi: "विवरण" })}
                     </button>
-                    <button
-                      type="button"
-                      className="button button-outline is-compact"
-                      disabled={pending}
-                      onClick={() => openEditBatch(batch)}
-                    >
-                      <Pencil size={15} aria-hidden="true" />
-                      {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-outline is-compact"
-                      disabled={pending}
-                      onClick={() => setCancelBatch(batch)}
-                    >
-                      <Trash2 size={15} aria-hidden="true" />
-                      {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
-                    </button>
+                    {!isAdmin ? (
+                      <Link
+                        href={`${basePath}/posts`}
+                        prefetch={false}
+                        className="button is-compact"
+                      >
+                        <Pencil size={15} aria-hidden="true" />
+                        {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                      </Link>
+                    ) : null}
+                    {isAdmin ? (
+                      <>
+                        <button
+                          type="button"
+                          className="button button-outline is-compact"
+                          disabled={pending}
+                          onClick={() => openEditBatch(batch)}
+                        >
+                          <Pencil size={15} aria-hidden="true" />
+                          {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-outline is-compact"
+                          disabled={pending}
+                          onClick={() => setCancelBatch(batch)}
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                          {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               </article>
@@ -848,6 +1027,7 @@ export function TaskBoard({
                   const fromPos = editFromPos;
                   const toPos = editToPos;
                   const notesValue = editNotes;
+                  const contentTypeValue = editContentType;
                   setEditBatch(null);
                   run(
                     () =>
@@ -856,6 +1036,7 @@ export function TaskBoard({
                         batchLabel: batch.batchLabel,
                         fromPos,
                         toPos,
+                        contentType: contentTypeValue,
                         notes: notesValue,
                       }),
                     tr({
@@ -875,12 +1056,25 @@ export function TaskBoard({
                 </h2>
                 <p>
                   {tr({
-                    en: `Change ${editBatch.assigneeName}'s #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} articles). Example: 1–2000 → 1–2500 adds articles; 1–200 removes the rest.`,
-                    kn: `${editBatch.assigneeName} ಅವರ #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} ಲೇಖನಗಳು) ಬದಲಾಯಿಸಿ. ಉದಾ.: 1–2000 → 1–2500 ಸೇರಿಸುತ್ತದೆ; 1–200 ಉಳಿದವುಗಳನ್ನು ತೆಗೆಯುತ್ತದೆ.`,
-                    hi: `${editBatch.assigneeName} का #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} लेख) बदलें। उदाहरण: 1–2000 → 1–2500 जोड़ता है; 1–200 बाकी हटाता है।`,
+                    en: `Change ${editBatch.assigneeName}'s #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} items). Ranges are numbered within the selected type.`,
+                    kn: `${editBatch.assigneeName} ಅವರ #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} ಐಟಂಗಳು) ಬದಲಾಯಿಸಿ. ವ್ಯಾಪ್ತಿ ಆಯ್ಕೆಮಾಡಿದ ಪ್ರಕಾರದೊಳಗೆ ಸಂಖ್ಯೆ ಮಾಡಲಾಗುತ್ತದೆ.`,
+                    hi: `${editBatch.assigneeName} का #${editBatch.batchLabel} (${editBatch.count.toLocaleString("en-IN")} आइटम) बदलें। रेंज चुने प्रकार में गिनी जाती है।`,
                   })}
                 </p>
                 <div className="field-row" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", width: "100%" }}>
+                  <label className="field" style={{ flex: "1 1 8rem" }}>
+                    <span>{tr({ en: "Content type", kn: "ವಿಷಯ ಪ್ರಕಾರ", hi: "कंटेंट प्रकार" })}</span>
+                    <select
+                      value={editContentType}
+                      onChange={(e) => setEditContentType(e.target.value as ContentType)}
+                    >
+                      {assignTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {tr(option.label)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="field" style={{ flex: "1 1 6rem" }}>
                     <span>{tr({ en: "From #", kn: "ಪ್ರಾರಂಭ #", hi: "से #" })}</span>
                     <input
@@ -1076,33 +1270,46 @@ export function TaskBoard({
                   </div>
                 </dl>
                 <div className="delete-dialog-actions">
-                  <button
-                    type="button"
-                    className="button button-outline"
-                    disabled={pending}
-                    onClick={() => {
-                      const batch = detailBatch;
-                      setDetailBatch(null);
-                      openEditBatch(batch);
-                    }}
-                  >
-                    <Pencil size={15} aria-hidden="true" />
-                    {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-outline"
-                    disabled={pending}
-                    onClick={() => {
-                      const batch = detailBatch;
-                      setDetailBatch(null);
-                      setCancelBatch(batch);
-                    }}
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                    {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
-                  </button>
-                  <button type="button" className="button" onClick={() => setDetailBatch(null)}>
+                  {!isAdmin ? (
+                    <Link
+                      href={`${basePath}/posts`}
+                      prefetch={false}
+                      className="button"
+                      onClick={() => setDetailBatch(null)}
+                    >
+                      {tr({ en: "Open articles", kn: "ಲೇಖನಗಳು ತೆರೆಯಿರಿ", hi: "लेख खोलें" })}
+                    </Link>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="button button-outline"
+                        disabled={pending}
+                        onClick={() => {
+                          const batch = detailBatch;
+                          setDetailBatch(null);
+                          openEditBatch(batch);
+                        }}
+                      >
+                        <Pencil size={15} aria-hidden="true" />
+                        {tr({ en: "Update", kn: "ನವೀಕರಿಸಿ", hi: "अपडेट" })}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-outline"
+                        disabled={pending}
+                        onClick={() => {
+                          const batch = detailBatch;
+                          setDetailBatch(null);
+                          setCancelBatch(batch);
+                        }}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                        {tr({ en: "Delete", kn: "ಅಳಿಸಿ", hi: "हटाएँ" })}
+                      </button>
+                    </>
+                  )}
+                  <button type="button" className="button button-outline" onClick={() => setDetailBatch(null)}>
                     {tr({ en: "Close", kn: "ಮುಚ್ಚಿ", hi: "बंद" })}
                   </button>
                 </div>
