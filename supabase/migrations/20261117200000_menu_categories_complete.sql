@@ -4,6 +4,22 @@
 -- menu parent, kind and order are aligned by slug. Reverse: no-op (rows are
 -- referenced by post_categories).
 
+-- Databases that skipped 20261029120000_taxonomy_phase1 lack these columns.
+alter table public.categories
+  add column if not exists name_hi text not null default '',
+  add column if not exists category_kind text not null default 'listing';
+
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'categories_category_kind_check'
+  ) then
+    alter table public.categories
+      add constraint categories_category_kind_check
+      check (category_kind in ('news','kshetra','programme','listing','upcoming'));
+  end if;
+end $$;
+
 with menu(slug, name_kn, name_en, name_hi, parent_slug, kind, sort_order) as (
   values
   ('state-jain-news', 'ರಾಜ್ಯ ಜೈನ ಸುದ್ದಿಗಳು', 'State Jain news', 'राज्य जैन समाचार', null, 'news', 100),
@@ -47,6 +63,7 @@ with menu(slug, parent_slug, kind, sort_order) as (
   ('jain-milan', null, 'news', 101),
   ('other-state-news', null, 'news', 102),
   ('kshetra-parichaya', null, 'kshetra', 103),
+  ('panchakalyana', null, 'news', 3),
   ('jain-bhakti-geete', null, 'listing', 104),
   ('jain-matha', null, 'news', 105),
   ('mahamastakabhisheka', null, 'news', 106),
