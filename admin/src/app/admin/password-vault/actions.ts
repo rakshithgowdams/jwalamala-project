@@ -15,7 +15,8 @@ import {
   isMissingPhoneColumnError,
   isValidVaultPhone,
   normalizeVaultPhone,
-  PHONE_COLUMN_HELP,
+  readVaultPhone,
+  writeVaultPhoneFields,
 } from "@/lib/vault/db";
 
 type Result = {
@@ -159,22 +160,20 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
         }
       })();
 
-    const withPhone = {
+    const baseFields = {
       title,
       site_url: parsed.data.siteUrl,
       email: parsed.data.email,
-      phone: parsed.data.phone,
       password_encrypted: passwordEncrypted,
       favicon_url: faviconUrl,
-      notes: parsed.data.notes,
+    };
+    const withPhone = {
+      ...baseFields,
+      ...writeVaultPhoneFields(parsed.data.phone, parsed.data.notes, true),
     };
     const withoutPhone = {
-      title,
-      site_url: parsed.data.siteUrl,
-      email: parsed.data.email,
-      password_encrypted: passwordEncrypted,
-      favicon_url: faviconUrl,
-      notes: parsed.data.notes,
+      ...baseFields,
+      ...writeVaultPhoneFields(parsed.data.phone, parsed.data.notes, false),
     };
 
     if (parsed.data.id) {
@@ -183,8 +182,6 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
         .update({ ...withPhone, updated_by: user.id, updated_at: now })
         .eq("id", parsed.data.id);
       if (error && isMissingPhoneColumnError(error.message)) {
-        // Never silently drop a phone the admin typed in.
-        if (parsed.data.phone) return fail(PHONE_COLUMN_HELP, PHONE_COLUMN_HELP, PHONE_COLUMN_HELP);
         ({ error } = await server
           .from("admin_password_vault")
           .update({ ...withoutPhone, updated_by: user.id, updated_at: now })
@@ -206,7 +203,6 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
       .select("id")
       .single();
     if (error && isMissingPhoneColumnError(error.message)) {
-      if (parsed.data.phone) return fail(PHONE_COLUMN_HELP, PHONE_COLUMN_HELP, PHONE_COLUMN_HELP);
       ({ data, error } = await server
         .from("admin_password_vault")
         .insert({ ...withoutPhone, created_by: user.id, updated_by: user.id })
@@ -322,9 +318,13 @@ export async function createVaultShareLink(input: unknown): Promise<Result> {
     if (error || !row)
       return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
 
+    const packed = readVaultPhone(
+      "phone" in row ? (row as { phone?: string }).phone : "",
+      row.notes,
+    );
     const token = randomBytes(24).toString("hex");
     const expiresAt = new Date(Date.now() + parsed.data.hours * 60 * 60 * 1000).toISOString();
-    const shareBase = {
+    const shareCore = {
       vault_id: row.id,
       token,
       title: row.title || "",
@@ -332,21 +332,18 @@ export async function createVaultShareLink(input: unknown): Promise<Result> {
       email: row.email || "",
       password_encrypted: row.password_encrypted,
       favicon_url: row.favicon_url || "",
-      notes: row.notes || "",
       created_by: user.id,
       expires_at: expiresAt,
     };
-    const sharePhone =
-      ("phone" in row ? String((row as { phone?: string }).phone || "") : "") || "";
     let { error: insertError } = await server.from("admin_password_vault_shares").insert({
-      ...shareBase,
-      phone: sharePhone,
+      ...shareCore,
+      ...writeVaultPhoneFields(packed.phone, packed.notes, true),
     });
     if (insertError && isMissingPhoneColumnError(insertError.message)) {
-      if (sharePhone) return fail(PHONE_COLUMN_HELP, PHONE_COLUMN_HELP, PHONE_COLUMN_HELP);
-      ({ error: insertError } = await server
-        .from("admin_password_vault_shares")
-        .insert(shareBase));
+      ({ error: insertError } = await server.from("admin_password_vault_shares").insert({
+        ...shareCore,
+        ...writeVaultPhoneFields(packed.phone, packed.notes, false),
+      }));
     }
     if (insertError)
       return fail(
@@ -428,16 +425,20 @@ export async function loadVaultShare(token: string): Promise<
     })
     .eq("id", data.id as string);
 
+  const packed = readVaultPhone(
+    "phone" in data ? (data as { phone?: string }).phone : "",
+    data.notes,
+  );
   return {
     ok: true,
     data: {
       title: (data.title as string) || "",
       siteUrl: (data.site_url as string) || "",
       email: (data.email as string) || "",
-      phone: ("phone" in data ? String((data as { phone?: string }).phone || "") : "") || "",
+      phone: packed.phone,
       password,
       faviconUrl: (data.favicon_url as string) || "",
-      notes: (data.notes as string) || "",
+      notes: packed.notes,
       expiresAt: (data.expires_at as string) || "",
     },
   };
