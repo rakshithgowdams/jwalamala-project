@@ -13,11 +13,22 @@ import {
 import { listActiveMathas, mathaName } from "@/lib/utils/mathas";
 import { SocialMediaListing } from "@/components/news/SocialMediaListing";
 import {
+  ProgrammeSiblingNav,
+  ProgrammesHub,
+} from "@/components/news/ProgrammesHub";
+import { getSetting } from "@/lib/v4/settings";
+import {
+  enabledProgrammeCards,
+  parseProgrammesHub,
+} from "@/lib/v4/programmes";
+import {
   JAIN_MATHA_SLUG,
+  JWALAMALA_PROGRAMMES_SLUG,
   SOCIAL_MEDIA_SLUG,
   SOCIAL_POSTERS_SLUG,
   SOCIAL_VIDEOS_SLUG,
   STATE_JAIN_NEWS_SLUG,
+  categoryKind,
   mathaHref,
   resolvePublicCategory,
   stateJainNewsDistrictHref,
@@ -44,9 +55,11 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Filters & { page?: string; tab?: string }>;
+  searchParams: Promise<
+    Filters & { page?: string; tab?: string; view?: string }
+  >;
 }) {
-  const { locale } = await getUiStrings();
+  const { kn, locale } = await getUiStrings();
   const { slug } = await params;
   const filters = await searchParams;
   const [categories, places, mathas, placeIds] = await Promise.all([
@@ -57,6 +70,19 @@ export default async function CategoryPage({
   ]);
   const category = resolvePublicCategory(slug, categories);
   if (!category) notFound();
+  if (slug === JWALAMALA_PROGRAMMES_SLUG) {
+    return <ProgrammesHub category={category} filters={filters} />;
+  }
+  const programmeHub =
+    categoryKind(category) === "programme" ||
+    slug === "weekly-jain-news" ||
+    slug === SOCIAL_VIDEOS_SLUG ||
+    slug === SOCIAL_MEDIA_SLUG
+      ? parseProgrammesHub(await getSetting("programmes_hub").catch(() => null))
+      : null;
+  const programmeCards = programmeHub
+    ? enabledProgrammeCards(programmeHub)
+    : [];
   const extraNav =
     slug === STATE_JAIN_NEWS_SLUG ? (
       <nav className="category-chips" aria-label={category.name_kn}>
@@ -78,6 +104,13 @@ export default async function CategoryPage({
           </Link>
         ))}
       </nav>
+    ) : programmeCards.length ? (
+      <ProgrammeSiblingNav
+        cards={programmeCards}
+        currentHref={"/category/" + slug}
+        locale={locale}
+        label={kn.programmesShows}
+      />
     ) : null;
   if (
     slug === SOCIAL_MEDIA_SLUG ||
@@ -98,6 +131,22 @@ export default async function CategoryPage({
       filters={filters}
       action={"/category/" + slug}
       extraNav={extraNav}
+      crumbs={
+        programmeCards.length ? (
+          <>
+            <Link href={"/category/" + JWALAMALA_PROGRAMMES_SLUG}>
+              {kn.programmesHubKicker}
+            </Link>
+            <span>/</span>
+            {pickText(
+              locale,
+              category.name_kn,
+              category.name_en,
+              category.name_hi,
+            )}
+          </>
+        ) : undefined
+      }
     />
   );
 }

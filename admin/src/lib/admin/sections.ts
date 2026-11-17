@@ -61,6 +61,16 @@ export const sectionGroups: SectionGroup[] = [
       { key: "topics", label: { en: "Topic collections", kn: "ವಿಷಯ ಸಂಗ್ರಹ", hi: "विषय संग्रह" }, view: "content.edit", grants: content },
       { key: "authors", label: { en: "Authors", kn: "ಲೇಖಕರು", hi: "लेखक" }, view: "content.edit", grants: content },
       { key: "home", label: { en: "Home page layout", kn: "ಮುಖಪುಟ ವಿನ್ಯಾಸ", hi: "होम पेज लेआउट" }, view: "content.edit", grants: content },
+      {
+        key: "programmes",
+        label: {
+          en: "Programmes hub",
+          kn: "ಕಾರ್ಯಕ್ರಮ ಕೇಂದ್ರ",
+          hi: "कार्यक्रम केंद्र",
+        },
+        view: "content.edit",
+        grants: content,
+      },
       { key: "trending", label: { en: "Trending topics", kn: "ಈಗ ಚರ್ಚೆಯಲ್ಲಿ", hi: "ट्रेंडिंग विषय" }, view: "content.edit", grants: content },
     ],
   },
