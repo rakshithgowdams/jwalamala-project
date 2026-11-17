@@ -118,12 +118,15 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const search = request.nextUrl.search;
   const restricted = isDeskPath(path);
+  // Server Actions need an untouched RSC response (text/x-component).
+  // Mutating response headers here can turn the action into HTML and crash the client.
+  const isServerAction = request.headers.has("next-action");
   const requestHeaders = deskRequestHeaders(request, path);
   let response = NextResponse.next({ request: { headers: requestHeaders } });
   const finish = (result: NextResponse) => {
     if (result !== response)
       for (const cookie of response.cookies.getAll()) result.cookies.set(cookie);
-    result.headers.set("Cache-Control", "private, no-store");
+    if (!isServerAction) result.headers.set("Cache-Control", "private, no-store");
     return result;
   };
   const toLogin = (error?: string) =>

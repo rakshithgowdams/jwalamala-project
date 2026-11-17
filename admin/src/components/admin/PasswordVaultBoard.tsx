@@ -133,18 +133,46 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
   function run(action: () => Promise<{ ok?: true; error?: string; password?: string }>, okMsg?: string) {
     setMessage({});
     start(async () => {
-      const result = await action();
-      if (result.error) setMessage({ error: result.error });
-      else {
+      try {
+        const result = await action();
+        if (result.error) {
+          setMessage({ error: result.error });
+          return;
+        }
         if (okMsg) setMessage({ ok: okMsg });
         if (result.password === undefined) {
           setEditing(false);
           setForm(emptyForm);
           setShowPassword(false);
-          router.refresh();
+          // Defer refresh so it does not race the action's revalidatePath flight.
+          window.setTimeout(() => {
+            try {
+              router.refresh();
+            } catch {
+              /* ignore refresh errors */
+            }
+          }, 50);
         }
+      } catch (error) {
+        const text =
+          error instanceof Error && error.message
+            ? error.message
+            : tr({
+                en: "Something went wrong. Please try again.",
+                kn: "ಏನೋ ತಪ್ಪಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+                hi: "कुछ गलत हुआ। फिर कोशिश करें।",
+              });
+        setMessage({
+          error:
+            text.includes("unexpected response")
+              ? tr({
+                  en: "Request failed. Hard-refresh the page (Ctrl+Shift+R) and try again.",
+                  kn: "ವಿನಂತಿ ವಿಫಲ. ಪುಟವನ್ನು hard-refresh ಮಾಡಿ (Ctrl+Shift+R) ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+                  hi: "अनुरोध विफल। पेज hard-refresh करें (Ctrl+Shift+R) और फिर कोशिश करें।",
+                })
+              : text,
+        });
       }
-      return result;
     });
   }
 

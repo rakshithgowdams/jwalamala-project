@@ -22,6 +22,14 @@ type Result = {
 };
 type Fail = (en: string, kn: string, hi: string) => Result;
 
+function isNextControlFlowError(error: unknown) {
+  const digest =
+    typeof error === "object" && error && "digest" in error
+      ? String((error as { digest?: string }).digest || "")
+      : "";
+  return digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_HTTP_ERROR_FALLBACK");
+}
+
 async function appOrigin() {
   const h = await headers();
   const host = h.get("x-forwarded-host") || h.get("host");
@@ -97,120 +105,153 @@ export type VaultRow = {
 
 /** Create or update an encrypted credential (admin only). */
 export async function saveVaultEntry(input: unknown): Promise<Result> {
-  const access = await gate();
-  if ("denied" in access) return access.denied;
-  const { server, user, fail } = access;
-  const parsed = saveSchema.safeParse(input);
-  if (!parsed.success)
-    return fail(
-      "Enter a valid site link, email, and password.",
-      "ಮಾನ್ಯ ಸೈಟ್ ಲಿಂಕ್, ಇಮೇಲ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
-      "मान्य साइट लिंक, ईमेल और पासवर्ड दर्ज करें।",
-    );
-
-  let passwordEncrypted: string;
   try {
-    passwordEncrypted = encryptVaultSecret(parsed.data.password);
-  } catch {
-    return fail(
-      "Vault encryption is not configured on the server.",
-      "ಸರ್ವರ್‌ನಲ್ಲಿ ವಾಲ್ಟ್ ಎನ್‌ಕ್ರಿಪ್ಷನ್ ಸಿದ್ಧವಿಲ್ಲ.",
-      "सर्वर पर वॉल्ट एन्क्रिप्शन सेट नहीं है।",
-    );
-  }
+    const access = await gate();
+    if ("denied" in access) return access.denied;
+    const { server, user, fail } = access;
+    const parsed = saveSchema.safeParse(input);
+    if (!parsed.success)
+      return fail(
+        "Enter a valid site link, email, and password.",
+        "ಮಾನ್ಯ ಸೈಟ್ ಲಿಂಕ್, ಇಮೇಲ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
+        "मान्य साइट लिंक, ईमेल और पासवर्ड दर्ज करें।",
+      );
 
-  const now = new Date().toISOString();
-  const faviconUrl = faviconForSite(parsed.data.siteUrl);
-  const title =
-    parsed.data.title ||
-    (() => {
-      try {
-        return new URL(parsed.data.siteUrl).hostname;
-      } catch {
-        return "Site";
-      }
-    })();
+    let passwordEncrypted: string;
+    try {
+      passwordEncrypted = encryptVaultSecret(parsed.data.password);
+    } catch {
+      return fail(
+        "Vault encryption is not configured on the server.",
+        "ಸರ್ವರ್‌ನಲ್ಲಿ ವಾಲ್ಟ್ ಎನ್‌ಕ್ರಿಪ್ಷನ್ ಸಿದ್ಧವಿಲ್ಲ.",
+        "सर्वर पर वॉल्ट एन्क्रिप्शन सेट नहीं है।",
+      );
+    }
 
-  if (parsed.data.id) {
-    const { error } = await server
+    const now = new Date().toISOString();
+    const faviconUrl = faviconForSite(parsed.data.siteUrl);
+    const title =
+      parsed.data.title ||
+      (() => {
+        try {
+          return new URL(parsed.data.siteUrl).hostname;
+        } catch {
+          return "Site";
+        }
+      })();
+
+    if (parsed.data.id) {
+      const { error } = await server
+        .from("admin_password_vault")
+        .update({
+          title,
+          site_url: parsed.data.siteUrl,
+          email: parsed.data.email,
+          password_encrypted: passwordEncrypted,
+          favicon_url: faviconUrl,
+          notes: parsed.data.notes,
+          updated_by: user.id,
+          updated_at: now,
+        })
+        .eq("id", parsed.data.id);
+      if (error)
+        return fail(
+          error.message || "Could not update the entry.",
+          "ನಮೂದು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+          "प्रविष्टि अपडेट नहीं हो सकी।",
+        );
+      touch();
+      return { ok: true, id: parsed.data.id };
+    }
+
+    const { data, error } = await server
       .from("admin_password_vault")
-      .update({
+      .insert({
         title,
         site_url: parsed.data.siteUrl,
         email: parsed.data.email,
         password_encrypted: passwordEncrypted,
         favicon_url: faviconUrl,
         notes: parsed.data.notes,
+        created_by: user.id,
         updated_by: user.id,
-        updated_at: now,
       })
-      .eq("id", parsed.data.id);
-    if (error)
-      return fail(error.message || "Could not update the entry.", "ನಮೂದು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "प्रविष्टि अपडेट नहीं हो सकी।");
+      .select("id")
+      .single();
+    if (error || !data)
+      return fail(
+        error?.message || "Could not save the entry.",
+        "ನಮೂದು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+        "प्रविष्टि सहेजी नहीं जा सकी।",
+      );
     touch();
-    return { ok: true, id: parsed.data.id };
+    return { ok: true, id: data.id as string };
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    return {
+      error: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+    };
   }
-
-  const { data, error } = await server
-    .from("admin_password_vault")
-    .insert({
-      title,
-      site_url: parsed.data.siteUrl,
-      email: parsed.data.email,
-      password_encrypted: passwordEncrypted,
-      favicon_url: faviconUrl,
-      notes: parsed.data.notes,
-      created_by: user.id,
-      updated_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (error || !data)
-    return fail(error?.message || "Could not save the entry.", "ನಮೂದು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "प्रविष्टि सहेजी नहीं जा सकी।");
-  touch();
-  return { ok: true, id: data.id as string };
 }
 
 /** Reveal one decrypted password (admin only; never logged). */
 export async function revealVaultPassword(input: unknown): Promise<Result> {
-  const access = await gate();
-  if ("denied" in access) return access.denied;
-  const { server, fail } = access;
-  const parsed = z.object({ id: z.uuid() }).safeParse(input);
-  if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
-
-  const { data, error } = await server
-    .from("admin_password_vault")
-    .select("password_encrypted")
-    .eq("id", parsed.data.id)
-    .maybeSingle();
-  if (error || !data)
-    return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
-
   try {
-    return { ok: true, password: decryptVaultSecret(data.password_encrypted as string) };
-  } catch {
-    return fail(
-      "Could not decrypt this password. Check the vault encryption key.",
-      "ಪಾಸ್‌ವರ್ಡ್ ಡೀಕ್ರಿಪ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ವಾಲ್ಟ್ ಕೀ ಪರಿಶೀಲಿಸಿ.",
-      "पासवर्ड डिक्रिप्ट नहीं हो सका। वॉल्ट कुंजी जांचें।",
-    );
+    const access = await gate();
+    if ("denied" in access) return access.denied;
+    const { server, fail } = access;
+    const parsed = z.object({ id: z.uuid() }).safeParse(input);
+    if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
+
+    const { data, error } = await server
+      .from("admin_password_vault")
+      .select("password_encrypted")
+      .eq("id", parsed.data.id)
+      .maybeSingle();
+    if (error || !data)
+      return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
+
+    try {
+      return { ok: true, password: decryptVaultSecret(data.password_encrypted as string) };
+    } catch {
+      return fail(
+        "Could not decrypt this password. Check the vault encryption key.",
+        "ಪಾಸ್‌ವರ್ಡ್ ಡೀಕ್ರಿಪ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ವಾಲ್ಟ್ ಕೀ ಪರಿಶೀಲಿಸಿ.",
+        "पासवर्ड डिक्रिप्ट नहीं हो सका। वॉल्ट कुंजी जांचें।",
+      );
+    }
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    return {
+      error: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+    };
   }
 }
 
 /** Delete a vault entry (admin only). */
 export async function deleteVaultEntry(input: unknown): Promise<Result> {
-  const access = await gate();
-  if ("denied" in access) return access.denied;
-  const { server, fail } = access;
-  const parsed = z.object({ id: z.uuid() }).safeParse(input);
-  if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
+  try {
+    const access = await gate();
+    if ("denied" in access) return access.denied;
+    const { server, fail } = access;
+    const parsed = z.object({ id: z.uuid() }).safeParse(input);
+    if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
 
-  const { error } = await server.from("admin_password_vault").delete().eq("id", parsed.data.id);
-  if (error)
-    return fail(error.message || "Could not delete the entry.", "ನಮೂದು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.", "प्रविष्टि हटाई नहीं जा सकी।");
-  touch();
-  return { ok: true };
+    const { error } = await server.from("admin_password_vault").delete().eq("id", parsed.data.id);
+    if (error)
+      return fail(
+        error.message || "Could not delete the entry.",
+        "ನಮೂದು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+        "प्रविष्टि हटाई नहीं जा सकी।",
+      );
+    touch();
+    return { ok: true };
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    return {
+      error: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+    };
+  }
 }
 
 const shareSchema = z.object({
@@ -224,47 +265,54 @@ const shareSchema = z.object({
  * The link snapshots the encrypted password; recipients open /vault-share/[token].
  */
 export async function createVaultShareLink(input: unknown): Promise<Result> {
-  const access = await gate();
-  if ("denied" in access) return access.denied;
-  const { server, user, fail } = access;
-  const parsed = shareSchema.safeParse(input);
-  if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
+  try {
+    const access = await gate();
+    if ("denied" in access) return access.denied;
+    const { server, user, fail } = access;
+    const parsed = shareSchema.safeParse(input);
+    if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
 
-  const { data: row, error } = await server
-    .from("admin_password_vault")
-    .select("id,title,site_url,email,password_encrypted,favicon_url,notes")
-    .eq("id", parsed.data.id)
-    .maybeSingle();
-  if (error || !row)
-    return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
+    const { data: row, error } = await server
+      .from("admin_password_vault")
+      .select("id,title,site_url,email,password_encrypted,favicon_url,notes")
+      .eq("id", parsed.data.id)
+      .maybeSingle();
+    if (error || !row)
+      return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
 
-  const token = randomBytes(24).toString("hex");
-  const expiresAt = new Date(Date.now() + parsed.data.hours * 60 * 60 * 1000).toISOString();
-  const { error: insertError } = await server.from("admin_password_vault_shares").insert({
-    vault_id: row.id,
-    token,
-    title: row.title || "",
-    site_url: row.site_url,
-    email: row.email || "",
-    password_encrypted: row.password_encrypted,
-    favicon_url: row.favicon_url || "",
-    notes: row.notes || "",
-    created_by: user.id,
-    expires_at: expiresAt,
-  });
-  if (insertError)
-    return fail(
-      insertError.message || "Could not create the share link.",
-      "ಹಂಚಿಕೆ ಲಿಂಕ್ ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "शेयर लिंक नहीं बन सका।",
-    );
+    const token = randomBytes(24).toString("hex");
+    const expiresAt = new Date(Date.now() + parsed.data.hours * 60 * 60 * 1000).toISOString();
+    const { error: insertError } = await server.from("admin_password_vault_shares").insert({
+      vault_id: row.id,
+      token,
+      title: row.title || "",
+      site_url: row.site_url,
+      email: row.email || "",
+      password_encrypted: row.password_encrypted,
+      favicon_url: row.favicon_url || "",
+      notes: row.notes || "",
+      created_by: user.id,
+      expires_at: expiresAt,
+    });
+    if (insertError)
+      return fail(
+        insertError.message || "Could not create the share link.",
+        "ಹಂಚಿಕೆ ಲಿಂಕ್ ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+        "शेयर लिंक नहीं बन सका।",
+      );
 
-  const origin = await appOrigin();
-  return {
-    ok: true,
-    shareUrl: `${origin}/vault-share/${token}`,
-    expiresAt,
-  };
+    const origin = await appOrigin();
+    return {
+      ok: true,
+      shareUrl: `${origin}/vault-share/${token}`,
+      expiresAt,
+    };
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    return {
+      error: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+    };
+  }
 }
 
 export type SharedVaultView = {

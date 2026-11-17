@@ -5,6 +5,8 @@ import { getUiStrings } from "@/lib/i18n/server";
 import { PasswordVaultBoard } from "@/components/admin/PasswordVaultBoard";
 import type { VaultRow } from "./actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function PasswordVaultPage() {
   const [{ profile, db }, { tr }] = await Promise.all([requireStaff(), getUiStrings()]);
   if (profile.role !== "admin") notFound();
