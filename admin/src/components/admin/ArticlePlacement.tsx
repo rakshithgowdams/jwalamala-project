@@ -70,11 +70,11 @@ export function ArticlePlacement({
     item.slug.includes(needle) ||
     Object.values(item.label).some((text) => text.toLowerCase().includes(needle));
 
-  function renderRow(item: PlacementOption) {
+  function renderRow(item: PlacementOption, asParent = false) {
     const category = bySlug.get(item.slug);
     const rowClass =
       "article-placement-row" +
-      (item.parent ? " is-child" : "") +
+      (asParent ? " is-parent" : "") +
       (category ? "" : " is-missing");
     if (!category) {
       return (
@@ -126,6 +126,15 @@ export function ArticlePlacement({
   const visibleGroups = groups
     .map((group) => ({ ...group, options: group.options.filter(matches) }))
     .filter((group) => group.options.length);
+  const isSingle = (group: (typeof visibleGroups)[number]) =>
+    group.options.length === 1 && !group.options[0].parent;
+  const singles = visibleGroups.filter(isSingle).map((group) => group.options[0]);
+  const nested = visibleGroups.filter((group) => !isSingle(group));
+  const pickedIn = (options: PlacementOption[]) =>
+    options.filter((item) => {
+      const id = bySlug.get(item.slug)?.id;
+      return id ? selectedIds.has(id) : false;
+    }).length;
 
   return (
     <div className="editor-stack article-placement">
@@ -153,46 +162,73 @@ export function ArticlePlacement({
           aria-label={tr({ en: "Find a section", kn: "ವಿಭಾಗ ಹುಡುಕಿ", hi: "अनुभाग खोजें" })}
         />
         <div className="article-placement-list">
-          {visibleGroups.map((group) => {
-            if (group.options.length === 1 && !group.options[0].parent) {
-              return renderRow(group.options[0]);
-            }
-            const picked = group.options.filter((item) => {
-              const id = bySlug.get(item.slug)?.id;
-              return id ? selectedIds.has(id) : false;
-            }).length;
-            return (
-              <details
-                key={group.key}
-                className="article-placement-group"
-                open={Boolean(needle) || openGroups.has(group.key)}
-                onToggle={(event) => {
-                  if (needle) return;
-                  const isOpen = event.currentTarget.open;
-                  setOpenGroups((current) => {
-                    if (current.has(group.key) === isOpen) return current;
-                    const copy = new Set(current);
-                    if (isOpen) copy.add(group.key);
-                    else copy.delete(group.key);
-                    return copy;
-                  });
-                }}
-              >
-                <summary>
-                  <span>{tr(group.label)}</span>
-                  <span className="article-placement-count">
-                    {picked ? `${picked} / ` : ""}
-                    {group.options.length}
-                  </span>
-                </summary>
-                <div className="article-placement-group-body">
-                  {group.options.map(renderRow)}
-                </div>
-              </details>
-            );
-          })}
+          {singles.length ? (
+            <div>
+              <p className="article-placement-subhead">
+                {tr({ en: "Main sections", kn: "ಮುಖ್ಯ ವಿಭಾಗಗಳು", hi: "मुख्य अनुभाग" })}
+              </p>
+              <div className="article-placement-columns">
+                {singles.map((item) => renderRow(item))}
+              </div>
+            </div>
+          ) : null}
+          {nested.length ? (
+            <div className="article-placement-groups">
+              {nested.map((group) => {
+                const picked = pickedIn(group.options);
+                return (
+                  <details
+                    key={group.key}
+                    className="article-placement-group"
+                    open={Boolean(needle) || openGroups.has(group.key)}
+                    onToggle={(event) => {
+                      if (needle) return;
+                      const isOpen = event.currentTarget.open;
+                      setOpenGroups((current) => {
+                        if (current.has(group.key) === isOpen) return current;
+                        const copy = new Set(current);
+                        if (isOpen) copy.add(group.key);
+                        else copy.delete(group.key);
+                        return copy;
+                      });
+                    }}
+                  >
+                    <summary>
+                      <span>{tr(group.label)}</span>
+                      <span
+                        className={
+                          "article-placement-count" + (picked ? " has-picked" : "")
+                        }
+                      >
+                        {picked
+                          ? tr({
+                              en: `${picked} of ${group.options.length} ticked`,
+                              kn: `${group.options.length}ರಲ್ಲಿ ${picked} ಆಯ್ಕೆ`,
+                              hi: `${group.options.length} में ${picked} चुने`,
+                            })
+                          : tr({
+                              en: `${group.options.length} options`,
+                              kn: `${group.options.length} ಆಯ್ಕೆಗಳು`,
+                              hi: `${group.options.length} विकल्प`,
+                            })}
+                      </span>
+                    </summary>
+                    <div className="article-placement-group-body article-placement-columns">
+                      {group.options.map((item) =>
+                        renderRow(
+                          item,
+                          !item.parent &&
+                            group.options.some((other) => other.parent === item.slug),
+                        ),
+                      )}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          ) : null}
           {!visibleGroups.length ? (
-            <p className="article-placement-lead">
+            <p className="article-placement-empty">
               {tr({ en: "No section matches.", kn: "ಹೊಂದುವ ವಿಭಾಗ ಇಲ್ಲ.", hi: "कोई अनुभाग नहीं मिला।" })}
             </p>
           ) : null}
