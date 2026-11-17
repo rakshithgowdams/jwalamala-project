@@ -3420,10 +3420,12 @@ body:has(.admin-main .staff-chat) {
 }
 .password-vault-form-password {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .password-vault-form-password input {
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 .password-vault-form-footer {
   flex: 0 0 auto;

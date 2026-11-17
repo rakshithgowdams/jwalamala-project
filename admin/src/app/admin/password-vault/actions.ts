@@ -88,6 +88,15 @@ const saveSchema = z.object({
   title: z.string().trim().max(160).default(""),
   siteUrl: urlSchema,
   email: z.string().trim().max(320).default(""),
+  phone: z
+    .string()
+    .trim()
+    .max(40)
+    .default("")
+    .refine(
+      (value) => !value || /^[+\d][\d\s()-]{6,38}$/.test(value),
+      "Invalid phone",
+    ),
   password: z.string().min(1).max(500),
   notes: z.string().trim().max(1000).default(""),
 });
@@ -97,6 +106,7 @@ export type VaultRow = {
   title: string;
   siteUrl: string;
   email: string;
+  phone: string;
   faviconUrl: string;
   notes: string;
   createdAt: string;
@@ -112,9 +122,9 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
     const parsed = saveSchema.safeParse(input);
     if (!parsed.success)
       return fail(
-        "Enter a valid site link, email, and password.",
-        "ಮಾನ್ಯ ಸೈಟ್ ಲಿಂಕ್, ಇಮೇಲ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
-        "मान्य साइट लिंक, ईमेल और पासवर्ड दर्ज करें।",
+        "Enter a valid site link, phone (optional), and password.",
+        "ಮಾನ್ಯ ಸೈಟ್ ಲಿಂಕ್, ಫೋನ್ (ಐಚ್ಛಿಕ) ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
+        "मान्य साइट लिंक, फ़ोन (वैकल्पिक) और पासवर्ड दर्ज करें।",
       );
 
     let passwordEncrypted: string;
@@ -147,6 +157,7 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
           title,
           site_url: parsed.data.siteUrl,
           email: parsed.data.email,
+          phone: parsed.data.phone,
           password_encrypted: passwordEncrypted,
           favicon_url: faviconUrl,
           notes: parsed.data.notes,
@@ -170,6 +181,7 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
         title,
         site_url: parsed.data.siteUrl,
         email: parsed.data.email,
+        phone: parsed.data.phone,
         password_encrypted: passwordEncrypted,
         favicon_url: faviconUrl,
         notes: parsed.data.notes,
@@ -274,7 +286,7 @@ export async function createVaultShareLink(input: unknown): Promise<Result> {
 
     const { data: row, error } = await server
       .from("admin_password_vault")
-      .select("id,title,site_url,email,password_encrypted,favicon_url,notes")
+      .select("id,title,site_url,email,phone,password_encrypted,favicon_url,notes")
       .eq("id", parsed.data.id)
       .maybeSingle();
     if (error || !row)
@@ -288,6 +300,7 @@ export async function createVaultShareLink(input: unknown): Promise<Result> {
       title: row.title || "",
       site_url: row.site_url,
       email: row.email || "",
+      phone: (row.phone as string) || "",
       password_encrypted: row.password_encrypted,
       favicon_url: row.favicon_url || "",
       notes: row.notes || "",
@@ -319,6 +332,7 @@ export type SharedVaultView = {
   title: string;
   siteUrl: string;
   email: string;
+  phone: string;
   password: string;
   faviconUrl: string;
   notes: string;
@@ -340,7 +354,7 @@ export async function loadVaultShare(token: string): Promise<
   const { data, error } = await server
     .from("admin_password_vault_shares")
     .select(
-      "id,title,site_url,email,password_encrypted,favicon_url,notes,expires_at,revoked_at,view_count",
+      "id,title,site_url,email,phone,password_encrypted,favicon_url,notes,expires_at,revoked_at,view_count",
     )
     .eq("token", clean)
     .maybeSingle();
@@ -370,6 +384,7 @@ export async function loadVaultShare(token: string): Promise<
       title: (data.title as string) || "",
       siteUrl: (data.site_url as string) || "",
       email: (data.email as string) || "",
+      phone: (data.phone as string) || "",
       password,
       faviconUrl: (data.favicon_url as string) || "",
       notes: (data.notes as string) || "",

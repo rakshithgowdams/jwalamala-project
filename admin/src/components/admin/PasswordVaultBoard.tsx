@@ -13,6 +13,7 @@ import {
   MoreVertical,
   Pencil,
   Plus,
+  RefreshCw,
   Trash2,
   X,
 } from "lucide-react";
@@ -30,6 +31,7 @@ type FormState = {
   title: string;
   siteUrl: string;
   email: string;
+  phone: string;
   password: string;
   notes: string;
 };
@@ -38,9 +40,18 @@ const emptyForm: FormState = {
   title: "",
   siteUrl: "https://",
   email: "",
+  phone: "",
   password: "",
   notes: "",
 };
+
+function generateVaultPassword(length = 16) {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*_-";
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => chars[byte % chars.length]).join("");
+}
 
 export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
   const { tr } = useUiStrings();
@@ -63,7 +74,10 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((row) =>
-      [row.title, row.siteUrl, row.email, row.notes].join(" ").toLowerCase().includes(q),
+      [row.title, row.siteUrl, row.email, row.phone, row.notes]
+        .join(" ")
+        .toLowerCase()
+        .includes(q),
     );
   }, [rows, query]);
 
@@ -363,6 +377,10 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                     <strong>{tr({ en: "Email", kn: "ಇಮೇಲ್", hi: "ईमेल" })}:</strong>{" "}
                     {row.email || "—"}
                   </p>
+                  <p className="task-card-meta">
+                    <strong>{tr({ en: "Phone", kn: "ಫೋನ್", hi: "फ़ोन" })}:</strong>{" "}
+                    {row.phone || "—"}
+                  </p>
                   <p className="task-card-meta password-vault-secret">
                     <strong>{tr({ en: "Password", kn: "ಪಾಸ್‌ವರ್ಡ್", hi: "पासवर्ड" })}:</strong>{" "}
                     {secret ? secret : "••••••••"}
@@ -433,6 +451,26 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
               >
                 <Copy size={15} />
                 {tr({ en: "Copy email", kn: "ಇಮೇಲ್ ನಕಲಿಸಿ", hi: "ईमेल कॉपी" })}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={pending || !openRow.phone}
+                onClick={() => {
+                  const phone = openRow.phone;
+                  closeMenu();
+                  copyText(
+                    phone,
+                    tr({
+                      en: "Phone copied.",
+                      kn: "ಫೋನ್ ನಕಲಿಸಲಾಯಿತು.",
+                      hi: "फ़ोन कॉपी हुआ।",
+                    }),
+                  );
+                }}
+              >
+                <Copy size={15} />
+                {tr({ en: "Copy phone", kn: "ಫೋನ್ ನಕಲಿಸಿ", hi: "फ़ोन कॉपी" })}
               </button>
               <button
                 type="button"
@@ -561,6 +599,7 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                       title: row.title,
                       siteUrl: row.siteUrl,
                       email: row.email,
+                      phone: row.phone,
                       password: result.password || "",
                       notes: row.notes,
                     });
@@ -612,6 +651,7 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                         title: form.title,
                         siteUrl: form.siteUrl,
                         email: form.email,
+                        phone: form.phone,
                         password: form.password,
                         notes: form.notes,
                       }),
@@ -705,6 +745,24 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                       />
                     </label>
                     <label className="field">
+                      <span>
+                        {tr({
+                          en: "Phone number",
+                          kn: "ಫೋನ್ ಸಂಖ್ಯೆ",
+                          hi: "फ़ोन नंबर",
+                        })}
+                      </span>
+                      <input
+                        type="tel"
+                        value={form.phone}
+                        onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                        maxLength={40}
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="+91 98765 43210"
+                      />
+                    </label>
+                    <label className="field">
                       <span>{tr({ en: "Password", kn: "ಪಾಸ್‌ವರ್ಡ್", hi: "पासवर्ड" })}</span>
                       <div className="password-vault-form-password">
                         <input
@@ -726,6 +784,23 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                           })}
                         >
                           {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-outline is-compact"
+                          onClick={() => {
+                            const next = generateVaultPassword(16);
+                            setForm((f) => ({ ...f, password: next }));
+                            setShowPassword(true);
+                          }}
+                          aria-label={tr({
+                            en: "Generate password",
+                            kn: "ಪಾಸ್‌ವರ್ಡ್ ರಚಿಸಿ",
+                            hi: "पासवर्ड बनाएँ",
+                          })}
+                        >
+                          <RefreshCw size={15} />
+                          {tr({ en: "Generate", kn: "ರಚಿಸಿ", hi: "बनाएँ" })}
                         </button>
                       </div>
                     </label>

@@ -5,11 +5,13 @@ import { Copy } from "lucide-react";
 export function CopyShareFields({
   siteUrl,
   email,
+  phone,
   password,
   notes,
 }: {
   siteUrl: string;
   email: string;
+  phone: string;
   password: string;
   notes: string;
 }) {
@@ -42,6 +44,15 @@ export function CopyShareFields({
         <div className="vault-share-row">
           <code>{email || "—"}</code>
           <button type="button" disabled={!email} onClick={() => copy("Email", email)}>
+            <Copy size={14} /> Copy
+          </button>
+        </div>
+      </label>
+      <label>
+        <span>Phone</span>
+        <div className="vault-share-row">
+          <code>{phone || "—"}</code>
+          <button type="button" disabled={!phone} onClick={() => copy("Phone", phone)}>
             <Copy size={14} /> Copy
           </button>
         </div>

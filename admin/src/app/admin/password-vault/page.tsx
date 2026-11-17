@@ -14,7 +14,7 @@ export default async function PasswordVaultPage() {
   const server = getAdminClient() || db;
   const { data, error } = await server
     .from("admin_password_vault")
-    .select("id,title,site_url,email,favicon_url,notes,created_at,updated_at")
+    .select("id,title,site_url,email,phone,favicon_url,notes,created_at,updated_at")
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -26,9 +26,9 @@ export default async function PasswordVaultPage() {
         </div>
         <p role="alert">
           {tr({
-            en: "Password vault is not set up yet. Run supabase/migrations/20261117100000_admin_password_vault.sql in the Supabase SQL Editor, then reload.",
-            kn: "ಪಾಸ್‌ವರ್ಡ್ ವಾಲ್ಟ್ ಇನ್ನೂ ಸಿದ್ಧವಿಲ್ಲ. Supabase SQL Editor ನಲ್ಲಿ supabase/migrations/20261117100000_admin_password_vault.sql ರನ್ ಮಾಡಿ.",
-            hi: "पासवर्ड वॉल्ट अभी सेट नहीं है। Supabase SQL Editor में supabase/migrations/20261117100000_admin_password_vault.sql चलाएँ।",
+            en: "Password vault needs a database update. Run supabase/migrations/20261117100000_admin_password_vault.sql and 20261117120000_admin_password_vault_phone.sql in the Supabase SQL Editor, then reload.",
+            kn: "ಪಾಸ್‌ವರ್ಡ್ ವಾಲ್ಟ್‌ಗೆ DB ಅಪ್‌ಡೇಟ್ ಬೇಕು. Supabase SQL Editor ನಲ್ಲಿ vault migrations ರನ್ ಮಾಡಿ.",
+            hi: "पासवर्ड वॉल्ट के लिए DB अपडेट चाहिए। Supabase SQL Editor में vault migrations चलाएँ।",
           })}
         </p>
         <p role="status">{error.message}</p>
@@ -41,6 +41,7 @@ export default async function PasswordVaultPage() {
     title: (row.title as string) || "",
     siteUrl: (row.site_url as string) || "",
     email: (row.email as string) || "",
+    phone: (row.phone as string) || "",
     faviconUrl: (row.favicon_url as string) || "",
     notes: (row.notes as string) || "",
     createdAt: (row.created_at as string) || "",

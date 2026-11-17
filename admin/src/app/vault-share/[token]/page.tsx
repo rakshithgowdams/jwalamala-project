@@ -45,6 +45,7 @@ export default async function VaultSharePage({
         <CopyShareFields
           siteUrl={row.siteUrl}
           email={row.email}
+          phone={row.phone}
           password={row.password}
           notes={row.notes}
         />

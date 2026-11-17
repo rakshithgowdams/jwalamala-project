@@ -13,6 +13,8 @@ create table if not exists public.admin_password_vault_shares (
     check (char_length(site_url) >= 8 and char_length(site_url) <= 2000),
   email text not null default ''
     check (char_length(email) <= 320),
+  phone text not null default ''
+    check (char_length(phone) <= 40),
   password_encrypted text not null
     check (char_length(password_encrypted) >= 16 and char_length(password_encrypted) <= 4000),
   favicon_url text not null default ''
