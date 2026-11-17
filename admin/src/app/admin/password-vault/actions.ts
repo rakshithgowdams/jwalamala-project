@@ -11,6 +11,7 @@ import {
   encryptVaultSecret,
   faviconForSite,
 } from "@/lib/vault/crypto";
+import { isMissingPhoneColumnError } from "@/lib/vault/db";
 
 type Result = {
   ok?: true;
@@ -150,21 +151,35 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
         }
       })();
 
+    const withPhone = {
+      title,
+      site_url: parsed.data.siteUrl,
+      email: parsed.data.email,
+      phone: parsed.data.phone,
+      password_encrypted: passwordEncrypted,
+      favicon_url: faviconUrl,
+      notes: parsed.data.notes,
+    };
+    const withoutPhone = {
+      title,
+      site_url: parsed.data.siteUrl,
+      email: parsed.data.email,
+      password_encrypted: passwordEncrypted,
+      favicon_url: faviconUrl,
+      notes: parsed.data.notes,
+    };
+
     if (parsed.data.id) {
-      const { error } = await server
+      let { error } = await server
         .from("admin_password_vault")
-        .update({
-          title,
-          site_url: parsed.data.siteUrl,
-          email: parsed.data.email,
-          phone: parsed.data.phone,
-          password_encrypted: passwordEncrypted,
-          favicon_url: faviconUrl,
-          notes: parsed.data.notes,
-          updated_by: user.id,
-          updated_at: now,
-        })
+        .update({ ...withPhone, updated_by: user.id, updated_at: now })
         .eq("id", parsed.data.id);
+      if (error && isMissingPhoneColumnError(error.message)) {
+        ({ error } = await server
+          .from("admin_password_vault")
+          .update({ ...withoutPhone, updated_by: user.id, updated_at: now })
+          .eq("id", parsed.data.id));
+      }
       if (error)
         return fail(
           error.message || "Could not update the entry.",
@@ -175,21 +190,18 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
       return { ok: true, id: parsed.data.id };
     }
 
-    const { data, error } = await server
+    let { data, error } = await server
       .from("admin_password_vault")
-      .insert({
-        title,
-        site_url: parsed.data.siteUrl,
-        email: parsed.data.email,
-        phone: parsed.data.phone,
-        password_encrypted: passwordEncrypted,
-        favicon_url: faviconUrl,
-        notes: parsed.data.notes,
-        created_by: user.id,
-        updated_by: user.id,
-      })
+      .insert({ ...withPhone, created_by: user.id, updated_by: user.id })
       .select("id")
       .single();
+    if (error && isMissingPhoneColumnError(error.message)) {
+      ({ data, error } = await server
+        .from("admin_password_vault")
+        .insert({ ...withoutPhone, created_by: user.id, updated_by: user.id })
+        .select("id")
+        .single());
+    }
     if (error || !data)
       return fail(
         error?.message || "Could not save the entry.",
@@ -284,29 +296,44 @@ export async function createVaultShareLink(input: unknown): Promise<Result> {
     const parsed = shareSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid entry.", "ಅಮಾನ್ಯ ನಮೂದು.", "अमान्य प्रविष्टि।");
 
-    const { data: row, error } = await server
+    let { data: row, error } = await server
       .from("admin_password_vault")
       .select("id,title,site_url,email,phone,password_encrypted,favicon_url,notes")
       .eq("id", parsed.data.id)
       .maybeSingle();
+    if (error && isMissingPhoneColumnError(error.message)) {
+      ({ data: row, error } = await server
+        .from("admin_password_vault")
+        .select("id,title,site_url,email,password_encrypted,favicon_url,notes")
+        .eq("id", parsed.data.id)
+        .maybeSingle());
+    }
     if (error || !row)
       return fail("Entry not found.", "ನಮೂದು ಸಿಗಲಿಲ್ಲ.", "प्रविष्टि नहीं मिली।");
 
     const token = randomBytes(24).toString("hex");
     const expiresAt = new Date(Date.now() + parsed.data.hours * 60 * 60 * 1000).toISOString();
-    const { error: insertError } = await server.from("admin_password_vault_shares").insert({
+    const shareBase = {
       vault_id: row.id,
       token,
       title: row.title || "",
       site_url: row.site_url,
       email: row.email || "",
-      phone: (row.phone as string) || "",
       password_encrypted: row.password_encrypted,
       favicon_url: row.favicon_url || "",
       notes: row.notes || "",
       created_by: user.id,
       expires_at: expiresAt,
+    };
+    let { error: insertError } = await server.from("admin_password_vault_shares").insert({
+      ...shareBase,
+      phone: ("phone" in row ? String((row as { phone?: string }).phone || "") : "") || "",
     });
+    if (insertError && isMissingPhoneColumnError(insertError.message)) {
+      ({ error: insertError } = await server
+        .from("admin_password_vault_shares")
+        .insert(shareBase));
+    }
     if (insertError)
       return fail(
         insertError.message || "Could not create the share link.",
@@ -351,13 +378,22 @@ export async function loadVaultShare(token: string): Promise<
   const server = getAdminClient();
   if (!server) return { ok: false, error: "Service unavailable." };
 
-  const { data, error } = await server
+  let { data, error } = await server
     .from("admin_password_vault_shares")
     .select(
       "id,title,site_url,email,phone,password_encrypted,favicon_url,notes,expires_at,revoked_at,view_count",
     )
     .eq("token", clean)
     .maybeSingle();
+  if (error && isMissingPhoneColumnError(error.message)) {
+    ({ data, error } = await server
+      .from("admin_password_vault_shares")
+      .select(
+        "id,title,site_url,email,password_encrypted,favicon_url,notes,expires_at,revoked_at,view_count",
+      )
+      .eq("token", clean)
+      .maybeSingle());
+  }
   if (error || !data) return { ok: false, error: "Share link not found." };
   if (data.revoked_at) return { ok: false, error: "This share link was revoked." };
   if (new Date(data.expires_at as string).getTime() <= Date.now())
@@ -384,7 +420,7 @@ export async function loadVaultShare(token: string): Promise<
       title: (data.title as string) || "",
       siteUrl: (data.site_url as string) || "",
       email: (data.email as string) || "",
-      phone: (data.phone as string) || "",
+      phone: ("phone" in data ? String((data as { phone?: string }).phone || "") : "") || "",
       password,
       faviconUrl: (data.favicon_url as string) || "",
       notes: (data.notes as string) || "",
