@@ -23,6 +23,7 @@ import { FacebookLogo, InstagramLogo, YouTubeLogo } from "./BrandIcons";
 import { DeletePostButton } from "./DeletePostButton";
 import { RestorePostButton } from "./RestorePostButton";
 import { ArticlePlacement } from "./ArticlePlacement";
+import { TagPicker } from "./TagPicker";
 import { useDeskPath } from "@/components/admin/DeskPathProvider";
 import { videoFromInput } from "@/lib/utils/video";
 
@@ -182,6 +183,7 @@ export function PostEditor({
   const [socialPlatform, setSocialPlatform] = useState(post?.social_platform || "");
   const [socialUrl, setSocialUrl] = useState(post?.social_post_url || "");
   const [mathaIds, setMathaIds] = useState(() => new Set(initialMathaIds));
+  const [tagIds, setTagIds] = useState<string[]>(post?.tag_ids || []);
   const selectedIds = new Set([primaryCategory, ...extraCategories]);
   const selectedSlugs = new Set(
     categories.filter((category) => selectedIds.has(category.id)).map((category) => category.slug),
@@ -308,6 +310,7 @@ export function PostEditor({
         ) {
           // Sponsorship is switched on deliberately, never by a restored draft.
           if (element.name === "sponsor_name" && element.type === "hidden") continue;
+          if (element.name === "tag_ids") continue;
           const values = draft.fields
             .filter((entry: string[]) => entry[0] === element.name)
             .map((entry: string[]) => entry[1]);
@@ -323,6 +326,11 @@ export function PostEditor({
       if (valueOf("thumbnail_url") !== undefined) setCover(valueOf("thumbnail_url") || "");
       if (valueOf("place_id") !== undefined) setPlaceId(valueOf("place_id") || "");
       if (valueOf("video_url") !== undefined) setVideoInput(valueOf("video_url") || "");
+      setTagIds(
+        (draft.fields as string[][])
+          .filter((entry) => entry[0] === "tag_ids")
+          .map((entry) => entry[1]),
+      );
       if (draft.body) editor?.commands.setContent(draft.body);
       dirty.current = true;
       setRecovery(tr({ en: "Draft restored. Review it, then save.", kn: "ಕರಡು ಪ್ರತಿ ಮರುಸ್ಥಾಪಿಸಲಾಗಿದೆ. ಪರಿಶೀಲಿಸಿ ಉಳಿಸಿ.", hi: "ड्राफ़्ट बहाल किया गया। जाँचकर सहेजें।" }));
@@ -1153,29 +1161,15 @@ export function PostEditor({
               <input key={id} type="hidden" name="category_ids" value={id} />
             ))}
             {choices.tags.length > 0 ? (
-              <label className="field">
-                {t.tags}
-                <select
-                  name="tag_ids"
-                  multiple
-                  size={Math.min(6, Math.max(3, choices.tags.length))}
-                  className="editor-simple-select"
-                  defaultValue={post?.tag_ids || []}
-                >
-                  {choices.tags.map((tag) => (
-                    <option key={tag.id} value={tag.id}>
-                      {tag.name_kn}
-                    </option>
-                  ))}
-                </select>
-                <small className="field-hint">
-                  {tr({
-                    en: "Hold Ctrl (Windows) or ⌘ (Mac) to pick more than one.",
-                    kn: "ಹೆಚ್ಚು ಆಯ್ಕೆಗೆ Ctrl (Windows) ಅಥವಾ ⌘ (Mac) ಒತ್ತಿ ಹಿಡಿಯಿರಿ.",
-                    hi: "एक से अधिक चुनने के लिए Ctrl (Windows) या ⌘ (Mac) दबाए रखें।",
-                  })}
-                </small>
-              </label>
+              <TagPicker
+                label={t.tags}
+                tags={choices.tags}
+                value={tagIds}
+                onChange={(next) => {
+                  setTagIds(next);
+                  dirty.current = true;
+                }}
+              />
             ) : null}
             {(
               [

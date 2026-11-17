@@ -342,6 +342,103 @@
 :where(.admin-main) .article-placement-mathas {
   max-height: 160px;
 }
+.admin-main .tag-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.admin-main .tag-picker-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.admin-main .tag-picker-label small {
+  color: var(--muted, #667085);
+  font-size: 12px;
+  font-weight: 600;
+}
+.admin-main .tag-picker-selected,
+.admin-main .tag-picker-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.admin-main .tag-picker-pool {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--surface);
+  scrollbar-width: thin;
+}
+.admin-main .tag-picker-search {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 13px;
+}
+.admin-main .tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 3px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.admin-main .tag-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--ui-border));
+  color: var(--accent);
+}
+.admin-main .tag-chip.is-picked {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  color: var(--accent);
+  font-weight: 600;
+}
+.admin-main .tag-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.admin-main .tag-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+.admin-main .tag-chip svg {
+  flex: none;
+}
+.admin-main .tag-picker-clear {
+  padding: 3px 6px;
+  border: 0;
+  background: none;
+  color: var(--muted, #667085);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
 :where(.admin-main) select.editor-simple-select {
   min-height: 0;
   height: auto;
