@@ -2032,6 +2032,9 @@
 .admin-main .staff-manager > .page-actions {
   margin: 0 0 16px;
 }
+.admin-main .staff-manager > .form-message {
+  margin: 0 0 16px;
+}
 .admin-main .staff-form-head {
   display: flex;
   align-items: center;
