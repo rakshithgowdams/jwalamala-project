@@ -5,6 +5,7 @@ import { getUiStrings } from "@/lib/i18n/server";
 import { PasswordVaultBoard } from "@/components/admin/PasswordVaultBoard";
 import {
   isMissingPhoneColumnError,
+  PHONE_COLUMN_SQL,
   VAULT_LIST_SELECT,
   VAULT_LIST_SELECT_LEGACY,
 } from "@/lib/vault/db";
@@ -17,6 +18,7 @@ export default async function PasswordVaultPage() {
   if (profile.role !== "admin") notFound();
 
   const server = getAdminClient() || db;
+  let phoneSupported = true;
   let { data, error } = await server
     .from("admin_password_vault")
     .select(VAULT_LIST_SELECT)
@@ -25,6 +27,7 @@ export default async function PasswordVaultPage() {
 
   // Older DBs / stale PostgREST cache may not expose `phone` yet.
   if (error && isMissingPhoneColumnError(error.message)) {
+    phoneSupported = false;
     const fallback = await server
       .from("admin_password_vault")
       .select(VAULT_LIST_SELECT_LEGACY)
@@ -61,17 +64,29 @@ export default async function PasswordVaultPage() {
     );
   }
 
-  const rows: VaultRow[] = (data || []).map((row) => ({
-    id: row.id as string,
-    title: (row.title as string) || "",
-    siteUrl: (row.site_url as string) || "",
-    email: (row.email as string) || "",
-    phone: ("phone" in row ? String((row as { phone?: string }).phone || "") : "") || "",
-    faviconUrl: (row.favicon_url as string) || "",
-    notes: (row.notes as string) || "",
-    createdAt: (row.created_at as string) || "",
-    updatedAt: (row.updated_at as string) || "",
-  }));
+  const rows: VaultRow[] = (data || []).map((row) => {
+    const phoneValue =
+      phoneSupported && row && typeof row === "object" && "phone" in row
+        ? String((row as { phone?: string | null }).phone ?? "")
+        : "";
+    return {
+      id: row.id as string,
+      title: (row.title as string) || "",
+      siteUrl: (row.site_url as string) || "",
+      email: (row.email as string) || "",
+      phone: phoneValue,
+      faviconUrl: (row.favicon_url as string) || "",
+      notes: (row.notes as string) || "",
+      createdAt: (row.created_at as string) || "",
+      updatedAt: (row.updated_at as string) || "",
+    };
+  });
 
-  return <PasswordVaultBoard rows={rows} />;
+  return (
+    <PasswordVaultBoard
+      rows={rows}
+      phoneSupported={phoneSupported}
+      phoneSetupSql={phoneSupported ? "" : PHONE_COLUMN_SQL}
+    />
+  );
 }

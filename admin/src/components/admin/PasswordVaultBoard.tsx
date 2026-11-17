@@ -53,7 +53,15 @@ function generateVaultPassword(length = 16) {
   return Array.from(bytes, (byte) => chars[byte % chars.length]).join("");
 }
 
-export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
+export function PasswordVaultBoard({
+  rows,
+  phoneSupported = true,
+  phoneSetupSql = "",
+}: {
+  rows: VaultRow[];
+  phoneSupported?: boolean;
+  phoneSetupSql?: string;
+}) {
   const { tr } = useUiStrings();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -269,6 +277,21 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
         })}
       </p>
 
+      {!phoneSupported ? (
+        <p className="password-vault-share-banner" role="alert">
+          {tr({
+            en: "Phone numbers are not enabled in the database yet. Run this in Supabase SQL Editor, then reload:",
+            kn: "ಫೋನ್ ಸಂಖ್ಯೆಗಳು ಇನ್ನೂ DB ನಲ್ಲಿ ಸಕ್ರಿಯವಿಲ್ಲ. Supabase SQL Editor ನಲ್ಲಿ ಇದನ್ನು ರನ್ ಮಾಡಿ, ನಂತರ ರೀಲೋಡ್:",
+            hi: "फ़ोन नंबर अभी DB में सक्षम नहीं हैं। Supabase SQL Editor में यह चलाएँ, फिर reload करें:",
+          })}
+          {phoneSetupSql ? (
+            <>
+              <br />
+              <code style={{ whiteSpace: "pre-wrap" }}>{phoneSetupSql}</code>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {message.error && !editing ? <p role="alert">{message.error}</p> : null}
       {message.ok ? <p role="status">{message.ok}</p> : null}
       {shareUrl ? (
@@ -760,7 +783,17 @@ export function PasswordVaultBoard({ rows }: { rows: VaultRow[] }) {
                         inputMode="tel"
                         autoComplete="tel"
                         placeholder="+91 98765 43210"
+                        disabled={!phoneSupported}
                       />
+                      {!phoneSupported ? (
+                        <small>
+                          {tr({
+                            en: "Enable the phone column in Supabase first (see banner above).",
+                            kn: "ಮೊದಲು Supabase ನಲ್ಲಿ ಫೋನ್ ಕಾಲಮ್ ಸಕ್ರಿಯಗೊಳಿಸಿ (ಮೇಲಿನ ಬ್ಯಾನರ್ ನೋಡಿ).",
+                            hi: "पहले Supabase में फ़ोन कॉलम सक्षम करें (ऊपर का बैनर देखें)।",
+                          })}
+                        </small>
+                      ) : null}
                     </label>
                     <label className="field">
                       <span>{tr({ en: "Password", kn: "ಪಾಸ್‌ವರ್ಡ್", hi: "पासवर्ड" })}</span>

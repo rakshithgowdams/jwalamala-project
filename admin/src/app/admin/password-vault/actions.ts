@@ -11,7 +11,12 @@ import {
   encryptVaultSecret,
   faviconForSite,
 } from "@/lib/vault/crypto";
-import { isMissingPhoneColumnError } from "@/lib/vault/db";
+import {
+  isMissingPhoneColumnError,
+  isValidVaultPhone,
+  normalizeVaultPhone,
+  PHONE_COLUMN_HELP,
+} from "@/lib/vault/db";
 
 type Result = {
   ok?: true;
@@ -89,15 +94,10 @@ const saveSchema = z.object({
   title: z.string().trim().max(160).default(""),
   siteUrl: urlSchema,
   email: z.string().trim().max(320).default(""),
-  phone: z
-    .string()
-    .trim()
-    .max(40)
-    .default("")
-    .refine(
-      (value) => !value || /^[+\d][\d\s()-]{6,38}$/.test(value),
-      "Invalid phone",
-    ),
+  phone: z.preprocess(
+    (value) => normalizeVaultPhone(value),
+    z.string().max(40).refine(isValidVaultPhone, "Invalid phone"),
+  ),
   password: z.string().min(1).max(500),
   notes: z.string().trim().max(1000).default(""),
 });
@@ -121,12 +121,20 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
     if ("denied" in access) return access.denied;
     const { server, user, fail } = access;
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success)
+    if (!parsed.success) {
+      const phoneIssue = parsed.error.issues.some((issue) => issue.path.includes("phone"));
+      if (phoneIssue)
+        return fail(
+          "Enter a valid phone number (at least 7 digits), or leave it blank.",
+          "ಮಾನ್ಯ ಫೋನ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ (ಕನಿಷ್ಠ 7 ಅಂಕೆ), ಅಥವಾ ಖಾಲಿ ಬಿಡಿ.",
+          "मान्य फ़ोन नंबर दर्ज करें (कम से कम 7 अंक), या खाली छोड़ें।",
+        );
       return fail(
-        "Enter a valid site link, phone (optional), and password.",
-        "ಮಾನ್ಯ ಸೈಟ್ ಲಿಂಕ್, ಫೋನ್ (ಐಚ್ಛಿಕ) ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
-        "मान्य साइट लिंक, फ़ोन (वैकल्पिक) और पासवर्ड दर्ज करें।",
+        "Enter a valid site link and password.",
+        "ಮಾನ್ಯ ಸೈಟ್ ಲಿಂಕ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
+        "मान्य साइट लिंक और पासवर्ड दर्ज करें।",
       );
+    }
 
     let passwordEncrypted: string;
     try {
@@ -175,6 +183,8 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
         .update({ ...withPhone, updated_by: user.id, updated_at: now })
         .eq("id", parsed.data.id);
       if (error && isMissingPhoneColumnError(error.message)) {
+        // Never silently drop a phone the admin typed in.
+        if (parsed.data.phone) return fail(PHONE_COLUMN_HELP, PHONE_COLUMN_HELP, PHONE_COLUMN_HELP);
         ({ error } = await server
           .from("admin_password_vault")
           .update({ ...withoutPhone, updated_by: user.id, updated_at: now })
@@ -196,6 +206,7 @@ export async function saveVaultEntry(input: unknown): Promise<Result> {
       .select("id")
       .single();
     if (error && isMissingPhoneColumnError(error.message)) {
+      if (parsed.data.phone) return fail(PHONE_COLUMN_HELP, PHONE_COLUMN_HELP, PHONE_COLUMN_HELP);
       ({ data, error } = await server
         .from("admin_password_vault")
         .insert({ ...withoutPhone, created_by: user.id, updated_by: user.id })
@@ -325,11 +336,14 @@ export async function createVaultShareLink(input: unknown): Promise<Result> {
       created_by: user.id,
       expires_at: expiresAt,
     };
+    const sharePhone =
+      ("phone" in row ? String((row as { phone?: string }).phone || "") : "") || "";
     let { error: insertError } = await server.from("admin_password_vault_shares").insert({
       ...shareBase,
-      phone: ("phone" in row ? String((row as { phone?: string }).phone || "") : "") || "",
+      phone: sharePhone,
     });
     if (insertError && isMissingPhoneColumnError(insertError.message)) {
+      if (sharePhone) return fail(PHONE_COLUMN_HELP, PHONE_COLUMN_HELP, PHONE_COLUMN_HELP);
       ({ error: insertError } = await server
         .from("admin_password_vault_shares")
         .insert(shareBase));
