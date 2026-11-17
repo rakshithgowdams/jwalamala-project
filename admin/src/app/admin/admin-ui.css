@@ -3346,25 +3346,120 @@ body:has(.admin-main .staff-chat) {
   display: grid;
   gap: 1rem;
 }
-.admin-main .password-vault-form {
+.password-vault-form-backdrop {
+  z-index: 10060;
+  align-items: center;
+}
+.password-vault-form-dialog {
+  width: min(520px, 100%);
+  max-height: min(90vh, 720px);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.password-vault-form-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border, #e4e6ec);
+  background: var(--surface, #fff);
+  border-radius: 12px 12px 0 0;
+}
+.password-vault-form-head h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.password-vault-form-close {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border, #e4e6ec);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.password-vault-form-close:hover {
+  background: #f3f4f7;
+}
+.password-vault-form-body {
+  display: grid;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+}
+.password-vault-form-lead {
+  margin: 0;
+  color: var(--muted, #667085);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.password-vault-form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
+}
+.password-vault-form-fields {
   display: grid;
   gap: 0.75rem;
 }
-.admin-main .password-vault-form h2 {
+.password-vault-form-password {
+  display: flex;
+  gap: 8px;
+}
+.password-vault-form-password input {
+  flex: 1;
+}
+.password-vault-form-footer {
+  flex: 0 0 auto;
   margin: 0;
-  font-size: 16px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--border, #e4e6ec);
+  background: var(--surface, #fff);
+  border-radius: 0 0 12px 12px;
 }
-.admin-main .password-vault-card .password-vault-favicon {
-  display: grid;
+.admin-main .password-vault-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.admin-main .password-vault-title-row h2 {
+  margin: 0;
+  min-width: 0;
+}
+.admin-main .password-vault-favicon-wrap {
+  display: inline-grid;
   place-items: center;
-  background: color-mix(in srgb, var(--surface, #fff) 88%, var(--muted));
-}
-.admin-main .password-vault-card .password-vault-favicon img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
   border-radius: 10px;
+  border: 1px solid var(--border);
   background: #fff;
+  color: var(--muted);
+  overflow: hidden;
+}
+.admin-main .password-vault-favicon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 .admin-main .password-vault-secret {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -3385,6 +3480,97 @@ body:has(.admin-main .staff-chat) {
 }
 .admin-main .password-vault-share-banner a {
   color: inherit;
+}
+.admin-main .password-vault-list {
+  overflow: visible;
+}
+.admin-main .post-card.password-vault-card {
+  position: relative;
+  aspect-ratio: auto;
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+  z-index: 1;
+}
+.admin-main .post-card.password-vault-card.is-menu-open {
+  z-index: 5;
+}
+.admin-main .post-card.password-vault-card .post-card-body {
+  overflow: visible;
+}
+.admin-main .password-vault-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.admin-main .password-vault-card-top .password-vault-title-row {
+  padding-right: 4px;
+}
+.admin-main .password-vault-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.admin-main .password-vault-menu-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface, #fff) 92%, var(--muted));
+  color: var(--text);
+  cursor: pointer;
+}
+.admin-main .password-vault-menu-trigger:hover,
+.admin-main .password-vault-menu-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface, #fff));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.password-vault-menu-panel.is-portal {
+  position: fixed;
+  z-index: 10050;
+  display: grid;
+  min-width: 13.5rem;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border, #e4e6ec);
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2447;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.18);
+}
+.password-vault-menu-panel.is-portal > button,
+.password-vault-menu-panel.is-portal > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.password-vault-menu-panel.is-portal > button:hover,
+.password-vault-menu-panel.is-portal > a:hover {
+  background: #f3f4f7;
+}
+.password-vault-menu-panel.is-portal > button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.password-vault-menu-panel.is-portal > button.is-danger {
+  color: #b42318;
 }
 .admin-main .task-batch-card .task-batch-thumb {
   display: grid;
